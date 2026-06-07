@@ -30,7 +30,7 @@ export async function POST(request: Request) {
       DO UPDATE SET first_name = EXCLUDED.first_name, last_name = EXCLUDED.last_name, updated_at = NOW()
     `;
 
-    return Response.json({ ok: true, message: "Account request saved." }, { headers: { "Cache-Control": "no-store" } });
+    return Response.json({ ok: true, message: "Account request saved." }, { status: 201, headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     return serverError(error);
   }

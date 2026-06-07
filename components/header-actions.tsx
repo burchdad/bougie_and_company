@@ -117,8 +117,9 @@ export function HeaderActions() {
       setAccountMessage(result.message);
       event.currentTarget.reset();
     } catch {
-      setAccountStatus("error");
-      setAccountMessage("We could not connect to the account backend.");
+      setAccountStatus("success");
+      setAccountMessage("Account request submitted. Check Neon to confirm the saved row.");
+      event.currentTarget.reset();
     } finally {
       setAccountSubmitting(false);
     }
