@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { readFormResponse } from "@/lib/form-response";
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -37,9 +38,9 @@ export function ContactForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ firstName, lastName, email, message: customerMessage })
       });
-      const result = (await response.json()) as { ok?: boolean; message?: string };
+      const result = await readFormResponse(response, "Thank you. Your message has been sent.");
 
-      if (!response.ok || !result.ok) {
+      if (!result.ok) {
         setStatus("error");
         setMessage(result.message || "We could not send your message yet.");
         return;

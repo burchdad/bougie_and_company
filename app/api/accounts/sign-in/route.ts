@@ -17,7 +17,7 @@ export async function POST(request: Request) {
       VALUES (${email})
     `;
 
-    return Response.json({ ok: true, message: "Sign-in request saved." });
+    return Response.json({ ok: true, message: "Sign-in request saved." }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     return serverError(error);
   }

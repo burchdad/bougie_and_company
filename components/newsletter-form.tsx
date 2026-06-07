@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { readFormResponse } from "@/lib/form-response";
 import { cn } from "@/lib/utils";
 
 type NewsletterFormProps = {
@@ -35,9 +36,9 @@ export function NewsletterForm({ buttonLabel = "Sign Up", dark = false, onSucces
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: trimmedEmail, source: "website" })
       });
-      const result = (await response.json()) as { ok?: boolean; message?: string };
+      const result = await readFormResponse(response, "You are on the Bougie List.");
 
-      if (!response.ok || !result.ok) {
+      if (!result.ok) {
         setStatus("error");
         setMessage(result.message || "We could not save your signup yet.");
         return;

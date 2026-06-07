@@ -5,6 +5,7 @@ import { Search, ShoppingBag, Trash2, UserRound, X } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { bestSellers, shopDepartments } from "@/lib/data";
+import { readFormResponse } from "@/lib/form-response";
 
 type Panel = "search" | "account" | "cart" | null;
 
@@ -104,16 +105,16 @@ export function HeaderActions() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(accountMode === "create" ? { firstName, lastName, email } : { email })
       });
-      const result = (await response.json()) as { ok?: boolean; message?: string };
+      const result = await readFormResponse(response, accountMode === "create" ? "Account request saved." : "Sign-in request saved.");
 
-      if (!response.ok || !result.ok) {
+      if (!result.ok) {
         setAccountStatus("error");
         setAccountMessage(result.message || "We could not save your account request yet.");
         return;
       }
 
       setAccountStatus("success");
-      setAccountMessage(result.message || (accountMode === "create" ? "Account request saved." : "Sign-in request saved."));
+      setAccountMessage(result.message);
       event.currentTarget.reset();
     } catch {
       setAccountStatus("error");

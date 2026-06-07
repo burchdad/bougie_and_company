@@ -30,7 +30,7 @@ export async function POST(request: Request) {
       VALUES (${firstName}, ${lastName}, ${email}, ${message})
     `;
 
-    return Response.json({ ok: true, message: "Thank you. Your message has been sent." });
+    return Response.json({ ok: true, message: "Thank you. Your message has been sent." }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     return serverError(error);
   }

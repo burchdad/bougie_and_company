@@ -20,7 +20,7 @@ export async function POST(request: Request) {
       DO UPDATE SET source = EXCLUDED.source, updated_at = NOW()
     `;
 
-    return Response.json({ ok: true, message: "You are on the Bougie List." });
+    return Response.json({ ok: true, message: "You are on the Bougie List." }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     return serverError(error);
   }
