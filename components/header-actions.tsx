@@ -80,7 +80,8 @@ export function HeaderActions() {
 
   async function handleAccountSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const email = String(form.get("email") || "").trim();
     const firstName = String(form.get("firstName") || "").trim();
     const lastName = String(form.get("lastName") || "").trim();
@@ -115,11 +116,11 @@ export function HeaderActions() {
 
       setAccountStatus("success");
       setAccountMessage(result.message);
-      event.currentTarget.reset();
+      formElement.reset();
     } catch {
       setAccountStatus("success");
       setAccountMessage("Account request submitted. Check Neon to confirm the saved row.");
-      event.currentTarget.reset();
+      formElement.reset();
     } finally {
       setAccountSubmitting(false);
     }

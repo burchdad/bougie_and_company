@@ -12,7 +12,8 @@ export function ContactForm() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const firstName = String(form.get("firstName") || "").trim();
     const lastName = String(form.get("lastName") || "").trim();
     const email = String(form.get("email") || "").trim();
@@ -46,7 +47,7 @@ export function ContactForm() {
         return;
       }
 
-      event.currentTarget.reset();
+      formElement.reset();
       setStatus("success");
       setMessage(result.message || "Thank you. Your message has been sent.");
     } catch {
