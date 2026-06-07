@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { ChevronDown } from "lucide-react";
+import { useRef, useState } from "react";
 
 type MenuItem = {
   label: string;
@@ -113,8 +114,10 @@ const menuItems: MenuItem[] = [
 ];
 
 function MenuLink({ item, nested = false }: { item: MenuItem; nested?: boolean }) {
+  const [open, setOpen] = useState(false);
+
   return (
-    <div className="group/item relative">
+    <div className="relative" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
       <Link
         className={`flex items-center justify-between gap-3 whitespace-nowrap rounded-md px-4 py-3 text-sm font-semibold uppercase tracking-[0.14em] text-espresso hover:bg-cream hover:text-saddle ${nested ? "min-w-56" : ""}`}
         href={item.href}
@@ -122,8 +125,8 @@ function MenuLink({ item, nested = false }: { item: MenuItem; nested?: boolean }
         {item.label}
         {item.children ? <ChevronDown className={`h-4 w-4 ${nested ? "-rotate-90" : ""}`} /> : null}
       </Link>
-      {item.children ? (
-        <div className={`${nested ? "left-full top-0 ml-2" : "left-0 top-full mt-2"} invisible absolute z-50 min-w-64 rounded-lg border border-saddle/15 bg-ivory p-2 opacity-0 shadow-glow transition group-hover/item:visible group-hover/item:opacity-100`}>
+      {item.children && open ? (
+        <div className={`${nested ? "left-full top-0 ml-2 before:absolute before:-left-3 before:top-0 before:h-full before:w-3" : "left-0 top-full pt-2 before:absolute before:left-0 before:top-0 before:h-2 before:w-full"} absolute z-50 min-w-64 rounded-lg border border-saddle/15 bg-ivory p-2 shadow-glow`}>
           {item.children.map((child) => (
             <MenuLink item={child} key={`${item.label}-${child.label}`} nested />
           ))}
@@ -134,11 +137,42 @@ function MenuLink({ item, nested = false }: { item: MenuItem; nested?: boolean }
 }
 
 export function CategoryMenu() {
+  const [activeMenu, setActiveMenu] = useState<string | null>(null);
+  const closeTimer = useRef<number | null>(null);
+
+  function openMenu(label: string) {
+    if (closeTimer.current) {
+      window.clearTimeout(closeTimer.current);
+    }
+    setActiveMenu(label);
+  }
+
+  function scheduleClose() {
+    closeTimer.current = window.setTimeout(() => setActiveMenu(null), 180);
+  }
+
   return (
     <div className="border-y border-saddle/10 bg-ivory/95">
       <nav className="mx-auto hidden max-w-7xl items-center justify-center gap-3 px-4 py-4 lg:flex">
         {menuItems.map((item) => (
-          <MenuLink item={item} key={item.label} />
+          <div className="relative" key={item.label} onMouseEnter={() => openMenu(item.label)} onMouseLeave={scheduleClose}>
+            <Link
+              className="flex items-center justify-between gap-3 whitespace-nowrap rounded-md px-4 py-3 text-sm font-semibold uppercase tracking-[0.14em] text-espresso hover:bg-cream hover:text-saddle"
+              href={item.href}
+            >
+              {item.label}
+              <ChevronDown className="h-4 w-4" />
+            </Link>
+            {activeMenu === item.label ? (
+              <div className="absolute left-0 top-full z-50 min-w-64 pt-2 before:absolute before:left-0 before:top-0 before:h-2 before:w-full" onMouseEnter={() => openMenu(item.label)} onMouseLeave={scheduleClose}>
+                <div className="rounded-lg border border-saddle/15 bg-ivory p-2 shadow-glow">
+                  {item.children?.map((child) => (
+                    <MenuLink item={child} key={`${item.label}-${child.label}`} nested />
+                  ))}
+                </div>
+              </div>
+            ) : null}
+          </div>
         ))}
       </nav>
       <div className="mx-auto grid max-w-7xl gap-2 px-4 py-4 lg:hidden">
