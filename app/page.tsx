@@ -2,7 +2,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { Facebook, Instagram, Music2 } from "lucide-react";
 import { AnimatedSection } from "@/components/animated-section";
-import { CategoryMenu } from "@/components/category-menu";
 import { NewsletterForm } from "@/components/newsletter-form";
 import { ProductShowcase } from "@/components/product-showcase";
 import { ReviewCarousel } from "@/components/review-carousel";
@@ -12,7 +11,6 @@ export default function HomePage() {
   return (
     <>
       <section className="sunset-band overflow-hidden">
-        <CategoryMenu />
         <div className="mx-auto grid max-w-7xl items-center gap-10 px-4 py-12 sm:px-6 md:grid-cols-[1.02fr_0.98fr] lg:px-8 lg:py-20">
           <div className="order-2 md:order-1">
             <p className="text-xs font-bold uppercase tracking-[0.3em] text-saddle">Luxury Texas Boutique</p>

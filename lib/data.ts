@@ -76,7 +76,7 @@ export const shopDepartments = [
   {
     id: "accessories",
     title: "Accessories",
-    items: ["Purses", "Luggage", "Men's Luggage", "Women's Luggage", "Home Collection", "Kitchen Collection", "Bath & Body", "Gift Collection", "Men's Care", "Women's Care", "Coozies", "Leather Coasters", "Cocktail Infusions"]
+    items: ["Purses", "Luggage", "Home Collection", "Kitchen Collection", "Bath & Body", "Gift Collection", "Men's Care", "Women's Care", "Coozies", "Leather Coasters", "Cocktail Infusions", "Soaps", "Homemade", "Foaming Hand Soap"]
   },
   {
     id: "bath-body",
@@ -86,17 +86,17 @@ export const shopDepartments = [
   {
     id: "home-collection",
     title: "Home Collection",
-    items: ["Candles / Wax Melts", "Tea Towels / Pillows", "Cocktail Mixers", "Coasters", "Outdoor Items"]
+    items: ["Candles / Wax Melts", "9 oz. Candles", "Wax Melts", "Tea Towels / Pillows", "Cocktail Mixers", "Coasters", "Regular Coasters", "Leather Coasters", "Outdoor Items"]
   },
   {
     id: "mens-collection",
     title: "Men's Collection",
-    items: ["T-Shirts", "Bottoms", "Caps", "Men's Care", "Body Spray", "Beard Products", "Luggage", "Coozies"]
+    items: ["T-Shirts", "Bath Bombs", "Caps", "Men's Care", "Body Spray", "Beard Products", "Homemade Mechanic Soaps", "Luggage", "Coozies"]
   },
   {
     id: "womens-collection",
     title: "Women's Collection",
-    items: ["Tops", "Bottoms", "Dresses", "Rompers & Jumpsuits", "Women's Care", "Week From Hell", "Bath Bombs", "Body Sprays", "Purses"]
+    items: ["Tops", "Bottoms", "Dresses", "Rompers & Jumpsuits", "Women's Care", "Week From Hell", "Bath Salts", "Body Scrubs", "Bath Bombs", "Body Sprays", "Purses", "Luggage"]
   },
   {
     id: "kitchen-selection",

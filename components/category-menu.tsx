@@ -18,14 +18,34 @@ const menuItems: MenuItem[] = [
       { label: "Purses", href: "/shop#accessories" },
       {
         label: "Luggage",
-        href: "/shop#accessories",
+        href: "/shop#accessories"
+      },
+      {
+        label: "Home Collection",
+        href: "/shop#home-collection",
         children: [
-          { label: "Men's", href: "/shop#mens-collection" },
-          { label: "Women's", href: "/shop#womens-collection" }
+          { label: "Candles / Wax Melts", href: "/shop#home-collection" },
+          { label: "Tea Towels / Pillows", href: "/shop#home-collection" },
+          { label: "Cocktail Mixers", href: "/shop#home-collection" },
+          {
+            label: "Coasters",
+            href: "/shop#home-collection",
+            children: [
+              { label: "Regular", href: "/shop#home-collection" },
+              { label: "Leather", href: "/shop#home-collection" }
+            ]
+          },
+          { label: "Outdoor Items", href: "/shop#home-collection" }
         ]
       },
-      { label: "Home Collection", href: "/shop#home-collection" },
-      { label: "Kitchen Collection", href: "/shop#kitchen-selection" },
+      {
+        label: "Kitchen Collection",
+        href: "/shop#kitchen-selection",
+        children: [
+          { label: "Homemade Dish Soap", href: "/shop#kitchen-selection" },
+          { label: "Foaming Hand Soap", href: "/shop#kitchen-selection" }
+        ]
+      },
       {
         label: "Bath & Body",
         href: "/shop#bath-body",
@@ -54,7 +74,15 @@ const menuItems: MenuItem[] = [
       },
       { label: "Coozies", href: "/shop#accessories" },
       { label: "Leather Coasters", href: "/shop#accessories" },
-      { label: "Cocktail Infusions", href: "/shop#accessories" }
+      { label: "Cocktail Infusions", href: "/shop#accessories" },
+      {
+        label: "Soaps",
+        href: "/shop#kitchen-selection",
+        children: [
+          { label: "Homemade", href: "/shop#kitchen-selection" },
+          { label: "Foaming Hand Soap", href: "/shop#kitchen-selection" }
+        ]
+      }
     ]
   },
   {
@@ -71,14 +99,15 @@ const menuItems: MenuItem[] = [
     href: "/shop#mens-collection",
     children: [
       { label: "T-Shirts", href: "/shop#mens-collection" },
-      { label: "Bottoms", href: "/shop#mens-collection" },
+      { label: "Bath Bombs", href: "/shop#mens-collection" },
       { label: "Caps", href: "/shop#accessories" },
       {
         label: "Men's Care",
         href: "/shop#mens-collection",
         children: [
           { label: "Body Spray", href: "/shop#mens-collection" },
-          { label: "Beard Products", href: "/shop#mens-collection" }
+          { label: "Beard Products", href: "/shop#mens-collection" },
+          { label: "Homemade Mechanic Soaps", href: "/shop#mens-collection" }
         ]
       },
       { label: "Luggage", href: "/shop#accessories" },
@@ -98,11 +127,22 @@ const menuItems: MenuItem[] = [
         href: "/shop#womens-collection",
         children: [
           { label: "Week From Hell", href: "/shop#womens-collection" },
+          { label: "Bath Salts", href: "/shop#womens-collection" },
+          { label: "Body Scrubs", href: "/shop#womens-collection" },
           { label: "Bath Bombs", href: "/shop#bath-body" },
           { label: "Body Sprays", href: "/shop#womens-collection" }
         ]
       },
-      { label: "Purses", href: "/shop#accessories" }
+      { label: "Purses", href: "/shop#accessories" },
+      { label: "Luggage", href: "/shop#accessories" }
+    ]
+  },
+  {
+    label: "Candles",
+    href: "/shop#home-collection",
+    children: [
+      { label: "9 oz.", href: "/shop#home-collection" },
+      { label: "Wax Melts", href: "/shop#home-collection" }
     ]
   },
   {

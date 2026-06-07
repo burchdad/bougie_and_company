@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Cormorant_Garamond, Inter } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
+import { CategoryMenu } from "@/components/category-menu";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { NewsletterPopup } from "@/components/newsletter-popup";
@@ -58,6 +59,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body className={`${display.variable} ${sans.variable} font-sans antialiased`}>
         <Script id="organization-schema" type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }} />
         <SiteHeader />
+        <CategoryMenu />
         <main>{children}</main>
         <SiteFooter />
         <NewsletterPopup />
