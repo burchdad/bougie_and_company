@@ -30,6 +30,7 @@ export function HeaderActions() {
   const [accountMode, setAccountMode] = useState<"sign-in" | "create">("sign-in");
   const [accountMessage, setAccountMessage] = useState("");
   const [accountStatus, setAccountStatus] = useState<"idle" | "error" | "success">("idle");
+  const [accountSubmitting, setAccountSubmitting] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -76,7 +77,7 @@ export function HeaderActions() {
     });
   }
 
-  function handleAccountSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleAccountSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const email = String(form.get("email") || "").trim();
@@ -95,18 +96,31 @@ export function HeaderActions() {
       return;
     }
 
-    if (accountMode === "create") {
-      const accounts = JSON.parse(window.localStorage.getItem("bougie-account-creations") || "[]") as unknown[];
-      window.localStorage.setItem("bougie-account-creations", JSON.stringify([...accounts, { firstName, lastName, email, createdAt: new Date().toISOString() }]));
-      setAccountMessage("Account request saved. Ecommerce account creation can connect here next.");
-    } else {
-      const signIns = JSON.parse(window.localStorage.getItem("bougie-account-signins") || "[]") as unknown[];
-      window.localStorage.setItem("bougie-account-signins", JSON.stringify([...signIns, { email, createdAt: new Date().toISOString() }]));
-      setAccountMessage("Sign-in request saved. Customer accounts can connect here next.");
-    }
+    setAccountSubmitting(true);
 
-    setAccountStatus("success");
-    event.currentTarget.reset();
+    try {
+      const response = await fetch(accountMode === "create" ? "/api/accounts" : "/api/accounts/sign-in", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(accountMode === "create" ? { firstName, lastName, email } : { email })
+      });
+      const result = (await response.json()) as { ok?: boolean; message?: string };
+
+      if (!response.ok || !result.ok) {
+        setAccountStatus("error");
+        setAccountMessage(result.message || "We could not save your account request yet.");
+        return;
+      }
+
+      setAccountStatus("success");
+      setAccountMessage(result.message || (accountMode === "create" ? "Account request saved." : "Sign-in request saved."));
+      event.currentTarget.reset();
+    } catch {
+      setAccountStatus("error");
+      setAccountMessage("We could not connect to the account backend.");
+    } finally {
+      setAccountSubmitting(false);
+    }
   }
 
   const panelMarkup = panel ? (
@@ -194,8 +208,8 @@ export function HeaderActions() {
                 Email address
                 <input className="focus-ring min-h-12 rounded-md border border-saddle/20 bg-white px-4 font-normal" name="email" type="email" />
               </label>
-              <button className="focus-ring rounded-md bg-ink px-5 py-4 text-sm font-bold uppercase tracking-[0.18em] text-ivory hover:bg-saddle" type="submit">
-                {accountMode === "sign-in" ? "Continue" : "Create Account"}
+              <button className="focus-ring rounded-md bg-ink px-5 py-4 text-sm font-bold uppercase tracking-[0.18em] text-ivory hover:bg-saddle" disabled={accountSubmitting} type="submit">
+                {accountSubmitting ? "Saving..." : accountMode === "sign-in" ? "Continue" : "Create Account"}
               </button>
             </form>
             {accountMessage ? <p className={`mt-4 text-sm ${accountStatus === "success" ? "text-saddle" : "text-ember"}`}>{accountMessage}</p> : null}

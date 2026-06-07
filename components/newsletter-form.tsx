@@ -15,8 +15,9 @@ export function NewsletterForm({ buttonLabel = "Sign Up", dark = false, onSucces
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
   const [status, setStatus] = useState<"idle" | "error" | "success">("idle");
+  const [submitting, setSubmitting] = useState(false);
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const trimmedEmail = email.trim();
 
@@ -26,14 +27,32 @@ export function NewsletterForm({ buttonLabel = "Sign Up", dark = false, onSucces
       return;
     }
 
-    const subscribers = JSON.parse(window.localStorage.getItem("bougie-newsletter-signups") || "[]") as Array<{ email: string; createdAt: string }>;
-    const nextSubscribers = [...subscribers.filter((subscriber) => subscriber.email !== trimmedEmail), { email: trimmedEmail, createdAt: new Date().toISOString() }];
-    window.localStorage.setItem("bougie-newsletter-signups", JSON.stringify(nextSubscribers));
+    setSubmitting(true);
 
-    setStatus("success");
-    setMessage("You are on the Bougie List.");
-    setEmail("");
-    onSuccess?.();
+    try {
+      const response = await fetch("/api/newsletter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: trimmedEmail, source: "website" })
+      });
+      const result = (await response.json()) as { ok?: boolean; message?: string };
+
+      if (!response.ok || !result.ok) {
+        setStatus("error");
+        setMessage(result.message || "We could not save your signup yet.");
+        return;
+      }
+
+      setStatus("success");
+      setMessage(result.message || "You are on the Bougie List.");
+      setEmail("");
+      onSuccess?.();
+    } catch {
+      setStatus("error");
+      setMessage("We could not connect to the signup backend.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -55,9 +74,10 @@ export function NewsletterForm({ buttonLabel = "Sign Up", dark = false, onSucces
             "focus-ring min-h-12 rounded-md px-6 text-sm font-bold uppercase tracking-[0.18em]",
             dark ? "bg-champagne text-ink hover:bg-ivory" : "bg-ink text-ivory hover:bg-saddle"
           )}
+          disabled={submitting}
           type="submit"
         >
-          {buttonLabel}
+          {submitting ? "Saving..." : buttonLabel}
         </button>
       </div>
       {message ? (
