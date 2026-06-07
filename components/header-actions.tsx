@@ -26,6 +26,7 @@ export function HeaderActions() {
   const [query, setQuery] = useState("");
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [mounted, setMounted] = useState(false);
+  const [accountMode, setAccountMode] = useState<"sign-in" | "create">("sign-in");
 
   useEffect(() => {
     setMounted(true);
@@ -60,6 +61,7 @@ export function HeaderActions() {
   );
 
   const results = searchable.filter((item) => `${item.label} ${item.meta}`.toLowerCase().includes(query.toLowerCase())).slice(0, 8);
+  const featuredSearches = ["Dresses", "Bath Salts", "Homemade Soaps", "Equine Jewelry", "Gift Certificates"];
   const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
   const subtotal = cartItems.reduce((sum, item) => sum + priceToNumber(item.price) * item.quantity, 0);
 
@@ -93,6 +95,18 @@ export function HeaderActions() {
                 value={query}
               />
             </label>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {featuredSearches.map((term) => (
+                <button
+                  className="focus-ring rounded-full border border-saddle/15 bg-white px-3 py-2 text-xs font-bold uppercase tracking-[0.14em] text-saddle hover:bg-cream"
+                  key={term}
+                  onClick={() => setQuery(term)}
+                  type="button"
+                >
+                  {term}
+                </button>
+              ))}
+            </div>
             <div className="mt-6 grid gap-2">
               {(query ? results : searchable.slice(0, 7)).map((item) => (
                 <Link className="rounded-md border border-saddle/12 bg-white px-4 py-3 hover:bg-cream" href={item.href} key={`${item.meta}-${item.label}`} onClick={() => setPanel(null)}>
@@ -106,14 +120,46 @@ export function HeaderActions() {
 
         {panel === "account" ? (
           <div className="flex-1 overflow-auto p-5">
-            <p className="leading-7 text-espresso/75">Sign in to save favorites, view orders, and make checkout faster when ecommerce is connected.</p>
+            <div className="grid grid-cols-2 rounded-lg border border-saddle/15 bg-white p-1">
+              <button
+                className={`focus-ring rounded-md px-4 py-3 text-sm font-bold uppercase tracking-[0.16em] ${accountMode === "sign-in" ? "bg-ink text-ivory" : "text-espresso hover:bg-cream"}`}
+                onClick={() => setAccountMode("sign-in")}
+                type="button"
+              >
+                Sign In
+              </button>
+              <button
+                className={`focus-ring rounded-md px-4 py-3 text-sm font-bold uppercase tracking-[0.16em] ${accountMode === "create" ? "bg-ink text-ivory" : "text-espresso hover:bg-cream"}`}
+                onClick={() => setAccountMode("create")}
+                type="button"
+              >
+                Create
+              </button>
+            </div>
+            <p className="mt-5 leading-7 text-espresso/75">
+              {accountMode === "sign-in"
+                ? "Sign in to save favorites, view orders, and make checkout faster when ecommerce is connected."
+                : "Create an account to save your Bougie favorites and keep future orders in one place."}
+            </p>
             <form className="mt-6 grid gap-4">
+              {accountMode === "create" ? (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="grid gap-2 text-sm font-semibold text-espresso">
+                    First name
+                    <input className="focus-ring min-h-12 rounded-md border border-saddle/20 bg-white px-4 font-normal" />
+                  </label>
+                  <label className="grid gap-2 text-sm font-semibold text-espresso">
+                    Last name
+                    <input className="focus-ring min-h-12 rounded-md border border-saddle/20 bg-white px-4 font-normal" />
+                  </label>
+                </div>
+              ) : null}
               <label className="grid gap-2 text-sm font-semibold text-espresso">
                 Email address
                 <input className="focus-ring min-h-12 rounded-md border border-saddle/20 bg-white px-4 font-normal" type="email" />
               </label>
               <button className="focus-ring rounded-md bg-ink px-5 py-4 text-sm font-bold uppercase tracking-[0.18em] text-ivory hover:bg-saddle" type="submit">
-                Continue
+                {accountMode === "sign-in" ? "Continue" : "Create Account"}
               </button>
             </form>
             <Link className="mt-5 inline-flex text-sm font-bold uppercase tracking-[0.16em] text-saddle hover:text-ink" href="/contact" onClick={() => setPanel(null)}>
