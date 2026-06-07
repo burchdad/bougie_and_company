@@ -51,7 +51,10 @@ const menuItems: MenuItem[] = [
           { label: "Body Sprays", href: "/shop#womens-collection" },
           { label: "Purses", href: "/shop#accessories" }
         ]
-      }
+      },
+      { label: "Coozies", href: "/shop#accessories" },
+      { label: "Leather Coasters", href: "/shop#accessories" },
+      { label: "Cocktail Infusions", href: "/shop#accessories" }
     ]
   },
   {
@@ -79,7 +82,7 @@ const menuItems: MenuItem[] = [
         ]
       },
       { label: "Luggage", href: "/shop#accessories" },
-      { label: "Koozie", href: "/shop#accessories" }
+      { label: "Coozies", href: "/shop#accessories" }
     ]
   },
   {
