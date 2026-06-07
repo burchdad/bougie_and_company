@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Facebook, Instagram, Music2, Star } from "lucide-react";
 import { AnimatedSection } from "@/components/animated-section";
+import { NewsletterForm } from "@/components/newsletter-form";
 import { ProductShowcase } from "@/components/product-showcase";
 import { lifestyles, reviews } from "@/lib/data";
 
@@ -129,10 +130,9 @@ export default function HomePage() {
               Be the first to know about new products, special promotions, seasonal collections, and exclusive offers.
             </p>
           </div>
-          <form className="flex flex-col gap-3 self-end sm:flex-row">
-            <input className="focus-ring min-h-12 flex-1 rounded-md border border-saddle/20 bg-white px-4 text-sm" placeholder="Email address" type="email" />
-            <button className="focus-ring rounded-md bg-ink px-6 py-3 text-sm font-bold uppercase tracking-[0.18em] text-ivory hover:bg-saddle" type="submit">Sign Up</button>
-          </form>
+          <div className="self-end">
+            <NewsletterForm />
+          </div>
         </div>
       </AnimatedSection>
 

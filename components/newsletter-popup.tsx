@@ -2,6 +2,7 @@
 
 import { X } from "lucide-react";
 import { useEffect, useState } from "react";
+import { NewsletterForm } from "@/components/newsletter-form";
 
 export function NewsletterPopup() {
   const [visible, setVisible] = useState(false);
@@ -39,17 +40,9 @@ export function NewsletterPopup() {
         <p className="mt-4 leading-7 text-espresso/75">
           Join our email list and be the first to know about new arrivals, exclusive promotions, and boutique releases.
         </p>
-        <form className="mt-6 flex flex-col gap-3 sm:flex-row">
-          <input
-            aria-label="Email address"
-            className="focus-ring min-h-12 flex-1 rounded-md border border-saddle/20 bg-white px-4 text-sm"
-            placeholder="Email address"
-            type="email"
-          />
-          <button className="focus-ring min-h-12 rounded-md bg-ink px-6 text-sm font-bold uppercase tracking-[0.18em] text-ivory hover:bg-saddle" type="submit">
-            Join
-          </button>
-        </form>
+        <div className="mt-6">
+          <NewsletterForm buttonLabel="Join" onSuccess={close} />
+        </div>
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Facebook, Instagram, Music2 } from "lucide-react";
+import { NewsletterForm } from "@/components/newsletter-form";
 
 const links = [
   ["Home", "/"],
@@ -33,10 +34,9 @@ export function SiteFooter() {
         <div>
           <h2 className="text-sm font-bold uppercase tracking-[0.24em] text-champagne">Newsletter</h2>
           <p className="mt-5 text-sm leading-7 text-ivory/70">Seasonal edits, special promotions, and boutique releases.</p>
-          <form className="mt-5 flex gap-2">
-            <input className="focus-ring min-h-11 min-w-0 flex-1 rounded-md border border-ivory/15 bg-white/10 px-3 text-sm text-white placeholder:text-ivory/45" placeholder="Email address" type="email" />
-            <button className="focus-ring rounded-md bg-champagne px-4 text-sm font-bold text-ink hover:bg-ivory" type="submit">Join</button>
-          </form>
+          <div className="mt-5">
+            <NewsletterForm buttonLabel="Join" dark />
+          </div>
           <div className="mt-6 flex gap-3">
             {[Facebook, Instagram, Music2].map((Icon, index) => (
               <a className="focus-ring rounded-full border border-ivory/15 p-2 text-ivory/80 hover:border-champagne hover:text-champagne" href="#" key={index} aria-label="Social link">

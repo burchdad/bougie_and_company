@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Facebook, Instagram, Mail, MapPin, Music2 } from "lucide-react";
+import { ContactForm } from "@/components/contact-form";
 
 export const metadata: Metadata = {
   title: "Contact",
@@ -25,15 +26,7 @@ export default function ContactPage() {
             ))}
           </div>
         </div>
-        <form className="rounded-lg border border-saddle/15 bg-white p-6 shadow-luxe">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="grid gap-2 text-sm font-semibold text-espresso">First Name<input className="focus-ring min-h-12 rounded-md border border-saddle/20 px-3 font-normal" /></label>
-            <label className="grid gap-2 text-sm font-semibold text-espresso">Last Name<input className="focus-ring min-h-12 rounded-md border border-saddle/20 px-3 font-normal" /></label>
-          </div>
-          <label className="mt-4 grid gap-2 text-sm font-semibold text-espresso">Email<input className="focus-ring min-h-12 rounded-md border border-saddle/20 px-3 font-normal" type="email" /></label>
-          <label className="mt-4 grid gap-2 text-sm font-semibold text-espresso">Message<textarea className="focus-ring min-h-40 rounded-md border border-saddle/20 px-3 py-3 font-normal" /></label>
-          <button className="focus-ring mt-5 rounded-md bg-ink px-6 py-4 text-sm font-bold uppercase tracking-[0.2em] text-ivory hover:bg-saddle" type="submit">Send Message</button>
-        </form>
+        <ContactForm />
       </div>
     </section>
   );

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Search, ShoppingBag, Trash2, UserRound, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { bestSellers, shopDepartments } from "@/lib/data";
 
@@ -16,6 +16,7 @@ type CartItem = {
 };
 
 const storageKey = "bougie-cart-preview";
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function priceToNumber(price: string) {
   return Number(price.replace(/[^0-9.]/g, "")) || 0;
@@ -27,6 +28,8 @@ export function HeaderActions() {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [mounted, setMounted] = useState(false);
   const [accountMode, setAccountMode] = useState<"sign-in" | "create">("sign-in");
+  const [accountMessage, setAccountMessage] = useState("");
+  const [accountStatus, setAccountStatus] = useState<"idle" | "error" | "success">("idle");
 
   useEffect(() => {
     setMounted(true);
@@ -71,6 +74,39 @@ export function HeaderActions() {
       window.localStorage.setItem(storageKey, JSON.stringify(next));
       return next;
     });
+  }
+
+  function handleAccountSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const email = String(form.get("email") || "").trim();
+    const firstName = String(form.get("firstName") || "").trim();
+    const lastName = String(form.get("lastName") || "").trim();
+
+    if (!emailPattern.test(email)) {
+      setAccountStatus("error");
+      setAccountMessage("Enter a valid email address.");
+      return;
+    }
+
+    if (accountMode === "create" && (!firstName || !lastName)) {
+      setAccountStatus("error");
+      setAccountMessage("Add your first and last name to create an account.");
+      return;
+    }
+
+    if (accountMode === "create") {
+      const accounts = JSON.parse(window.localStorage.getItem("bougie-account-creations") || "[]") as unknown[];
+      window.localStorage.setItem("bougie-account-creations", JSON.stringify([...accounts, { firstName, lastName, email, createdAt: new Date().toISOString() }]));
+      setAccountMessage("Account request saved. Ecommerce account creation can connect here next.");
+    } else {
+      const signIns = JSON.parse(window.localStorage.getItem("bougie-account-signins") || "[]") as unknown[];
+      window.localStorage.setItem("bougie-account-signins", JSON.stringify([...signIns, { email, createdAt: new Date().toISOString() }]));
+      setAccountMessage("Sign-in request saved. Customer accounts can connect here next.");
+    }
+
+    setAccountStatus("success");
+    event.currentTarget.reset();
   }
 
   const panelMarkup = panel ? (
@@ -141,27 +177,28 @@ export function HeaderActions() {
                 ? "Sign in to save favorites, view orders, and make checkout faster when ecommerce is connected."
                 : "Create an account to save your Bougie favorites and keep future orders in one place."}
             </p>
-            <form className="mt-6 grid gap-4">
+            <form className="mt-6 grid gap-4" onSubmit={handleAccountSubmit}>
               {accountMode === "create" ? (
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="grid gap-2 text-sm font-semibold text-espresso">
                     First name
-                    <input className="focus-ring min-h-12 rounded-md border border-saddle/20 bg-white px-4 font-normal" />
+                    <input className="focus-ring min-h-12 rounded-md border border-saddle/20 bg-white px-4 font-normal" name="firstName" />
                   </label>
                   <label className="grid gap-2 text-sm font-semibold text-espresso">
                     Last name
-                    <input className="focus-ring min-h-12 rounded-md border border-saddle/20 bg-white px-4 font-normal" />
+                    <input className="focus-ring min-h-12 rounded-md border border-saddle/20 bg-white px-4 font-normal" name="lastName" />
                   </label>
                 </div>
               ) : null}
               <label className="grid gap-2 text-sm font-semibold text-espresso">
                 Email address
-                <input className="focus-ring min-h-12 rounded-md border border-saddle/20 bg-white px-4 font-normal" type="email" />
+                <input className="focus-ring min-h-12 rounded-md border border-saddle/20 bg-white px-4 font-normal" name="email" type="email" />
               </label>
               <button className="focus-ring rounded-md bg-ink px-5 py-4 text-sm font-bold uppercase tracking-[0.18em] text-ivory hover:bg-saddle" type="submit">
                 {accountMode === "sign-in" ? "Continue" : "Create Account"}
               </button>
             </form>
+            {accountMessage ? <p className={`mt-4 text-sm ${accountStatus === "success" ? "text-saddle" : "text-ember"}`}>{accountMessage}</p> : null}
             <Link className="mt-5 inline-flex text-sm font-bold uppercase tracking-[0.16em] text-saddle hover:text-ink" href="/contact" onClick={() => setPanel(null)}>
               Need help?
             </Link>
