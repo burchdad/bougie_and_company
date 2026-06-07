@@ -16,6 +16,12 @@ export const navItems = [
   { href: "/contact", label: "Contact" }
 ];
 
+export const socialLinks = [
+  { label: "Facebook", href: "https://www.facebook.com/share/1EQuCjxyGL/" },
+  { label: "Instagram", href: "https://www.instagram.com/bougieandcompanytx/" },
+  { label: "TikTok", href: "https://www.tiktok.com/@bougieandcompany" }
+];
+
 export const categories = [
   { name: "Clothing", href: "/shop#clothing", icon: Shirt, tone: "from-cream to-champagne/40" },
   { name: "Jewelry and Headbands", href: "/shop#jewelry-headbands", icon: Sparkles, tone: "from-ivory to-saddle/20" },

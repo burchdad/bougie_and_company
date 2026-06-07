@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Facebook, Instagram, Music2 } from "lucide-react";
 import { NewsletterForm } from "@/components/newsletter-form";
+import { socialLinks } from "@/lib/data";
 
 const links = [
   ["Home", "/"],
@@ -39,7 +40,7 @@ export function SiteFooter() {
           </div>
           <div className="mt-6 flex gap-3">
             {[Facebook, Instagram, Music2].map((Icon, index) => (
-              <a className="focus-ring rounded-full border border-ivory/15 p-2 text-ivory/80 hover:border-champagne hover:text-champagne" href="#" key={index} aria-label="Social link">
+              <a className="focus-ring rounded-full border border-ivory/15 p-2 text-ivory/80 hover:border-champagne hover:text-champagne" href={socialLinks[index].href} key={socialLinks[index].label} aria-label={socialLinks[index].label} target="_blank" rel="noreferrer">
                 <Icon className="h-5 w-5" />
               </a>
             ))}

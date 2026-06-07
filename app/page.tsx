@@ -4,7 +4,7 @@ import { Facebook, Instagram, Music2, Star } from "lucide-react";
 import { AnimatedSection } from "@/components/animated-section";
 import { NewsletterForm } from "@/components/newsletter-form";
 import { ProductShowcase } from "@/components/product-showcase";
-import { lifestyles, reviews } from "@/lib/data";
+import { lifestyles, reviews, socialLinks } from "@/lib/data";
 
 export default function HomePage() {
   return (
@@ -155,7 +155,7 @@ export default function HomePage() {
           <h2 className="font-display text-3xl text-ink">Follow the boutique</h2>
           <div className="flex gap-3">
             {[Facebook, Instagram, Music2].map((Icon, index) => (
-              <a className="focus-ring rounded-full border border-saddle/20 p-3 text-saddle hover:bg-cream" href="#" key={index} aria-label="Social link">
+              <a className="focus-ring rounded-full border border-saddle/20 p-3 text-saddle hover:bg-cream" href={socialLinks[index].href} key={socialLinks[index].label} aria-label={socialLinks[index].label} target="_blank" rel="noreferrer">
                 <Icon className="h-5 w-5" />
               </a>
             ))}
