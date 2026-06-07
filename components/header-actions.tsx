@@ -23,7 +23,13 @@ function priceToNumber(price: string) {
   return Number(price.replace(/[^0-9.]/g, "")) || 0;
 }
 
-export function HeaderActions() {
+type HeaderActionsProps = {
+  showSearch?: boolean;
+  showAccount?: boolean;
+  showCart?: boolean;
+};
+
+export function HeaderActions({ showSearch = true, showAccount = true, showCart = true }: HeaderActionsProps) {
   const [panel, setPanel] = useState<Panel>(null);
   const [query, setQuery] = useState("");
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -270,16 +276,22 @@ export function HeaderActions() {
   return (
     <>
       <div className="flex items-center gap-1">
-        <button className="focus-ring rounded-full p-2.5 text-espresso hover:bg-cream" aria-label="Search" onClick={() => setPanel("search")} type="button">
-          <Search className="h-5 w-5" />
-        </button>
-        <button className="focus-ring rounded-full p-2.5 text-espresso hover:bg-cream" aria-label="Account" onClick={() => setPanel("account")} type="button">
-          <UserRound className="h-5 w-5" />
-        </button>
-        <button className="focus-ring relative rounded-full p-2.5 text-espresso hover:bg-cream" aria-label="Cart" onClick={() => setPanel("cart")} type="button">
-          <ShoppingBag className="h-5 w-5" />
-          {cartCount > 0 ? <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-saddle px-1 text-[0.65rem] font-bold text-ivory">{cartCount}</span> : null}
-        </button>
+        {showSearch ? (
+          <button className="focus-ring rounded-full p-2.5 text-espresso hover:bg-cream" aria-label="Search" onClick={() => setPanel("search")} type="button">
+            <Search className="h-5 w-5" />
+          </button>
+        ) : null}
+        {showAccount ? (
+          <button className="focus-ring rounded-full p-2.5 text-espresso hover:bg-cream" aria-label="Account" onClick={() => setPanel("account")} type="button">
+            <UserRound className="h-5 w-5" />
+          </button>
+        ) : null}
+        {showCart ? (
+          <button className="focus-ring relative rounded-full p-2.5 text-espresso hover:bg-cream" aria-label="Cart" onClick={() => setPanel("cart")} type="button">
+            <ShoppingBag className="h-5 w-5" />
+            {cartCount > 0 ? <span className="absolute -right-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-saddle px-1 text-[0.65rem] font-bold text-ivory">{cartCount}</span> : null}
+          </button>
+        ) : null}
       </div>
 
       {mounted && panelMarkup ? createPortal(panelMarkup, document.body) : null}

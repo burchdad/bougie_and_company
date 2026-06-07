@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Facebook, Instagram, Music2 } from "lucide-react";
 import { AnimatedSection } from "@/components/animated-section";
+import { CategoryMenu } from "@/components/category-menu";
 import { NewsletterForm } from "@/components/newsletter-form";
 import { ProductShowcase } from "@/components/product-showcase";
 import { ReviewCarousel } from "@/components/review-carousel";
@@ -11,6 +12,7 @@ export default function HomePage() {
   return (
     <>
       <section className="sunset-band overflow-hidden">
+        <CategoryMenu />
         <div className="mx-auto grid max-w-7xl items-center gap-10 px-4 py-12 sm:px-6 md:grid-cols-[1.02fr_0.98fr] lg:px-8 lg:py-20">
           <div className="order-2 md:order-1">
             <p className="text-xs font-bold uppercase tracking-[0.3em] text-saddle">Luxury Texas Boutique</p>
@@ -22,9 +24,6 @@ export default function HomePage() {
               Boutique fashion, self care, home goods, equine jewelry, gifts, and mercantile finds with a polished Texas point of view.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Link className="focus-ring rounded-md bg-ember px-6 py-4 text-center text-sm font-bold uppercase tracking-[0.2em] text-ivory shadow-luxe hover:bg-saddle" href="/shop">
-                Shop Collection
-              </Link>
               <Link className="focus-ring rounded-md border border-saddle/30 px-6 py-4 text-center text-sm font-bold uppercase tracking-[0.2em] text-espresso hover:bg-cream" href="/about">
                 Our Story
               </Link>

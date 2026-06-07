@@ -8,7 +8,7 @@ export function NewsletterPopup() {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    const seen = window.localStorage.getItem("bougie-popup-seen");
+    const seen = window.sessionStorage.getItem("bougie-popup-seen-v2");
     if (!seen) {
       const timer = window.setTimeout(() => setVisible(true), 1200);
       return () => window.clearTimeout(timer);
@@ -16,7 +16,7 @@ export function NewsletterPopup() {
   }, []);
 
   function close() {
-    window.localStorage.setItem("bougie-popup-seen", "true");
+    window.sessionStorage.setItem("bougie-popup-seen-v2", "true");
     setVisible(false);
   }
 

@@ -76,7 +76,7 @@ export const shopDepartments = [
   {
     id: "accessories",
     title: "Accessories",
-    items: ["Purses", "Luggage", "Caps", "Coozies"]
+    items: ["Purses", "Luggage", "Men's Luggage", "Women's Luggage", "Home Collection", "Kitchen Collection", "Bath & Body", "Gift Collection", "Men's Care", "Women's Care"]
   },
   {
     id: "bath-body",
@@ -91,7 +91,12 @@ export const shopDepartments = [
   {
     id: "mens-collection",
     title: "Men's Collection",
-    items: ["Men's Care", "Women's Care"]
+    items: ["T-Shirts", "Bottoms", "Caps", "Men's Care", "Body Spray", "Beard Products", "Luggage", "Koozie"]
+  },
+  {
+    id: "womens-collection",
+    title: "Women's Collection",
+    items: ["Tops", "Bottoms", "Dresses", "Rompers & Jumpsuits", "Women's Care", "Week From Hell", "Bath Bombs", "Body Sprays", "Purses"]
   },
   {
     id: "kitchen-selection",
