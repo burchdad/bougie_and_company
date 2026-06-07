@@ -24,10 +24,10 @@ export const metadata: Metadata = {
     default: "Bougie & Company Boutique | Luxury Texas Boutique",
     template: "%s | Bougie & Company Boutique"
   },
-  description: "A luxury Texas boutique and mercantile offering boutique clothing, equine jewelry, home goods, bath and body, gifts, men's products, and outdoor finds.",
+  description: "A luxury Texas boutique and mercantile offering boutique clothing, equine jewelry, home goods, bath and body, gifts, men's products, women's products, and kitchen goods.",
   openGraph: {
     title: "Bougie & Company Boutique",
-    description: "Country Roots. Luxury Taste.",
+    description: "Luxury Meets Country.",
     url: siteUrl,
     siteName: "Bougie & Company Boutique",
     images: ["/images/logo.png"],
@@ -48,7 +48,7 @@ const organizationSchema = {
     addressRegion: "TX",
     addressCountry: "US"
   },
-  slogan: "Country Roots. Luxury Taste.",
+  slogan: "Luxury Meets Country.",
   sameAs: ["https://facebook.com", "https://instagram.com", "https://tiktok.com"]
 };
 

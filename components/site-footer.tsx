@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Facebook, Instagram, Music2 } from "lucide-react";
 
 const links = [
+  ["Home", "/"],
   ["Shop", "/shop"],
   ["About", "/about"],
   ["Contact", "/contact"],
@@ -16,7 +17,7 @@ export function SiteFooter() {
       <div className="mx-auto grid max-w-7xl gap-10 px-4 py-14 sm:px-6 md:grid-cols-[1.2fr_0.8fr_1fr] lg:px-8">
         <div>
           <Image src="/images/logo.png" alt="Bougie & Company logo" width={112} height={112} className="h-24 w-24 rounded-full bg-ivory object-contain p-1" />
-          <p className="mt-5 max-w-sm font-display text-3xl">Country Roots. Luxury Taste.</p>
+          <p className="mt-5 max-w-sm font-display text-3xl">Luxury Meets Country.</p>
           <p className="mt-4 max-w-md text-sm leading-7 text-ivory/70">
             A luxury Texas boutique and mercantile for fashion, gifts, home, self care, and elevated everyday goods.
           </p>

@@ -19,7 +19,7 @@ export function SiteHeader() {
           <Image src="/images/logo.png" alt="Bougie & Company logo" width={78} height={78} className="h-14 w-14 object-contain" priority />
           <div className="hidden sm:block">
             <p className="font-display text-xl leading-none text-ink">Bougie & Company</p>
-            <p className="mt-1 text-[0.65rem] font-bold uppercase tracking-[0.22em] text-saddle">Country Roots. Luxury Taste.</p>
+            <p className="mt-1 text-[0.65rem] font-bold uppercase tracking-[0.22em] text-saddle">Luxury Meets Country.</p>
           </div>
         </Link>
         <div className="hidden items-center gap-8 lg:flex">

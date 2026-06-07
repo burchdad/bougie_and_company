@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Facebook, Instagram, Music2, Star } from "lucide-react";
 import { AnimatedSection } from "@/components/animated-section";
-import { bestSellers, categories, lifestyles } from "@/lib/data";
+import { bestSellers, lifestyles, reviews } from "@/lib/data";
 
 export default function HomePage() {
   return (
@@ -14,9 +14,7 @@ export default function HomePage() {
             <h1 className="mt-4 font-display text-5xl font-semibold leading-[0.95] text-ink sm:text-6xl lg:text-7xl">
               Bougie & Company
             </h1>
-            <p className="mt-5 font-display text-3xl text-saddle sm:text-4xl">
-              Country Roots. <br /> Luxury Taste.
-            </p>
+            <p className="mt-5 font-display text-3xl text-saddle sm:text-4xl">Luxury Meets Country.</p>
             <p className="mt-6 max-w-xl text-lg leading-8 text-espresso/75">
               Boutique Fashion / Gifts / Home / Self Care
             </p>
@@ -30,36 +28,12 @@ export default function HomePage() {
             </div>
           </div>
           <div className="order-1 md:order-2">
-            <div className="relative min-h-[520px] overflow-hidden rounded-lg border border-champagne/35 bg-espresso shadow-glow md:min-h-[680px]">
-              <Image src="/images/owners.png" alt="Bougie & Company owners" fill className="object-cover object-[50%_28%]" priority sizes="(min-width: 768px) 52vw, 100vw" />
-              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink/70 to-transparent p-6">
-                <Image src="/images/logo.png" alt="" width={110} height={110} className="h-20 w-20 rounded-full bg-ivory object-contain p-1" />
-              </div>
+            <div className="grid min-h-[430px] place-items-center rounded-lg border border-champagne/35 bg-white p-8 shadow-glow md:min-h-[600px]">
+              <Image src="/images/logo.png" alt="Bougie & Company logo" width={560} height={560} className="h-auto w-full max-w-[520px] object-contain" priority />
             </div>
           </div>
         </div>
       </section>
-
-      <AnimatedSection className="bg-white px-4 py-16 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-7xl">
-          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-[0.26em] text-saddle">Featured Categories</p>
-              <h2 className="mt-3 font-display text-4xl text-ink">Shop the Boutique Edit</h2>
-            </div>
-            <Link href="/shop" className="text-sm font-bold uppercase tracking-[0.2em] text-saddle hover:text-ink">View All</Link>
-          </div>
-          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {categories.map(({ name, href, icon: Icon, tone }) => (
-              <Link href={href} key={name} className={`group rounded-lg border border-saddle/15 bg-gradient-to-br ${tone} p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-luxe`}>
-                <Icon className="h-8 w-8 text-saddle" />
-                <h3 className="mt-8 font-display text-3xl text-ink">{name}</h3>
-                <p className="mt-3 text-sm leading-6 text-espresso/65">Curated pieces with polished Southern character.</p>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </AnimatedSection>
 
       <AnimatedSection className="bg-cream px-4 py-16 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-7xl">
@@ -81,6 +55,28 @@ export default function HomePage() {
                   <span className="font-bold text-espresso">{product.price}</span>
                   <button className="focus-ring rounded-md bg-ink px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] text-ivory hover:bg-saddle" type="button">Add</button>
                 </div>
+              </article>
+            ))}
+          </div>
+        </div>
+      </AnimatedSection>
+
+      <AnimatedSection className="bg-white px-4 py-16 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl">
+          <p className="text-xs font-bold uppercase tracking-[0.26em] text-saddle">Customer Reviews</p>
+          <h2 className="mt-3 font-display text-4xl text-ink">Five-Star Favorites</h2>
+          <div className="mt-8 grid gap-5 md:grid-cols-2 lg:grid-cols-5">
+            {reviews.map((review) => (
+              <article className="rounded-lg border border-saddle/15 bg-ivory p-5 shadow-sm" key={`${review.name}-${review.product}`}>
+                <div className="flex gap-1 text-champagne" aria-label="5 star review">
+                  {Array.from({ length: 5 }).map((_, index) => (
+                    <Star className="h-4 w-4 fill-champagne" key={index} />
+                  ))}
+                </div>
+                <p className="mt-4 text-sm font-bold uppercase tracking-[0.16em] text-saddle">{review.product}</p>
+                <p className="mt-3 text-sm leading-6 text-espresso/75">{review.text}</p>
+                <p className="mt-5 text-sm font-bold text-ink">{review.name}</p>
+                <p className="text-xs uppercase tracking-[0.18em] text-espresso/55">{review.location}</p>
               </article>
             ))}
           </div>

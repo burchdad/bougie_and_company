@@ -15,7 +15,7 @@ export default function ContactPage() {
           <h1 className="mt-4 font-display text-5xl text-ink sm:text-6xl">We would love to hear from you.</h1>
           <div className="mt-8 grid gap-4 text-espresso/75">
             <p className="flex items-center gap-3"><MapPin className="h-5 w-5 text-saddle" /> Rusk, Texas</p>
-            <p className="flex items-center gap-3"><Mail className="h-5 w-5 text-saddle" /> hello@bougieandcompany.com</p>
+            <p className="flex items-center gap-3"><Mail className="h-5 w-5 text-saddle" /> info@bougieandcompany</p>
           </div>
           <div className="mt-8 flex gap-3">
             {[Facebook, Instagram, Music2].map((Icon, index) => (
