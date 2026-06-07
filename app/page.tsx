@@ -44,13 +44,23 @@ export default function HomePage() {
             </div>
           </div>
           <div className="order-1 md:order-2">
-            <div className="relative grid min-h-[430px] place-items-center overflow-hidden rounded-lg border border-champagne/35 bg-ink p-8 shadow-glow md:min-h-[600px]">
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_32%_20%,rgba(216,174,102,0.3),transparent_22rem),linear-gradient(135deg,rgba(122,63,25,0.4),transparent_32rem)]" />
-              <Image src="/images/logo.png" alt="Bougie & Company logo" width={560} height={560} className="relative h-auto w-full max-w-[480px] rounded-full bg-ivory/95 object-contain p-3 shadow-glow" priority />
-              <div className="absolute inset-x-8 bottom-8 hidden justify-between border-t border-ivory/15 pt-5 text-xs font-bold uppercase tracking-[0.22em] text-champagne sm:flex">
-                <span>Boutique</span>
-                <span>Mercantile</span>
-                <span>Rusk, Texas</span>
+            <div className="relative overflow-hidden rounded-lg border border-champagne/35 bg-ink p-7 text-ivory shadow-glow md:min-h-[560px]">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_18%,rgba(201,79,22,0.38),transparent_18rem),radial-gradient(circle_at_88%_12%,rgba(216,174,102,0.26),transparent_18rem),linear-gradient(135deg,#21150e_0%,#080604_55%,#08223e_100%)]" />
+              <div className="relative flex h-full min-h-[500px] flex-col justify-between">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.26em] text-champagne">Featured Edit</p>
+                  <h2 className="mt-4 max-w-sm font-display text-5xl leading-tight">New season finds with a Texas point of view.</h2>
+                  <p className="mt-5 max-w-md leading-7 text-ivory/72">
+                    Shop warm scents, self-care staples, dressed-up basics, leather goods, equine shine, and gifts that feel personal.
+                  </p>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {["Women's Collection", "Bath & Body", "Home Collection", "Gift Collection"].map((label) => (
+                    <Link className="rounded-md border border-ivory/15 bg-white/8 px-4 py-4 text-sm font-bold uppercase tracking-[0.16em] text-ivory hover:border-champagne hover:bg-white/12" href="/shop" key={label}>
+                      {label}
+                    </Link>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
