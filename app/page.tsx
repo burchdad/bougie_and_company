@@ -1,10 +1,11 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Facebook, Instagram, Music2, Star } from "lucide-react";
+import { Facebook, Instagram, Music2 } from "lucide-react";
 import { AnimatedSection } from "@/components/animated-section";
 import { NewsletterForm } from "@/components/newsletter-form";
 import { ProductShowcase } from "@/components/product-showcase";
-import { lifestyles, reviews, socialLinks } from "@/lib/data";
+import { ReviewCarousel } from "@/components/review-carousel";
+import { lifestyles, socialLinks } from "@/lib/data";
 
 export default function HomePage() {
   return (
@@ -82,22 +83,7 @@ export default function HomePage() {
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-champagne">Local Love</p>
             </div>
           </div>
-          <div className="mt-8 grid gap-5 md:grid-cols-2 lg:grid-cols-5">
-            {reviews.map((review, index) => (
-              <article className="rounded-lg border border-saddle/15 bg-white/85 p-5 shadow-sm backdrop-blur transition hover:-translate-y-1 hover:bg-white hover:shadow-luxe" key={`${review.name}-${review.product}`}>
-                <span className="rounded-full bg-cream px-2 py-1 text-[0.62rem] font-bold uppercase tracking-[0.14em] text-saddle">0{index + 1}</span>
-                <div className="flex gap-1 text-champagne" aria-label="5 star review">
-                  {Array.from({ length: 5 }).map((_, index) => (
-                    <Star className="h-4 w-4 fill-champagne" key={index} />
-                  ))}
-                </div>
-                <p className="mt-4 text-sm font-bold uppercase tracking-[0.16em] text-saddle">{review.product}</p>
-                <p className="mt-3 text-sm leading-6 text-espresso/75">{review.text}</p>
-                <p className="mt-5 text-sm font-bold text-ink">{review.name}</p>
-                <p className="text-xs uppercase tracking-[0.18em] text-espresso/55">{review.location}</p>
-              </article>
-            ))}
-          </div>
+          <ReviewCarousel />
         </div>
       </AnimatedSection>
 
