@@ -60,7 +60,8 @@ const menuItems: MenuItem[] = [
         href: "/shop#mens-collection",
         children: [
           { label: "Body Spray", href: "/shop#mens-collection" },
-          { label: "Beard Products", href: "/shop#mens-collection" }
+          { label: "Beard Products", href: "/shop#mens-collection" },
+          { label: "Homemade Mechanic Soaps", href: "/shop#mens-collection" }
         ]
       },
       {
@@ -68,6 +69,9 @@ const menuItems: MenuItem[] = [
         href: "/shop#womens-collection",
         children: [
           { label: "Week From Hell", href: "/shop#womens-collection" },
+          { label: "Bath Salts", href: "/shop#womens-collection" },
+          { label: "Body Scrubs", href: "/shop#womens-collection" },
+          { label: "Bath Bombs", href: "/shop#bath-body" },
           { label: "Body Sprays", href: "/shop#womens-collection" },
           { label: "Purses", href: "/shop#accessories" }
         ]
