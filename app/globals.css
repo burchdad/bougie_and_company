@@ -33,6 +33,26 @@ body::selection {
     linear-gradient(135deg, rgba(8, 34, 62, 0.07), transparent 36rem);
 }
 
+.sunset-band {
+  background-image:
+    radial-gradient(circle at 12% 18%, rgba(201, 79, 22, 0.18), transparent 22rem),
+    radial-gradient(circle at 88% 8%, rgba(8, 34, 62, 0.16), transparent 24rem),
+    linear-gradient(135deg, #fffaf1 0%, #f7efe4 42%, rgba(216, 174, 102, 0.32) 100%);
+}
+
+.midnight-band {
+  background-image:
+    radial-gradient(circle at 18% 20%, rgba(201, 79, 22, 0.28), transparent 26rem),
+    radial-gradient(circle at 82% 10%, rgba(216, 174, 102, 0.2), transparent 24rem),
+    linear-gradient(135deg, #080604 0%, #21150e 52%, #08223e 100%);
+}
+
+.editorial-panel {
+  background-image:
+    linear-gradient(135deg, rgba(255, 250, 241, 0.96), rgba(247, 239, 228, 0.88)),
+    radial-gradient(circle at top right, rgba(201, 79, 22, 0.18), transparent 18rem);
+}
+
 .luxury-border {
   border: 1px solid rgba(122, 63, 25, 0.18);
 }

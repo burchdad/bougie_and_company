@@ -20,7 +20,7 @@ export default function PrivacyPolicyPage() {
   };
 
   return (
-    <section className="bg-ivory px-4 py-16 sm:px-6 lg:px-8">
+    <section className="sunset-band px-4 py-16 sm:px-6 lg:px-8">
       <Script id="privacy-faq-schema" type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }} />
       <div className="mx-auto max-w-4xl">
         <p className="text-xs font-bold uppercase tracking-[0.3em] text-saddle">Privacy</p>

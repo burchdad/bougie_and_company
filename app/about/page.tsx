@@ -10,7 +10,7 @@ const values = ["Luxury without losing the roots", "Thoughtfully curated product
 
 export default function AboutPage() {
   return (
-    <section className="bg-ivory">
+    <section className="sunset-band">
       <div className="mx-auto grid max-w-7xl gap-10 px-4 py-16 sm:px-6 md:grid-cols-[0.95fr_1.05fr] lg:px-8">
         <div className="relative min-h-[620px] overflow-hidden rounded-lg border border-saddle/15 shadow-luxe">
           <Image src="/images/owners.png" alt="Bougie & Company owners" fill className="object-cover object-[50%_24%]" priority sizes="(min-width: 768px) 45vw, 100vw" />
@@ -23,10 +23,10 @@ export default function AboutPage() {
           </p>
         </div>
       </div>
-      <div className="bg-white px-4 py-16 sm:px-6 lg:px-8">
+      <div className="bg-white/85 px-4 py-16 backdrop-blur sm:px-6 lg:px-8">
         <div className="mx-auto grid max-w-7xl gap-8 md:grid-cols-3">
           {["Rooted In Texas", "Handpicked Goods", "Boutique Service"].map((item, index) => (
-            <div className="rounded-lg border border-saddle/15 bg-ivory p-6" key={item}>
+            <div className="editorial-panel rounded-lg border border-saddle/15 p-6 shadow-sm" key={item}>
               <p className="text-sm font-bold text-saddle">0{index + 1}</p>
               <h2 className="mt-4 font-display text-3xl text-ink">{item}</h2>
               <p className="mt-3 text-sm leading-7 text-espresso/70">
@@ -36,7 +36,7 @@ export default function AboutPage() {
           ))}
         </div>
       </div>
-      <div className="bg-ink px-4 py-16 text-ivory sm:px-6 lg:px-8">
+      <div className="midnight-band px-4 py-16 text-ivory sm:px-6 lg:px-8">
         <div className="mx-auto grid max-w-7xl gap-10 md:grid-cols-2">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.3em] text-champagne">Mission</p>

@@ -9,7 +9,7 @@ export const metadata: Metadata = {
 
 export default function ContactPage() {
   return (
-    <section className="grain bg-ivory px-4 py-16 sm:px-6 lg:px-8">
+    <section className="sunset-band px-4 py-16 sm:px-6 lg:px-8">
       <div className="mx-auto grid max-w-7xl gap-10 md:grid-cols-[0.85fr_1.15fr]">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.3em] text-saddle">Contact</p>
