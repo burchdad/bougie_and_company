@@ -2,21 +2,22 @@ import Image from "next/image";
 import Link from "next/link";
 import { Facebook, Instagram, Music2, Star } from "lucide-react";
 import { AnimatedSection } from "@/components/animated-section";
-import { bestSellers, lifestyles, reviews } from "@/lib/data";
+import { ProductShowcase } from "@/components/product-showcase";
+import { lifestyles, reviews } from "@/lib/data";
 
 export default function HomePage() {
   return (
     <>
       <section className="grain overflow-hidden bg-ivory">
-        <div className="mx-auto grid max-w-7xl items-center gap-10 px-4 py-10 sm:px-6 md:grid-cols-[0.95fr_1.05fr] lg:px-8 lg:py-16">
+        <div className="mx-auto grid max-w-7xl items-center gap-10 px-4 py-12 sm:px-6 md:grid-cols-[1.02fr_0.98fr] lg:px-8 lg:py-20">
           <div className="order-2 md:order-1">
             <p className="text-xs font-bold uppercase tracking-[0.3em] text-saddle">Luxury Texas Boutique</p>
-            <h1 className="mt-4 font-display text-5xl font-semibold leading-[0.95] text-ink sm:text-6xl lg:text-7xl">
+            <h1 className="mt-4 max-w-2xl font-display text-5xl font-semibold leading-[0.95] text-ink sm:text-6xl lg:text-7xl">
               Bougie & Company
             </h1>
             <p className="mt-5 font-display text-3xl text-saddle sm:text-4xl">Luxury Meets Country.</p>
             <p className="mt-6 max-w-xl text-lg leading-8 text-espresso/75">
-              Boutique Fashion / Gifts / Home / Self Care
+              Boutique fashion, self care, home goods, equine jewelry, gifts, and mercantile finds with a polished Texas point of view.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link className="focus-ring rounded-md bg-ink px-6 py-4 text-center text-sm font-bold uppercase tracking-[0.2em] text-ivory hover:bg-saddle" href="/shop">
@@ -26,10 +27,30 @@ export default function HomePage() {
                 Our Story
               </Link>
             </div>
+            <div className="mt-10 grid max-w-xl grid-cols-3 divide-x divide-saddle/15 border-y border-saddle/15 py-4 text-center">
+              <div>
+                <p className="font-display text-3xl text-ink">10</p>
+                <p className="text-[0.65rem] font-bold uppercase tracking-[0.18em] text-saddle">Reviews</p>
+              </div>
+              <div>
+                <p className="font-display text-3xl text-ink">9</p>
+                <p className="text-[0.65rem] font-bold uppercase tracking-[0.18em] text-saddle">Departments</p>
+              </div>
+              <div>
+                <p className="font-display text-3xl text-ink">$150</p>
+                <p className="text-[0.65rem] font-bold uppercase tracking-[0.18em] text-saddle">Free Ship</p>
+              </div>
+            </div>
           </div>
           <div className="order-1 md:order-2">
-            <div className="grid min-h-[430px] place-items-center rounded-lg border border-champagne/35 bg-white p-8 shadow-glow md:min-h-[600px]">
-              <Image src="/images/logo.png" alt="Bougie & Company logo" width={560} height={560} className="h-auto w-full max-w-[520px] object-contain" priority />
+            <div className="relative grid min-h-[430px] place-items-center overflow-hidden rounded-lg border border-champagne/35 bg-ink p-8 shadow-glow md:min-h-[600px]">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_32%_20%,rgba(216,174,102,0.3),transparent_22rem),linear-gradient(135deg,rgba(122,63,25,0.4),transparent_32rem)]" />
+              <Image src="/images/logo.png" alt="Bougie & Company logo" width={560} height={560} className="relative h-auto w-full max-w-[480px] rounded-full bg-ivory/95 object-contain p-3 shadow-glow" priority />
+              <div className="absolute inset-x-8 bottom-8 hidden justify-between border-t border-ivory/15 pt-5 text-xs font-bold uppercase tracking-[0.22em] text-champagne sm:flex">
+                <span>Boutique</span>
+                <span>Mercantile</span>
+                <span>Rusk, Texas</span>
+              </div>
             </div>
           </div>
         </div>
@@ -39,25 +60,7 @@ export default function HomePage() {
         <div className="mx-auto max-w-7xl">
           <p className="text-xs font-bold uppercase tracking-[0.26em] text-saddle">Best Sellers</p>
           <h2 className="mt-3 font-display text-4xl text-ink">Customer Favorites</h2>
-          <div className="mt-8 grid gap-5 md:grid-cols-2 lg:grid-cols-4">
-            {bestSellers.map((product) => (
-              <article className="rounded-lg border border-saddle/15 bg-ivory p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-luxe" key={product.name}>
-                <div className="flex aspect-[4/5] items-center justify-center rounded-md bg-gradient-to-br from-espresso via-saddle to-champagne p-6 text-center text-ivory">
-                  <div>
-                    <Star className="mx-auto h-8 w-8 fill-champagne text-champagne" />
-                    <p className="mt-5 font-display text-3xl">{product.name}</p>
-                  </div>
-                </div>
-                <p className="mt-5 text-xs font-bold uppercase tracking-[0.2em] text-saddle">{product.category}</p>
-                <h3 className="mt-2 font-display text-2xl text-ink">{product.name}</h3>
-                <p className="mt-2 text-sm leading-6 text-espresso/65">{product.description}</p>
-                <div className="mt-5 flex items-center justify-between">
-                  <span className="font-bold text-espresso">{product.price}</span>
-                  <button className="focus-ring rounded-md bg-ink px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] text-ivory hover:bg-saddle" type="button">Add</button>
-                </div>
-              </article>
-            ))}
-          </div>
+          <ProductShowcase />
         </div>
       </AnimatedSection>
 

@@ -30,25 +30,29 @@ export const bestSellers = [
     name: "Saddle Stitch Weekender",
     category: "Accessories",
     price: "$148",
-    description: "A structured travel piece with western polish and city-ready hardware."
+    description: "A structured travel piece with western polish and city-ready hardware.",
+    tone: "from-espresso via-saddle to-champagne"
   },
   {
     name: "Champagne Trail Body Butter",
     category: "Bath & Body",
     price: "$28",
-    description: "A rich, soft finish for slow mornings, dress nights, and everything between."
+    description: "A rich, soft finish for slow mornings, dress nights, and everything between.",
+    tone: "from-saddle via-ember to-champagne"
   },
   {
     name: "Sterling Reins Necklace",
     category: "Equine Jewelry",
     price: "$64",
-    description: "Equine-inspired shine with a refined boutique silhouette."
+    description: "Equine-inspired shine with a refined boutique silhouette.",
+    tone: "from-navy via-espresso to-champagne"
   },
   {
     name: "Rusk Ranch Candle",
     category: "Home Collection",
     price: "$36",
-    description: "Warm woods, amber spice, and a clean burn for a dressed-up home."
+    description: "Warm woods, amber spice, and a clean burn for a dressed-up home.",
+    tone: "from-ink via-saddle to-ember"
   }
 ];
 

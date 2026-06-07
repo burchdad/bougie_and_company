@@ -2,9 +2,10 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Menu, Search, ShoppingBag, UserRound, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { useState } from "react";
 import { navItems } from "@/lib/data";
+import { HeaderActions } from "@/components/header-actions";
 
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
@@ -30,9 +31,7 @@ export function SiteHeader() {
           ))}
         </div>
         <div className="flex items-center gap-1">
-          <button className="focus-ring rounded-full p-2.5 text-espresso hover:bg-cream" aria-label="Search" type="button"><Search className="h-5 w-5" /></button>
-          <button className="focus-ring rounded-full p-2.5 text-espresso hover:bg-cream" aria-label="Account" type="button"><UserRound className="h-5 w-5" /></button>
-          <button className="focus-ring rounded-full p-2.5 text-espresso hover:bg-cream" aria-label="Cart" type="button"><ShoppingBag className="h-5 w-5" /></button>
+          <HeaderActions />
           <button className="focus-ring rounded-full p-2.5 text-espresso hover:bg-cream lg:hidden" aria-label="Menu" onClick={() => setOpen(!open)} type="button">
             {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
