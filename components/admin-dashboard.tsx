@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { Camera, EyeOff, KeyRound, Loader2, PackageSearch, Save, Search, Star, UploadCloud } from "lucide-react";
+import { Camera, EyeOff, FileText, Gift, KeyRound, LayoutDashboard, Loader2, Package, PackageSearch, Save, Search, Settings, ShoppingBag, Star, Tags, Truck, UploadCloud } from "lucide-react";
 import { shopDepartments } from "@/lib/data";
 
 type AdminProduct = {
@@ -31,6 +31,19 @@ type ProductResponse = {
 };
 
 const adminStorageKey = "bougie-admin-key";
+const adminSessionKey = "bougie-admin-signed-in";
+const adminTabs = [
+  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { id: "orders", label: "Orders", icon: ShoppingBag },
+  { id: "products", label: "Products", icon: Package },
+  { id: "categories", label: "Categories", icon: Tags },
+  { id: "discounts", label: "Discounts", icon: Gift },
+  { id: "shipping", label: "Shipping", icon: Truck },
+  { id: "content", label: "Legal / Content", icon: FileText },
+  { id: "settings", label: "Settings", icon: Settings }
+] as const;
+
+type AdminTab = (typeof adminTabs)[number]["id"];
 
 function money(value: string | null) {
   const parsed = Number(value);
@@ -39,6 +52,8 @@ function money(value: string | null) {
 
 export function AdminDashboard() {
   const [adminKey, setAdminKey] = useState("");
+  const [isSignedIn, setIsSignedIn] = useState(false);
+  const [activeTab, setActiveTab] = useState<AdminTab>("dashboard");
   const [products, setProducts] = useState<AdminProduct[]>([]);
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState("");
@@ -48,7 +63,11 @@ export function AdminDashboard() {
   const [message, setMessage] = useState("");
 
   useEffect(() => {
-    setAdminKey(window.localStorage.getItem(adminStorageKey) || "");
+    const storedKey = window.localStorage.getItem(adminStorageKey) || "";
+    const signedIn = window.sessionStorage.getItem(adminSessionKey) === "true";
+
+    setAdminKey(storedKey);
+    setIsSignedIn(Boolean(storedKey && signedIn));
   }, []);
 
   const selectedProduct = useMemo(() => products.find((product) => product.epos_product_id === selectedId) || products[0], [products, selectedId]);
@@ -78,14 +97,68 @@ export function AdminDashboard() {
     }
   }
 
-  useEffect(() => {
-    loadProducts("");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [adminKey]);
+  function handleLogin(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
 
-  function saveAdminKey() {
+    if (!adminKey.trim()) {
+      setMessage("Enter the admin password to continue.");
+      return;
+    }
+
     window.localStorage.setItem(adminStorageKey, adminKey);
-    loadProducts();
+    window.sessionStorage.setItem(adminSessionKey, "true");
+    setIsSignedIn(true);
+    setMessage("");
+    setActiveTab("dashboard");
+  }
+
+  function handleLogout() {
+    window.sessionStorage.removeItem(adminSessionKey);
+    setIsSignedIn(false);
+    setProducts([]);
+    setSelectedId("");
+    setMessage("");
+  }
+
+  useEffect(() => {
+    if (isSignedIn && activeTab === "products" && products.length === 0) {
+      loadProducts("");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, isSignedIn]);
+
+  if (!isSignedIn) {
+    return (
+      <section className="midnight-band min-h-[42rem] px-4 py-16 text-ivory sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-lg">
+          <p className="text-xs font-bold uppercase tracking-[0.28em] text-champagne">Secure Admin</p>
+          <h1 className="mt-4 font-display text-5xl">Admin Login</h1>
+          <p className="mt-4 text-lg leading-8 text-ivory/75">
+            Sign in to manage product photos, storefront copy, category labels, and synced Epos catalog settings.
+          </p>
+          <form className="mt-8 rounded-lg border border-champagne/30 bg-ink/75 p-6 shadow-luxe" onSubmit={handleLogin}>
+            <label className="grid gap-2 text-sm font-semibold text-ivory">
+              Admin Password
+              <span className="relative">
+                <KeyRound className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-champagne" />
+                <input
+                  autoFocus
+                  className="focus-ring min-h-14 w-full rounded-md border border-champagne/25 bg-espresso/80 pl-11 pr-4 text-ivory placeholder:text-ivory/45"
+                  onChange={(event) => setAdminKey(event.target.value)}
+                  placeholder="Admin Password"
+                  type="password"
+                  value={adminKey}
+                />
+              </span>
+            </label>
+            <button className="focus-ring mt-5 rounded-full bg-champagne px-7 py-3 text-xs font-bold uppercase tracking-[0.18em] text-ink hover:bg-ivory" type="submit">
+              Sign In
+            </button>
+            {message ? <p className="mt-4 text-sm font-semibold text-champagne">{message}</p> : null}
+          </form>
+        </div>
+      </section>
+    );
   }
 
   async function handleSearch(event: FormEvent<HTMLFormElement>) {
@@ -173,32 +246,85 @@ export function AdminDashboard() {
   return (
     <section className="midnight-band min-h-screen px-4 py-12 text-ivory sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
-        <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.28em] text-champagne">Admin</p>
-            <h1 className="mt-3 font-display text-5xl">Bougie Product Dashboard</h1>
-            <p className="mt-3 max-w-3xl text-ivory/75">Manage website photos, featured products, department labels, and storefront copy while Epos remains the source for price, SKU, stock, and product IDs.</p>
-            <p className="mt-2 max-w-3xl text-sm font-semibold text-champagne">Set `ADMIN_ACCESS_KEY` in Vercel, redeploy, then enter that key here to unlock admin actions.</p>
-          </div>
-          <div className="flex min-w-72 items-center gap-2 rounded-lg border border-champagne/25 bg-ink/70 p-2">
-            <KeyRound className="ml-2 h-4 w-4 text-champagne" />
-            <input
-              className="focus-ring min-h-10 flex-1 rounded-md border border-champagne/20 bg-ivory px-3 text-sm text-ink"
-              onChange={(event) => setAdminKey(event.target.value)}
-              placeholder="Admin key"
-              type="password"
-              value={adminKey}
-            />
-            <button className="focus-ring rounded-md bg-champagne px-4 py-2 text-xs font-bold uppercase tracking-[0.14em] text-ink" onClick={saveAdminKey} type="button">
-              Save
-            </button>
+            <h1 className="mt-3 font-display text-5xl">Admin Dashboard</h1>
+            <p className="mt-3 max-w-3xl text-ivory/75">Manage catalog presentation, website content, product photos, and synced Epos storefront settings.</p>
           </div>
         </div>
 
         {message ? <div className="mt-6 rounded-lg border border-champagne/25 bg-ink/75 px-5 py-4 text-sm font-semibold text-champagne">{message}</div> : null}
 
-        <div className="mt-8 grid gap-6 lg:grid-cols-[22rem_1fr]">
-          <aside className="rounded-lg border border-champagne/20 bg-ink/80 p-4 shadow-luxe">
+        <div className="mt-8 grid gap-6 lg:grid-cols-[15rem_1fr]">
+          <aside className="flex min-h-[38rem] flex-col rounded-lg border border-champagne/25 bg-ink/80 p-4 shadow-luxe">
+            <p className="px-3 text-xs font-bold uppercase tracking-[0.22em] text-champagne">Admin</p>
+            <nav className="mt-4 grid gap-1">
+              {adminTabs.map((tab) => {
+                const Icon = tab.icon;
+                return (
+                  <button
+                    className={`focus-ring flex items-center gap-3 rounded-md px-3 py-3 text-left text-sm font-semibold ${activeTab === tab.id ? "bg-champagne/20 text-ivory" : "text-ivory/75 hover:bg-ivory/10 hover:text-ivory"}`}
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    type="button"
+                  >
+                    <Icon className="h-4 w-4 text-champagne" />
+                    {tab.label}
+                  </button>
+                );
+              })}
+            </nav>
+            <button className="focus-ring mt-auto rounded-full border border-champagne/50 px-4 py-3 text-xs font-bold uppercase tracking-[0.16em] text-champagne hover:bg-champagne hover:text-ink" onClick={handleLogout} type="button">
+              Logout
+            </button>
+          </aside>
+
+          <section className="rounded-lg border border-champagne/25 bg-ink/75 p-5 shadow-luxe">
+            {activeTab === "dashboard" ? (
+              <div>
+                <h2 className="font-display text-4xl">Dashboard</h2>
+                <p className="mt-2 text-ivory/70">Choose a workspace from the admin menu.</p>
+                <div className="mt-6 grid gap-4 md:grid-cols-3">
+                  <button className="focus-ring rounded-lg border border-champagne/25 bg-ivory/5 p-5 text-left hover:bg-ivory/10" onClick={() => setActiveTab("products")} type="button">
+                    <Package className="h-7 w-7 text-champagne" />
+                    <p className="mt-4 font-display text-3xl">Products</p>
+                    <p className="mt-2 text-sm text-ivory/65">Edit storefront copy and upload product photos.</p>
+                  </button>
+                  <div className="rounded-lg border border-champagne/25 bg-ivory/5 p-5">
+                    <ShoppingBag className="h-7 w-7 text-champagne" />
+                    <p className="mt-4 font-display text-3xl">Orders</p>
+                    <p className="mt-2 text-sm text-ivory/65">Checkout/order tools will connect here next.</p>
+                  </div>
+                  <div className="rounded-lg border border-champagne/25 bg-ivory/5 p-5">
+                    <Settings className="h-7 w-7 text-champagne" />
+                    <p className="mt-4 font-display text-3xl">Settings</p>
+                    <p className="mt-2 text-sm text-ivory/65">Storefront configuration and admin options.</p>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {activeTab !== "dashboard" && activeTab !== "products" ? (
+              <div className="grid min-h-[34rem] place-items-center rounded-lg border border-dashed border-champagne/25 text-center">
+                <div>
+                  <PackageSearch className="mx-auto h-10 w-10 text-champagne" />
+                  <p className="mt-3 font-display text-3xl">{adminTabs.find((tab) => tab.id === activeTab)?.label}</p>
+                  <p className="mt-2 text-sm text-ivory/65">This workspace is ready for the next ecommerce build step.</p>
+                </div>
+              </div>
+            ) : null}
+
+            {activeTab === "products" ? (
+              <div>
+                <div className="flex flex-wrap items-end justify-between gap-4">
+                  <div>
+                    <h2 className="font-display text-4xl">Products</h2>
+                    <p className="mt-2 text-ivory/70">Manage Epos-synced products, photos, and website presentation.</p>
+                  </div>
+                </div>
+                <div className="mt-6 grid gap-6 xl:grid-cols-[20rem_1fr]">
+                  <aside className="rounded-lg border border-champagne/20 bg-ink/80 p-4">
             <form className="flex gap-2" onSubmit={handleSearch}>
               <label className="relative flex-1">
                 <span className="sr-only">Search products</span>
@@ -333,6 +459,10 @@ export function AdminDashboard() {
               </div>
             </div>
           )}
+                </div>
+              </div>
+            ) : null}
+          </section>
         </div>
       </div>
     </section>
