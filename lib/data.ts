@@ -81,22 +81,22 @@ export const shopDepartments = [
   {
     id: "bath-body",
     title: "Bath & Body",
-    items: ["Bath Bombs", "Body Spray", "Bath Salts", "Body Scrubs", "Clay Masks", "Body Butter", "Lotion", "Handmade Soaps", "Chap Stick", "Week From Hell"]
+    items: ["Bath Bombs", "Body Butter/Lotion", "Chap Stick", "Body Spray", "Bath Salts", "Body Scrubs", "Clay Masks", "Handmade Soaps", "Week From Hell"]
   },
   {
     id: "home-collection",
     title: "Home Collection",
-    items: ["Candles / Wax Melts", "9 oz. Candles", "Wax Melts", "Tea Towels / Pillows", "Cocktail Mixers", "Coasters", "Regular Coasters", "Leather Coasters", "Outdoor Items"]
+    items: ["Candles", "Soy 9oz", "Soy Wax melts", "Tea Towels / Pillows", "Cocktail Mixers", "Coasters", "Regular Coasters", "Leather Coasters", "Outdoor Items"]
   },
   {
     id: "mens-collection",
     title: "Men's Collection",
-    items: ["T-Shirts", "Bath Bombs", "Caps", "Men's Care", "Body Spray", "Beard Products", "Homemade Mechanic Soaps", "Luggage", "Coozies"]
+    items: ["T-Shirts", "Caps", "Men's Care", "Bath Bombs", "Chap Stick", "Body Spray", "Beard Products", "Homemade Mechanic Soaps", "Luggage", "Coozies"]
   },
   {
     id: "womens-collection",
     title: "Women's Collection",
-    items: ["Tops", "Bottoms", "Dresses", "Rompers & Jumpsuits", "Women's Care", "Week From Hell", "Bath Salts", "Body Scrubs", "Bath Bombs", "Body Sprays", "Purses", "Luggage"]
+    items: ["Tops", "Bottoms", "Dresses", "Rompers & Jumpsuits", "Women's Care", "Week From Hell", "Bath Salts", "Body Scrubs", "Bath Bombs", "Body Butter/Lotion", "Chap Stick", "Body Sprays", "Purses", "Luggage"]
   },
   {
     id: "kitchen-selection",

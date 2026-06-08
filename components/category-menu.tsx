@@ -24,7 +24,14 @@ const menuItems: MenuItem[] = [
         label: "Home Collection",
         href: "/shop#home-collection",
         children: [
-          { label: "Candles / Wax Melts", href: "/shop#home-collection" },
+          {
+            label: "Candles",
+            href: "/shop#home-collection",
+            children: [
+              { label: "Soy 9oz", href: "/shop#home-collection" },
+              { label: "Soy Wax melts", href: "/shop#home-collection" }
+            ]
+          },
           { label: "Tea Towels / Pillows", href: "/shop#home-collection" },
           { label: "Cocktail Mixers", href: "/shop#home-collection" },
           {
@@ -50,8 +57,9 @@ const menuItems: MenuItem[] = [
         label: "Bath & Body",
         href: "/shop#bath-body",
         children: [
-          { label: "Bath Salts", href: "/shop#bath-body" },
-          { label: "Body Scrubs", href: "/shop#bath-body" }
+          { label: "Bath Bombs", href: "/shop#bath-body" },
+          { label: "Body Butter/Lotion", href: "/shop#bath-body" },
+          { label: "Chap Stick", href: "/shop#bath-body" }
         ]
       },
       { label: "Gift Collection", href: "/shop#gift-collection" },
@@ -59,6 +67,7 @@ const menuItems: MenuItem[] = [
         label: "Men's Care",
         href: "/shop#mens-collection",
         children: [
+          { label: "Bath Bombs", href: "/shop#mens-collection" },
           { label: "Body Spray", href: "/shop#mens-collection" },
           { label: "Beard Products", href: "/shop#mens-collection" },
           { label: "Homemade Mechanic Soaps", href: "/shop#mens-collection" }
@@ -72,6 +81,8 @@ const menuItems: MenuItem[] = [
           { label: "Bath Salts", href: "/shop#womens-collection" },
           { label: "Body Scrubs", href: "/shop#womens-collection" },
           { label: "Bath Bombs", href: "/shop#bath-body" },
+          { label: "Body Butter/Lotion", href: "/shop#womens-collection" },
+          { label: "Chap Stick", href: "/shop#womens-collection" },
           { label: "Body Sprays", href: "/shop#womens-collection" },
           { label: "Purses", href: "/shop#accessories" }
         ]
@@ -109,6 +120,8 @@ const menuItems: MenuItem[] = [
         label: "Men's Care",
         href: "/shop#mens-collection",
         children: [
+          { label: "Bath Bombs", href: "/shop#mens-collection" },
+          { label: "Chap Stick", href: "/shop#mens-collection" },
           { label: "Body Spray", href: "/shop#mens-collection" },
           { label: "Beard Products", href: "/shop#mens-collection" },
           { label: "Homemade Mechanic Soaps", href: "/shop#mens-collection" }
@@ -134,6 +147,8 @@ const menuItems: MenuItem[] = [
           { label: "Bath Salts", href: "/shop#womens-collection" },
           { label: "Body Scrubs", href: "/shop#womens-collection" },
           { label: "Bath Bombs", href: "/shop#bath-body" },
+          { label: "Body Butter/Lotion", href: "/shop#womens-collection" },
+          { label: "Chap Stick", href: "/shop#womens-collection" },
           { label: "Body Sprays", href: "/shop#womens-collection" }
         ]
       },
@@ -145,8 +160,8 @@ const menuItems: MenuItem[] = [
     label: "Candles",
     href: "/shop#home-collection",
     children: [
-      { label: "9 oz.", href: "/shop#home-collection" },
-      { label: "Wax Melts", href: "/shop#home-collection" }
+      { label: "Soy 9oz", href: "/shop#home-collection" },
+      { label: "Soy Wax melts", href: "/shop#home-collection" }
     ]
   },
   {
