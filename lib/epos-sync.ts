@@ -138,7 +138,7 @@ export async function syncEposStock() {
         ${stockId},
         ${getEposNumber(stock, ["ProductId", "ProductID", "productId"])},
         ${getEposNumber(stock, ["LocationId", "LocationID", "locationId"])},
-        ${getEposNumber(stock, ["CurrentStock", "Stock", "Quantity", "currentStock", "stock"])},
+        ${getEposNumber(stock, ["CurrentStock", "StockLevel", "Stock", "Quantity", "Qty", "Available", "currentStock", "stockLevel", "stock", "quantity"])},
         ${getEposNumber(stock, ["OnOrder", "onOrder"])},
         ${JSON.stringify(stock)}::jsonb,
         NOW()

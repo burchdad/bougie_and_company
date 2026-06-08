@@ -204,7 +204,6 @@ export function ShopProducts() {
           <div className="mt-5 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
             {filteredProducts.map((product, index) => {
               const stock = stockCount(product.stock);
-              const inStock = stock > 0;
               const price = money(product.sale_price);
 
               return (
@@ -226,8 +225,8 @@ export function ShopProducts() {
                       {product.description || (product.sku ? `SKU ${product.sku}` : "Synced from Bougie & Company inventory.")}
                     </p>
                     <div className="mt-4 flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-[0.14em]">
-                      <span className={`rounded-full px-3 py-1 ${inStock ? "bg-moss/15 text-moss" : "bg-ember/10 text-ember"}`}>
-                        {inStock ? `${stock} in stock` : "Ask for availability"}
+                      <span className={`rounded-full px-3 py-1 ${stock > 0 ? "bg-moss/15 text-moss" : "bg-champagne/20 text-saddle"}`}>
+                        {stock > 0 ? `${stock} in stock` : "Confirm availability"}
                       </span>
                       {product.sku ? <span className="rounded-full bg-cream px-3 py-1 text-saddle">SKU {product.sku}</span> : null}
                     </div>
@@ -235,7 +234,7 @@ export function ShopProducts() {
                       <span className="font-bold text-espresso">{price}</span>
                       <button
                         className="focus-ring inline-flex items-center gap-2 rounded-md bg-ink px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] text-ivory hover:bg-saddle disabled:cursor-not-allowed disabled:bg-espresso/30"
-                        disabled={!inStock || price === "Price in store"}
+                        disabled={price === "Price in store"}
                         onClick={() => addToCart(product)}
                         type="button"
                       >
