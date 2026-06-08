@@ -16,7 +16,8 @@ const config: Config = {
         cream: "#f7efe4",
         ivory: "#fffaf1",
         ember: "#c94f16",
-        navy: "#08223e"
+        navy: "#08223e",
+        moss: "#42613a"
       },
       fontFamily: {
         display: ["var(--font-display)", "Georgia", "serif"],
