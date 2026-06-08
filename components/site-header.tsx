@@ -10,7 +10,7 @@ export function SiteHeader() {
   const [open, setOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-saddle/10 bg-ivory/95 backdrop-blur-xl">
+    <header className="border-b border-saddle/10 bg-ivory/95 backdrop-blur-xl">
       <div className="bg-ink px-4 py-2 text-center text-sm font-bold tracking-[0.08em] text-champagne">
         Fresh Boutique Arrivals | Free Shipping over $150
       </div>
