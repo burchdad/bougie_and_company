@@ -73,3 +73,27 @@ CREATE INDEX IF NOT EXISTS epos_sync_events_created_at_idx ON epos_sync_events (
 CREATE INDEX IF NOT EXISTS epos_products_name_idx ON epos_products (name);
 CREATE INDEX IF NOT EXISTS epos_products_sku_idx ON epos_products (sku);
 CREATE INDEX IF NOT EXISTS epos_product_stock_product_idx ON epos_product_stock (epos_product_id);
+
+CREATE TABLE IF NOT EXISTS product_site_meta (
+  epos_product_id TEXT PRIMARY KEY REFERENCES epos_products(epos_product_id) ON DELETE CASCADE,
+  marketing_title TEXT,
+  marketing_description TEXT,
+  department TEXT,
+  is_featured BOOLEAN NOT NULL DEFAULT FALSE,
+  is_hidden BOOLEAN NOT NULL DEFAULT FALSE,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS product_images (
+  id BIGSERIAL PRIMARY KEY,
+  epos_product_id TEXT NOT NULL REFERENCES epos_products(epos_product_id) ON DELETE CASCADE,
+  url TEXT NOT NULL,
+  pathname TEXT,
+  alt_text TEXT,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  is_primary BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS product_images_product_idx ON product_images (epos_product_id, sort_order ASC);
+CREATE INDEX IF NOT EXISTS product_site_meta_department_idx ON product_site_meta (department);

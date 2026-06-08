@@ -1,4 +1,4 @@
-import { getSql } from "@/lib/db";
+import { getAdminProducts } from "@/lib/admin-products";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,59 +13,23 @@ type ProductRow = {
   sale_price: string | null;
   stock: string | null;
   synced_at: string;
+  marketing_title: string | null;
+  marketing_description: string | null;
+  department: string | null;
+  is_featured: boolean | null;
+  is_hidden: boolean | null;
+  primary_image_url: string | null;
+  primary_image_alt: string | null;
 };
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const query = searchParams.get("q")?.trim() || "";
-    const sql = getSql();
+    const rows = (await getAdminProducts(query)) as ProductRow[];
+    const products = rows.filter((product) => !product.is_hidden);
 
-    const rows = (query
-      ? await sql`
-          SELECT
-            p.epos_product_id,
-            p.name,
-            p.description,
-            p.sku,
-            p.barcode,
-            p.category_id::text,
-            p.sale_price::text,
-            COALESCE(SUM(s.current_stock), 0)::text AS stock,
-            p.synced_at::text
-          FROM epos_products p
-          LEFT JOIN epos_product_stock s ON s.epos_product_id::text = p.epos_product_id
-          WHERE p.is_deleted = FALSE
-            AND (
-              p.name ILIKE ${`%${query}%`}
-              OR p.description ILIKE ${`%${query}%`}
-              OR p.sku ILIKE ${`%${query}%`}
-              OR p.barcode ILIKE ${`%${query}%`}
-            )
-          GROUP BY p.epos_product_id, p.name, p.description, p.sku, p.barcode, p.category_id, p.sale_price, p.synced_at
-          ORDER BY p.name ASC
-          LIMIT 240
-        `
-      : await sql`
-          SELECT
-            p.epos_product_id,
-            p.name,
-            p.description,
-            p.sku,
-            p.barcode,
-            p.category_id::text,
-            p.sale_price::text,
-            COALESCE(SUM(s.current_stock), 0)::text AS stock,
-            p.synced_at::text
-          FROM epos_products p
-          LEFT JOIN epos_product_stock s ON s.epos_product_id::text = p.epos_product_id
-          WHERE p.is_deleted = FALSE
-          GROUP BY p.epos_product_id, p.name, p.description, p.sku, p.barcode, p.category_id, p.sale_price, p.synced_at
-          ORDER BY p.name ASC
-          LIMIT 240
-        `) as ProductRow[];
-
-    return Response.json({ ok: true, products: rows }, { headers: { "Cache-Control": "no-store" } });
+    return Response.json({ ok: true, products }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Product catalog is not available yet.";
     console.error(message);

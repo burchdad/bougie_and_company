@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { Search, ShoppingBag, SlidersHorizontal, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { shopDepartments } from "@/lib/data";
@@ -14,6 +15,13 @@ type Product = {
   sale_price: string | null;
   stock: string | null;
   synced_at: string;
+  marketing_title: string | null;
+  marketing_description: string | null;
+  department: string | null;
+  is_featured: boolean | null;
+  is_hidden: boolean | null;
+  primary_image_url: string | null;
+  primary_image_alt: string | null;
 };
 
 type ProductResponse = {
@@ -46,6 +54,10 @@ function stockCount(value: string | null) {
 }
 
 function getProductDepartment(product: Product) {
+  if (product.department) {
+    return product.department;
+  }
+
   const haystack = `${product.name} ${product.description || ""}`.toLowerCase();
   const match = shopDepartments.find((department) => departmentKeywords[department.id]?.some((keyword) => haystack.includes(keyword)));
   return match?.id || "all";
@@ -121,7 +133,7 @@ export function ShopProducts() {
       new CustomEvent("bougie:add-to-cart", {
         detail: {
           id: product.epos_product_id,
-          name: product.name,
+          name: product.marketing_title || product.name,
           price: money(product.sale_price),
           category: departmentTitle(getProductDepartment(product))
         }
@@ -210,19 +222,29 @@ export function ShopProducts() {
                 <article className="group overflow-hidden rounded-lg border border-saddle/15 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-luxe" key={product.epos_product_id}>
                   <div className="relative flex aspect-[4/3] items-end overflow-hidden bg-gradient-to-br from-espresso via-saddle to-ember p-5 text-ivory">
                     <div className="absolute inset-0 opacity-30 mix-blend-soft-light luxury-pattern" />
-                    <span className="absolute right-4 top-4 rounded-full bg-ink/50 px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] text-champagne">
+                    {product.primary_image_url ? (
+                      <Image
+                        alt={product.primary_image_alt || product.marketing_title || product.name}
+                        className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                        height={600}
+                        src={product.primary_image_url}
+                        width={800}
+                      />
+                    ) : null}
+                    {product.primary_image_url ? <div className="absolute inset-0 bg-gradient-to-t from-ink/80 via-ink/10 to-transparent" /> : null}
+                    <span className="absolute right-4 top-4 z-10 rounded-full bg-ink/50 px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] text-champagne">
                       {String(index + 1).padStart(2, "0")}
                     </span>
                     <div className="relative">
                       <ShoppingBag className="h-7 w-7 text-champagne" />
-                      <p className="mt-4 line-clamp-2 font-display text-3xl leading-tight">{product.name}</p>
+                      <p className="mt-4 line-clamp-2 font-display text-3xl leading-tight">{product.marketing_title || product.name}</p>
                     </div>
                   </div>
                   <div className="p-5">
                     <p className="text-xs font-bold uppercase tracking-[0.18em] text-saddle">{departmentTitle(getProductDepartment(product))}</p>
-                    <h3 className="mt-2 line-clamp-2 min-h-16 font-display text-2xl leading-tight text-ink">{product.name}</h3>
+                    <h3 className="mt-2 line-clamp-2 min-h-16 font-display text-2xl leading-tight text-ink">{product.marketing_title || product.name}</h3>
                     <p className="mt-2 min-h-12 text-sm leading-6 text-espresso/65">
-                      {product.description || (product.sku ? `SKU ${product.sku}` : "Synced from Bougie & Company inventory.")}
+                      {product.marketing_description || product.description || (product.sku ? `SKU ${product.sku}` : "Synced from Bougie & Company inventory.")}
                     </p>
                     <div className="mt-4 flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-[0.14em]">
                       <span className={`rounded-full px-3 py-1 ${stock > 0 ? "bg-moss/15 text-moss" : "bg-champagne/20 text-saddle"}`}>
