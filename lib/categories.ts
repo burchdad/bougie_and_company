@@ -69,6 +69,24 @@ export async function seedDefaultCategoriesIfEmpty() {
   const countRows = await sql`SELECT COUNT(*)::int AS count FROM site_categories`;
 
   if (Number(countRows[0]?.count || 0) > 0) {
+    const existingHeaderRows = await sql`SELECT slug FROM site_categories WHERE parent_id IS NULL AND is_header = TRUE`;
+    const existingHeaderSlugs = new Set(existingHeaderRows.map((row) => String(row.slug)));
+    const rows = await sql`SELECT COALESCE(MAX(sort_order), -1)::int AS sort_order FROM site_categories WHERE parent_id IS NULL`;
+    let sortOrder = Number(rows[0]?.sort_order ?? -1) + 1;
+
+    for (const item of defaultMenuItems) {
+      const slug = slugify(item.label);
+      if (existingHeaderSlugs.has(slug)) {
+        continue;
+      }
+
+      await sql`
+        INSERT INTO site_categories (label, slug, href, parent_id, sort_order, is_header)
+        VALUES (${item.label}, ${slug}, ${item.href}, ${null}, ${sortOrder}, ${true})
+      `;
+      sortOrder += 1;
+    }
+
     return;
   }
 

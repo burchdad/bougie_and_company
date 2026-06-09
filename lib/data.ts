@@ -74,6 +74,11 @@ export const shopDepartments = [
     items: ["Necklaces", "Bracelets", "Earrings"]
   },
   {
+    id: "tack",
+    title: "Tack",
+    items: ["Tack"]
+  },
+  {
     id: "accessories",
     title: "Accessories",
     items: ["Purses", "Luggage", "Home Collection", "Kitchen Collection", "Bath & Body", "Gift Collection", "Men's Care", "Women's Care", "Coozies", "Leather Coasters", "Cocktail Infusions", "Soaps", "Homemade", "Foaming Hand Soap"]
