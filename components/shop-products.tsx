@@ -422,65 +422,55 @@ export function ShopProducts() {
           </span>
         </label>
         <div className="mt-5 grid gap-4">
-          <div className="grid gap-2">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-saddle">Department</p>
-            <button
-              className={`focus-ring rounded-md px-3 py-2 text-left text-sm font-bold ${activeDepartment === "all" ? "bg-ink text-ivory" : "bg-cream text-espresso hover:bg-champagne/30"}`}
-              onClick={() => {
-                setActiveDepartment("all");
-                window.history.replaceState(null, "", "/shop");
+          <label className="grid gap-2 text-sm font-semibold text-espresso">
+            Department
+            <select
+              className="focus-ring min-h-11 rounded-md border border-saddle/20 bg-cream px-3 font-bold text-espresso"
+              onChange={(event) => {
+                const nextDepartment = event.target.value;
+                setActiveDepartment(nextDepartment);
+                window.history.replaceState(null, "", nextDepartment === "all" ? "/shop" : `/shop#${nextDepartment}`);
               }}
-              type="button"
+              value={activeRootCategory?.id || "all"}
             >
-              All Products
-            </button>
-            {topLevelCategories.map((department) => (
-              <button
-                className={`focus-ring rounded-md px-3 py-2 text-left text-sm font-bold ${activeRootCategory?.id === department.id ? "bg-ink text-ivory" : "bg-cream text-espresso hover:bg-champagne/30"}`}
-                key={department.id}
-                onClick={() => {
-                  setActiveDepartment(department.id);
-                  window.history.replaceState(null, "", `/shop#${department.id}`);
-                }}
-                type="button"
-              >
-                {department.label}
-              </button>
-            ))}
-          </div>
-
-          {visibleRefinements.length ? (
-            <div className="grid gap-2 border-t border-saddle/10 pt-4">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-saddle">Refine</p>
-                {activePath.length > 1 ? (
-                  <p className="mt-1 text-xs font-semibold text-espresso/55">{activePath.map((category) => category.label).join(" / ")}</p>
-                ) : null}
-              </div>
-              {visibleRefinements.map((department) => (
-                <button
-                  className={`focus-ring rounded-md px-3 py-2 text-left font-bold ${activeDepartment === department.id ? "bg-ink text-ivory" : "bg-cream text-espresso hover:bg-champagne/30"} ${department.depth ? "text-xs uppercase tracking-[0.08em]" : "text-sm"}`}
-                  key={department.id}
-                  onClick={() => {
-                    setActiveDepartment(department.id);
-                    window.history.replaceState(null, "", `/shop#${department.id}`);
-                  }}
-                  style={{ paddingLeft: `${0.75 + department.depth * 0.85}rem` }}
-                  type="button"
-                >
+              <option value="all">All Products</option>
+              {topLevelCategories.map((department) => (
+                <option key={department.id} value={department.id}>
                   {department.label}
-                </button>
+                </option>
               ))}
-            </div>
-          ) : activeDepartment !== "all" ? (
-            <div className="rounded-md border border-dashed border-saddle/20 bg-cream/60 p-3 text-xs font-semibold text-espresso/60">
-              No extra refinements for this department.
-            </div>
+            </select>
+          </label>
+
+          {activeRootCategory && visibleRefinements.length ? (
+            <label className="grid gap-2 text-sm font-semibold text-espresso">
+              Category
+              <select
+                className="focus-ring min-h-11 rounded-md border border-saddle/20 bg-cream px-3 font-bold text-espresso"
+                onChange={(event) => {
+                  const nextDepartment = event.target.value || activeRootCategory.id;
+                  setActiveDepartment(nextDepartment);
+                  window.history.replaceState(null, "", `/shop#${nextDepartment}`);
+                }}
+                value={activeDepartment === activeRootCategory.id ? "" : activeDepartment}
+              >
+                <option value="">All {activeRootCategory.label}</option>
+                {visibleRefinements.map((department) => (
+                  <option key={department.id} value={department.id}>
+                    {"- ".repeat(department.depth)}
+                    {department.label}
+                  </option>
+                ))}
+              </select>
+              {activePath.length > 1 ? (
+                <span className="text-xs font-semibold text-espresso/55">{activePath.map((category) => category.label).join(" / ")}</span>
+              ) : null}
+            </label>
           ) : null}
 
           {activeDepartment !== "all" ? (
             <button
-              className="focus-ring rounded-md border border-saddle/20 px-3 py-2 text-left text-xs font-bold uppercase tracking-[0.16em] text-saddle hover:bg-cream"
+              className="focus-ring rounded-md border border-saddle/20 px-3 py-2 text-center text-xs font-bold uppercase tracking-[0.16em] text-saddle hover:bg-cream"
               onClick={() => {
                 setActiveDepartment("all");
                 window.history.replaceState(null, "", "/shop");
