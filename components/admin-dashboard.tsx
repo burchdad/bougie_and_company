@@ -95,6 +95,7 @@ export function AdminDashboard() {
   const [loggingIn, setLoggingIn] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [importingImages, setImportingImages] = useState(false);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
@@ -477,6 +478,51 @@ export function AdminDashboard() {
     }
   }
 
+  async function handleImportEposImages() {
+    setImportingImages(true);
+    setMessage("");
+
+    try {
+      const response = await fetch("/api/admin/products/images/import", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(adminKey ? { "x-admin-key": adminKey } : {})
+        },
+        body: JSON.stringify({ skipExisting: true })
+      });
+      const result = (await response.json()) as {
+        ok: boolean;
+        message?: string;
+        result?: {
+          productsScanned: number;
+          imageUrlsFound: number;
+          uploaded: number;
+          skippedExisting: number;
+          skippedDuplicate: number;
+          failed: number;
+        };
+      };
+
+      if (!response.ok || !result.ok) {
+        setMessage(result.message || "Could not import Epos product images.");
+        return;
+      }
+
+      const counts = result.result;
+      setMessage(
+        counts
+          ? `${result.message} Scanned ${counts.productsScanned}, found ${counts.imageUrlsFound} image URL${counts.imageUrlsFound === 1 ? "" : "s"}, skipped ${counts.skippedExisting} product${counts.skippedExisting === 1 ? "" : "s"} with existing photos, failed ${counts.failed}.`
+          : result.message || "Epos image import complete."
+      );
+      await loadProducts(query);
+    } catch {
+      setMessage("Could not connect to the Epos image import backend.");
+    } finally {
+      setImportingImages(false);
+    }
+  }
+
   return (
     <section className="midnight-band min-h-screen px-4 py-10 text-ivory sm:px-6 2xl:px-10">
       <div className="mx-auto w-full max-w-[112rem]">
@@ -819,17 +865,27 @@ export function AdminDashboard() {
                     <h2 className="font-display text-4xl">Products</h2>
                     <p className="mt-2 text-ivory/70">Manage Epos-synced products, photos, and website presentation.</p>
                   </div>
-                  <button
-                    className="focus-ring rounded-md bg-champagne px-5 py-3 text-xs font-bold uppercase tracking-[0.16em] text-ink hover:bg-ivory"
-                    onClick={() => {
-                      setIsCreatingProduct(true);
-                      setSelectedId("");
-                      setMessage("");
-                    }}
-                    type="button"
-                  >
-                    Add Product
-                  </button>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      className="focus-ring rounded-md border border-champagne/45 px-5 py-3 text-xs font-bold uppercase tracking-[0.16em] text-champagne hover:bg-champagne hover:text-ink disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={importingImages}
+                      onClick={handleImportEposImages}
+                      type="button"
+                    >
+                      {importingImages ? "Importing" : "Import Epos Images"}
+                    </button>
+                    <button
+                      className="focus-ring rounded-md bg-champagne px-5 py-3 text-xs font-bold uppercase tracking-[0.16em] text-ink hover:bg-ivory"
+                      onClick={() => {
+                        setIsCreatingProduct(true);
+                        setSelectedId("");
+                        setMessage("");
+                      }}
+                      type="button"
+                    >
+                      Add Product
+                    </button>
+                  </div>
                 </div>
                 <div className="mt-6 grid gap-6 xl:grid-cols-[22rem_minmax(0,1fr)] 2xl:grid-cols-[24rem_minmax(0,1fr)]">
                   <aside className="rounded-lg border border-champagne/20 bg-ink/80 p-4">
