@@ -96,6 +96,7 @@ export function AdminDashboard() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [importingImages, setImportingImages] = useState(false);
+  const [repairingStock, setRepairingStock] = useState(false);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
@@ -489,7 +490,7 @@ export function AdminDashboard() {
           "Content-Type": "application/json",
           ...(adminKey ? { "x-admin-key": adminKey } : {})
         },
-        body: JSON.stringify({ skipExisting: true, limit: 25 })
+        body: JSON.stringify({ skipExisting: true, limit: 150 })
       });
       const text = await response.text();
       let result: {
@@ -529,6 +530,48 @@ export function AdminDashboard() {
       setMessage("Could not connect to the Epos image import backend.");
     } finally {
       setImportingImages(false);
+    }
+  }
+
+  async function handleRepairStock() {
+    setRepairingStock(true);
+    setMessage("");
+
+    try {
+      const response = await fetch("/api/admin/products/stock/fill", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(adminKey ? { "x-admin-key": adminKey } : {})
+        },
+        body: JSON.stringify({ minimumStock: 1, limit: 500 })
+      });
+      const result = (await response.json()) as {
+        ok: boolean;
+        message?: string;
+        result?: {
+          updated: number;
+          failed: number;
+          remainingBelowMinimum: number;
+        };
+      };
+
+      if (!response.ok || !result.ok) {
+        setMessage(result.message || "Could not repair Epos stock.");
+        return;
+      }
+
+      const counts = result.result;
+      setMessage(
+        counts
+          ? `${result.message} Updated ${counts.updated}, failed ${counts.failed}, remaining ${counts.remainingBelowMinimum}.`
+          : result.message || "Stock repair complete."
+      );
+      await loadProducts(query);
+    } catch {
+      setMessage("Could not connect to the stock repair backend.");
+    } finally {
+      setRepairingStock(false);
     }
   }
 
@@ -882,6 +925,14 @@ export function AdminDashboard() {
                       type="button"
                     >
                       {importingImages ? "Importing" : "Import Epos Images"}
+                    </button>
+                    <button
+                      className="focus-ring rounded-md border border-champagne/45 px-5 py-3 text-xs font-bold uppercase tracking-[0.16em] text-champagne hover:bg-champagne hover:text-ink disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={repairingStock}
+                      onClick={handleRepairStock}
+                      type="button"
+                    >
+                      {repairingStock ? "Updating Stock" : "Set Stock Minimum"}
                     </button>
                     <button
                       className="focus-ring rounded-md bg-champagne px-5 py-3 text-xs font-bold uppercase tracking-[0.16em] text-ink hover:bg-ivory"
