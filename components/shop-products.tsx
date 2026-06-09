@@ -261,6 +261,35 @@ function groupProducts(products: Product[]) {
   }));
 }
 
+function categoryAncestors(category: FilterCategory | undefined, categories: FilterCategory[]) {
+  const byId = new Map(categories.map((item) => [item.id, item]));
+  const ancestors: FilterCategory[] = [];
+  let current = category;
+
+  while (current) {
+    ancestors.unshift(current);
+    current = current.parentId ? byId.get(current.parentId) : undefined;
+  }
+
+  return ancestors;
+}
+
+function categoryDescendants(categoryId: string, categories: FilterCategory[]) {
+  const byParent = new Map<string | null, FilterCategory[]>();
+  categories.forEach((category) => {
+    byParent.set(category.parentId, [...(byParent.get(category.parentId) || []), category]);
+  });
+
+  const collect = (parentId: string, baseDepth: number): FilterCategory[] =>
+    (byParent.get(parentId) || []).flatMap((category) => [
+      { ...category, depth: category.depth - baseDepth - 1 },
+      ...collect(category.id, baseDepth)
+    ]);
+
+  const parent = categories.find((category) => category.id === categoryId);
+  return parent ? collect(categoryId, parent.depth) : [];
+}
+
 export function ShopProducts() {
   const [products, setProducts] = useState<Product[]>([]);
   const [query, setQuery] = useState("");
@@ -353,21 +382,11 @@ export function ShopProducts() {
   }, [activeDepartment, products, query]);
 
   const filteredGroups = useMemo(() => groupProducts(filteredProducts), [filteredProducts]);
-  const allGroups = useMemo(() => groupProducts(products), [products]);
-
-  const departmentCounts = useMemo(() => {
-    const counts = new Map<string, number>();
-    filterCategories.forEach((category) => counts.set(category.id, 0));
-    allGroups.forEach((group) => {
-      filterCategories.forEach((category) => {
-        if (group.products.some((product) => productMatchesFilter(product, category.id))) {
-          counts.set(category.id, (counts.get(category.id) || 0) + 1);
-        }
-      });
-    });
-    return counts;
-  }, [allGroups, filterCategories]);
-
+  const topLevelCategories = useMemo(() => filterCategories.filter((category) => category.depth === 0), [filterCategories]);
+  const activeCategory = activeDepartment === "all" ? undefined : filterCategories.find((category) => category.id === activeDepartment);
+  const activePath = useMemo(() => categoryAncestors(activeCategory, filterCategories), [activeCategory, filterCategories]);
+  const activeRootCategory = activePath[0];
+  const visibleRefinements = useMemo(() => (activeRootCategory ? categoryDescendants(activeRootCategory.id, filterCategories) : []), [activeRootCategory, filterCategories]);
   const activeCategoryLabel = activeDepartment === "all" ? "All Products" : filterCategories.find((category) => category.id === activeDepartment)?.label || departmentTitle(activeDepartment);
 
   function addToCart(product: Product) {
@@ -402,33 +421,75 @@ export function ShopProducts() {
             />
           </span>
         </label>
-        <div className="mt-5 grid gap-2">
-          <button
-            className={`focus-ring flex items-center justify-between rounded-md px-3 py-2 text-left text-sm font-bold ${activeDepartment === "all" ? "bg-ink text-ivory" : "bg-cream text-espresso hover:bg-champagne/30"}`}
-            onClick={() => {
-              setActiveDepartment("all");
-              window.history.replaceState(null, "", "/shop");
-            }}
-            type="button"
-          >
-            All Products
-            <span>{allGroups.length}</span>
-          </button>
-          {filterCategories.map((department) => (
+        <div className="mt-5 grid gap-4">
+          <div className="grid gap-2">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-saddle">Department</p>
             <button
-              className={`focus-ring flex items-center justify-between rounded-md px-3 py-2 text-left text-sm font-bold ${activeDepartment === department.id ? "bg-ink text-ivory" : "bg-cream text-espresso hover:bg-champagne/30"}`}
-              key={department.id}
+              className={`focus-ring rounded-md px-3 py-2 text-left text-sm font-bold ${activeDepartment === "all" ? "bg-ink text-ivory" : "bg-cream text-espresso hover:bg-champagne/30"}`}
               onClick={() => {
-                setActiveDepartment(department.id);
-                window.history.replaceState(null, "", `/shop#${department.id}`);
+                setActiveDepartment("all");
+                window.history.replaceState(null, "", "/shop");
               }}
-              style={{ paddingLeft: `${0.75 + department.depth * 0.85}rem` }}
               type="button"
             >
-              <span className={department.depth ? "text-xs uppercase tracking-[0.08em]" : ""}>{department.label}</span>
-              <span>{departmentCounts.get(department.id) || 0}</span>
+              All Products
             </button>
-          ))}
+            {topLevelCategories.map((department) => (
+              <button
+                className={`focus-ring rounded-md px-3 py-2 text-left text-sm font-bold ${activeRootCategory?.id === department.id ? "bg-ink text-ivory" : "bg-cream text-espresso hover:bg-champagne/30"}`}
+                key={department.id}
+                onClick={() => {
+                  setActiveDepartment(department.id);
+                  window.history.replaceState(null, "", `/shop#${department.id}`);
+                }}
+                type="button"
+              >
+                {department.label}
+              </button>
+            ))}
+          </div>
+
+          {visibleRefinements.length ? (
+            <div className="grid gap-2 border-t border-saddle/10 pt-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-saddle">Refine</p>
+                {activePath.length > 1 ? (
+                  <p className="mt-1 text-xs font-semibold text-espresso/55">{activePath.map((category) => category.label).join(" / ")}</p>
+                ) : null}
+              </div>
+              {visibleRefinements.map((department) => (
+                <button
+                  className={`focus-ring rounded-md px-3 py-2 text-left font-bold ${activeDepartment === department.id ? "bg-ink text-ivory" : "bg-cream text-espresso hover:bg-champagne/30"} ${department.depth ? "text-xs uppercase tracking-[0.08em]" : "text-sm"}`}
+                  key={department.id}
+                  onClick={() => {
+                    setActiveDepartment(department.id);
+                    window.history.replaceState(null, "", `/shop#${department.id}`);
+                  }}
+                  style={{ paddingLeft: `${0.75 + department.depth * 0.85}rem` }}
+                  type="button"
+                >
+                  {department.label}
+                </button>
+              ))}
+            </div>
+          ) : activeDepartment !== "all" ? (
+            <div className="rounded-md border border-dashed border-saddle/20 bg-cream/60 p-3 text-xs font-semibold text-espresso/60">
+              No extra refinements for this department.
+            </div>
+          ) : null}
+
+          {activeDepartment !== "all" ? (
+            <button
+              className="focus-ring rounded-md border border-saddle/20 px-3 py-2 text-left text-xs font-bold uppercase tracking-[0.16em] text-saddle hover:bg-cream"
+              onClick={() => {
+                setActiveDepartment("all");
+                window.history.replaceState(null, "", "/shop");
+              }}
+              type="button"
+            >
+              Clear filter
+            </button>
+          ) : null}
         </div>
       </aside>
 
