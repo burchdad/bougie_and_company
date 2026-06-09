@@ -1,6 +1,7 @@
 "use client";
 
-import { ShoppingBag, Star } from "lucide-react";
+import Image from "next/image";
+import { ShoppingBag } from "lucide-react";
 import { bestSellers } from "@/lib/data";
 
 export function ProductShowcase() {
@@ -20,15 +21,19 @@ export function ProductShowcase() {
     <div className="mt-8 grid gap-5 md:grid-cols-2 lg:grid-cols-4">
       {bestSellers.map((product, index) => (
         <article className="group overflow-hidden rounded-lg border border-saddle/15 bg-ivory shadow-sm transition hover:-translate-y-1 hover:shadow-luxe" key={product.name}>
-          <div className={`relative flex aspect-[4/5] items-end overflow-hidden bg-gradient-to-br ${product.tone} p-5 text-ivory`}>
-            <div className="absolute inset-0 opacity-35 mix-blend-soft-light luxury-pattern" />
-            <span className="absolute right-4 top-4 rounded-full bg-ink/45 px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] text-champagne">
+          <div className={`relative aspect-[4/5] overflow-hidden bg-gradient-to-br ${product.tone}`}>
+            <Image
+              alt={product.imageAlt}
+              className="object-cover transition duration-500 group-hover:scale-105"
+              fill
+              priority={index === 0}
+              sizes="(min-width: 1024px) 25vw, (min-width: 768px) 50vw, 100vw"
+              src={product.image}
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-ink/45 via-transparent to-transparent" />
+            <span className="absolute right-4 top-4 rounded-full bg-ink/55 px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] text-champagne">
               0{index + 1}
             </span>
-            <div className="relative">
-              <Star className="h-7 w-7 fill-champagne text-champagne" />
-              <p className="mt-5 font-display text-3xl leading-tight">{product.name}</p>
-            </div>
           </div>
           <div className="p-5">
             <p className="text-xs font-bold uppercase tracking-[0.2em] text-saddle">{product.category}</p>
