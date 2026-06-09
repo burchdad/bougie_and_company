@@ -52,15 +52,28 @@ export function buildCategoryTree(categories: SiteCategory[]) {
   });
 
   const build = (parentId: number | null): CategoryMenuItem[] =>
-    (byParent.get(parentId) || []).map((category) => ({
-      id: category.id,
-      label: category.label,
-      href: category.href,
-      children: build(category.id)
-    }));
+    (byParent.get(parentId) || []).map((category) => {
+      const children = build(category.id);
+      return {
+        id: category.id,
+        label: category.label,
+        href: category.href,
+        ...(children.length ? { children } : {})
+      };
+    });
 
   const headerCategories = categories.filter((category) => category.is_header && category.parent_id === null);
-  return headerCategories.length ? headerCategories.map((category) => ({ id: category.id, label: category.label, href: category.href, children: build(category.id) })) : build(null);
+  return headerCategories.length
+    ? headerCategories.map((category) => {
+        const children = build(category.id);
+        return {
+          id: category.id,
+          label: category.label,
+          href: category.href,
+          ...(children.length ? { children } : {})
+        };
+      })
+    : build(null);
 }
 
 export async function seedDefaultCategoriesIfEmpty() {
