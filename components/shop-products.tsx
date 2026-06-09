@@ -3,8 +3,9 @@
 import Image from "next/image";
 import { Search, ShoppingBag, SlidersHorizontal, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { shopDepartments } from "@/lib/data";
+import { defaultMenuItems } from "@/lib/category-defaults";
 import { departmentTitle, inferDepartment } from "@/lib/product-categorization";
+import type { CategoryMenuItem } from "@/lib/category-defaults";
 
 type Product = {
   epos_product_id: string;
@@ -37,6 +38,19 @@ type ProductGroup = {
   products: Product[];
 };
 
+type FilterCategory = {
+  id: string;
+  label: string;
+  href: string;
+  depth: number;
+  parentId: string | null;
+};
+
+type CategoryResponse = {
+  ok: boolean;
+  menu?: CategoryMenuItem[];
+};
+
 const variantWords = [
   "xxs",
   "xs",
@@ -57,6 +71,90 @@ const variantWords = [
   "os"
 ];
 
+const categoryKeywordMap: Record<string, string[]> = {
+  accessories: ["purse", "bag", "luggage", "weekender", "coozie", "koozie", "coaster", "infusion", "cocktail", "cap", "hat"],
+  "bath-body": ["bath", "body", "scrub", "salt", "bomb", "chap", "mask", "lotion", "soap", "beard", "spray", "week from hell", "shampoo"],
+  "bath-bombs": ["bath bomb"],
+  "bath-salts": ["bath salt"],
+  "beard-products": ["beard"],
+  "body-butter-lotion": ["body butter", "lotion"],
+  "body-scrubs": ["body scrub", "scrub"],
+  "body-spray": ["body spray", "body sprays"],
+  "body-sprays": ["body spray", "body sprays"],
+  "chap-stick": ["chap stick", "chapstick"],
+  candles: ["candle"],
+  "clay-masks": ["clay mask"],
+  clothing: ["shirt", "tee", "t-shirt", "top", "bottom", "dress", "romper", "jumpsuit", "cardigan", "jean", "short", "pant", "skirt"],
+  "cocktail-infusions": ["cocktail", "infusion", "mixer"],
+  "cocktail-mixers": ["cocktail", "mixer"],
+  coasters: ["coaster"],
+  coozies: ["coozie", "koozie"],
+  dresses: ["dress"],
+  earrings: ["earring"],
+  "equine-jewelry": ["equine", "horse", "rein", "snaffle", "necklace", "bracelet", "earring"],
+  "foaming-hand-soap": ["foaming hand"],
+  "gift-certificates": ["gift certificate"],
+  "gift-collection": ["gift", "certificate", "set"],
+  "gift-sets": ["gift set"],
+  "handmade-soaps": ["handmade soap", "homemade soap"],
+  headbands: ["headband"],
+  "home-collection": ["candle", "wax", "melt", "tea towel", "pillow", "coaster", "mixer", "outdoor"],
+  homemade: ["homemade"],
+  "homemade-dish-soap": ["dish soap"],
+  "homemade-mechanic-soaps": ["mechanic soap", "mechanic soaps"],
+  "jewelry-headbands": ["jewelry", "headband", "earring", "bracelet", "necklace"],
+  "kitchen-collection": ["dish soap", "foaming hand", "kitchen"],
+  "kitchen-selection": ["dish soap", "foaming hand", "kitchen"],
+  "leather-coasters": ["leather coaster"],
+  luggage: ["luggage", "weekender", "duffle", "travel"],
+  "mens-care": ["men", "beard", "mechanic", "body spray", "shampoo", "chap"],
+  "mens-collection": ["men", "beard", "mechanic", "cap", "t-shirt", "body spray", "shampoo"],
+  necklaces: ["necklace"],
+  "outdoor-items": ["outdoor"],
+  purses: ["purse", "bag"],
+  regular: ["regular coaster"],
+  "rompers-jumpsuits": ["romper", "jumpsuit"],
+  "soy-9oz": ["9oz", "9 oz", "soy"],
+  "soy-wax-melts": ["wax melt", "wax melts"],
+  soaps: ["soap"],
+  tack: ["tack", "halter", "lead rope", "bridle", "bit", "reins", "saddle", "spur"],
+  "t-shirts": ["t-shirt", "tee", "shirt"],
+  "tea-towels-pillows": ["tea towel", "pillow"],
+  "week-from-hell": ["week from hell"],
+  "womens-care": ["women", "week from hell", "bath salt", "body scrub", "bath bomb", "body spray", "chap"],
+  "womens-collection": ["women", "dress", "romper", "jumpsuit", "purse", "bath bomb", "body spray", "week from hell"]
+};
+
+function slugify(value: string) {
+  return value.toLowerCase().trim().replace(/&/g, " and ").replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "category";
+}
+
+function hashFromHref(href: string) {
+  const hash = href.split("#")[1];
+  return hash ? slugify(hash) : "";
+}
+
+function uniqueCategoryId(item: CategoryMenuItem, parentId: string | null, seen: Set<string>) {
+  const hrefHash = hashFromHref(item.href);
+  const labelSlug = slugify(item.label);
+  const baseId = parentId && hrefHash === parentId ? labelSlug : hrefHash || labelSlug;
+  const id = seen.has(baseId) && parentId ? `${parentId}-${labelSlug}` : baseId;
+  seen.add(id);
+  return id;
+}
+
+function flattenMenuItems(items: CategoryMenuItem[], depth = 0, parentId: string | null = null, seen = new Set<string>()): FilterCategory[] {
+  return items.flatMap((item) => {
+    const id = uniqueCategoryId(item, parentId, seen);
+    return [
+      { id, label: item.label, href: `/shop#${id}`, depth, parentId },
+      ...flattenMenuItems(item.children || [], depth + 1, id, seen)
+    ];
+  });
+}
+
+const fallbackFilterCategories = flattenMenuItems(defaultMenuItems);
+
 function money(value: string | null) {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? `$${parsed.toFixed(2)}` : "Price in store";
@@ -69,6 +167,40 @@ function stockCount(value: string | null) {
 
 function getProductDepartment(product: Product) {
   return inferDepartment(product) || "all";
+}
+
+function productSearchText(product: Product) {
+  return `${product.name} ${product.marketing_title || ""} ${product.description || ""} ${product.marketing_description || ""} ${product.sku || ""}`.toLowerCase();
+}
+
+function categoryKeywords(filterId: string) {
+  const direct = categoryKeywordMap[filterId];
+  if (direct) {
+    return direct;
+  }
+
+  const segments = filterId.split("-");
+  for (let index = 0; index < segments.length; index += 1) {
+    const possible = segments.slice(index).join("-");
+    if (categoryKeywordMap[possible]) {
+      return categoryKeywordMap[possible];
+    }
+  }
+
+  return [filterId.replace(/-/g, " ")];
+}
+
+function productMatchesFilter(product: Product, filterId: string) {
+  if (filterId === "all") {
+    return true;
+  }
+
+  if (getProductDepartment(product) === filterId) {
+    return true;
+  }
+
+  const haystack = productSearchText(product);
+  return categoryKeywords(filterId).some((keyword) => haystack.includes(keyword));
 }
 
 function cleanProductTitle(product: Product) {
@@ -133,22 +265,10 @@ export function ShopProducts() {
   const [products, setProducts] = useState<Product[]>([]);
   const [query, setQuery] = useState("");
   const [activeDepartment, setActiveDepartment] = useState("all");
+  const [filterCategories, setFilterCategories] = useState<FilterCategory[]>(fallbackFilterCategories);
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
-
-  useEffect(() => {
-    function applyHash() {
-      const nextDepartment = window.location.hash.replace("#", "");
-      if (nextDepartment && shopDepartments.some((department) => department.id === nextDepartment)) {
-        setActiveDepartment(nextDepartment);
-      }
-    }
-
-    applyHash();
-    window.addEventListener("hashchange", applyHash);
-    return () => window.removeEventListener("hashchange", applyHash);
-  }, []);
 
   useEffect(() => {
     let ignore = false;
@@ -186,25 +306,69 @@ export function ShopProducts() {
     };
   }, []);
 
+  useEffect(() => {
+    let ignore = false;
+
+    async function loadCategories() {
+      try {
+        const response = await fetch("/api/categories", { cache: "no-store" });
+        const result = (await response.json()) as CategoryResponse;
+
+        if (!ignore && result.ok && result.menu?.length) {
+          setFilterCategories(flattenMenuItems(result.menu));
+        }
+      } catch {
+        if (!ignore) {
+          setFilterCategories(fallbackFilterCategories);
+        }
+      }
+    }
+
+    loadCategories();
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    function applyHash() {
+      const nextDepartment = window.location.hash.replace("#", "");
+      if (nextDepartment && filterCategories.some((category) => category.id === nextDepartment)) {
+        setActiveDepartment(nextDepartment);
+      }
+    }
+
+    applyHash();
+    window.addEventListener("hashchange", applyHash);
+    return () => window.removeEventListener("hashchange", applyHash);
+  }, [filterCategories]);
+
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
-      const searchable = `${product.name} ${product.description || ""} ${product.sku || ""}`.toLowerCase();
+      const searchable = productSearchText(product);
       const matchesQuery = !query || searchable.includes(query.toLowerCase());
-      const matchesDepartment = activeDepartment === "all" || getProductDepartment(product) === activeDepartment;
+      const matchesDepartment = productMatchesFilter(product, activeDepartment);
       return matchesQuery && matchesDepartment;
     });
   }, [activeDepartment, products, query]);
 
   const filteredGroups = useMemo(() => groupProducts(filteredProducts), [filteredProducts]);
+  const allGroups = useMemo(() => groupProducts(products), [products]);
 
   const departmentCounts = useMemo(() => {
     const counts = new Map<string, number>();
-    groupProducts(products).forEach((group) => {
-      const department = getProductDepartment(group.products[0]);
-      counts.set(department, (counts.get(department) || 0) + 1);
+    filterCategories.forEach((category) => counts.set(category.id, 0));
+    allGroups.forEach((group) => {
+      filterCategories.forEach((category) => {
+        if (group.products.some((product) => productMatchesFilter(product, category.id))) {
+          counts.set(category.id, (counts.get(category.id) || 0) + 1);
+        }
+      });
     });
     return counts;
-  }, [products]);
+  }, [allGroups, filterCategories]);
+
+  const activeCategoryLabel = activeDepartment === "all" ? "All Products" : filterCategories.find((category) => category.id === activeDepartment)?.label || departmentTitle(activeDepartment);
 
   function addToCart(product: Product) {
     window.dispatchEvent(
@@ -248,9 +412,9 @@ export function ShopProducts() {
             type="button"
           >
             All Products
-            <span>{groupProducts(products).length}</span>
+            <span>{allGroups.length}</span>
           </button>
-          {shopDepartments.map((department) => (
+          {filterCategories.map((department) => (
             <button
               className={`focus-ring flex items-center justify-between rounded-md px-3 py-2 text-left text-sm font-bold ${activeDepartment === department.id ? "bg-ink text-ivory" : "bg-cream text-espresso hover:bg-champagne/30"}`}
               key={department.id}
@@ -258,9 +422,10 @@ export function ShopProducts() {
                 setActiveDepartment(department.id);
                 window.history.replaceState(null, "", `/shop#${department.id}`);
               }}
+              style={{ paddingLeft: `${0.75 + department.depth * 0.85}rem` }}
               type="button"
             >
-              {department.title}
+              <span className={department.depth ? "text-xs uppercase tracking-[0.08em]" : ""}>{department.label}</span>
               <span>{departmentCounts.get(department.id) || 0}</span>
             </button>
           ))}
@@ -271,7 +436,7 @@ export function ShopProducts() {
         <div className="rounded-lg bg-ink p-5 text-ivory shadow-luxe">
           <p className="text-xs font-bold uppercase tracking-[0.22em] text-champagne">Live Epos Catalog</p>
           <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
-            <h2 className="font-display text-4xl">{departmentTitle(activeDepartment)}</h2>
+            <h2 className="font-display text-4xl">{activeCategoryLabel}</h2>
             <p className="text-sm font-semibold text-ivory/75">{loading ? "Loading inventory..." : `${filteredGroups.length} products showing`}</p>
           </div>
         </div>

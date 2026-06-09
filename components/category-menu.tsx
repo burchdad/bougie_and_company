@@ -11,6 +11,31 @@ type MenuItem = {
   children?: MenuItem[];
 };
 
+function slugify(value: string) {
+  return value.toLowerCase().trim().replace(/&/g, " and ").replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "category";
+}
+
+function hashFromHref(href: string) {
+  const hash = href.split("#")[1];
+  return hash ? slugify(hash) : "";
+}
+
+function normalizeMenuLinks(items: MenuItem[], parentId: string | null = null, seen = new Set<string>()): MenuItem[] {
+  return items.map((item) => {
+    const hrefHash = hashFromHref(item.href);
+    const labelSlug = slugify(item.label);
+    const baseId = parentId && hrefHash === parentId ? labelSlug : hrefHash || labelSlug;
+    const id = seen.has(baseId) && parentId ? `${parentId}-${labelSlug}` : baseId;
+    seen.add(id);
+
+    return {
+      ...item,
+      href: `/shop#${id}`,
+      children: item.children?.length ? normalizeMenuLinks(item.children, id, seen) : undefined
+    };
+  });
+}
+
 function MenuLink({ item, nested = false }: { item: MenuItem; nested?: boolean }) {
   const [open, setOpen] = useState(false);
   const hasChildren = Boolean(item.children?.length);
@@ -37,7 +62,7 @@ function MenuLink({ item, nested = false }: { item: MenuItem; nested?: boolean }
 
 export function CategoryMenu() {
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
-  const [menuItems, setMenuItems] = useState<MenuItem[]>(defaultMenuItems);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>(() => normalizeMenuLinks(defaultMenuItems));
   const closeTimer = useRef<number | null>(null);
 
   useEffect(() => {
@@ -48,10 +73,10 @@ export function CategoryMenu() {
         const response = await fetch("/api/categories", { cache: "no-store" });
         const result = (await response.json()) as { ok: boolean; menu?: MenuItem[] };
         if (!ignore && result.ok && result.menu?.length) {
-          setMenuItems(result.menu);
+          setMenuItems(normalizeMenuLinks(result.menu));
         }
       } catch {
-        setMenuItems(defaultMenuItems);
+        setMenuItems(normalizeMenuLinks(defaultMenuItems));
       }
     }
 

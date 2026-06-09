@@ -38,6 +38,10 @@ export function slugify(value: string) {
   return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "category";
 }
 
+function categoryHref(category: SiteCategory) {
+  return category.parent_id ? `/shop#${category.slug}` : category.href;
+}
+
 export async function listSiteCategories() {
   await ensureCategoryTables();
   const sql = getSql();
@@ -57,7 +61,7 @@ export function buildCategoryTree(categories: SiteCategory[]) {
       return {
         id: category.id,
         label: category.label,
-        href: category.href,
+        href: categoryHref(category),
         ...(children.length ? { children } : {})
       };
     });
@@ -69,7 +73,7 @@ export function buildCategoryTree(categories: SiteCategory[]) {
         return {
           id: category.id,
           label: category.label,
-          href: category.href,
+          href: categoryHref(category),
           ...(children.length ? { children } : {})
         };
       })
