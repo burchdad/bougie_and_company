@@ -70,6 +70,7 @@ export function AdminDashboard() {
   const [products, setProducts] = useState<AdminProduct[]>([]);
   const [categories, setCategories] = useState<SiteCategory[]>([]);
   const [editingCategoryId, setEditingCategoryId] = useState<number | null>(null);
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState("");
   const [loading, setLoading] = useState(true);
@@ -87,6 +88,7 @@ export function AdminDashboard() {
   }, []);
 
   const selectedProduct = useMemo(() => products.find((product) => product.epos_product_id === selectedId) || products[0], [products, selectedId]);
+  const selectedCategory = useMemo(() => categories.find((category) => category.id === editingCategoryId) || null, [categories, editingCategoryId]);
 
   async function loadProducts(searchTerm = query) {
     setLoading(true);
@@ -310,6 +312,7 @@ export function AdminDashboard() {
       if (result.ok) {
         event.currentTarget.reset();
         setEditingCategoryId(null);
+        setIsCategoryModalOpen(false);
         await loadCategories();
       }
     } catch {
@@ -325,6 +328,10 @@ export function AdminDashboard() {
       });
       const result = (await response.json()) as { ok: boolean; message?: string };
       setMessage(result.message || (result.ok ? "Category removed." : "Could not remove category."));
+      if (editingCategoryId === id) {
+        setEditingCategoryId(null);
+        setIsCategoryModalOpen(false);
+      }
       await loadCategories();
     } catch {
       setMessage("Could not connect to the category delete backend.");
@@ -449,52 +456,21 @@ export function AdminDashboard() {
                   </div>
                 ) : null}
                 {activeTab === "categories" ? (
-                  <div className="mt-5 grid gap-5 xl:grid-cols-[24rem_1fr]">
-                    <form className="rounded-lg border border-champagne/25 bg-ink/50 p-5" key={editingCategoryId || "new-category"} onSubmit={handleCategorySubmit}>
-                      <p className="font-display text-3xl">{editingCategoryId ? "Edit Category" : "Add Category"}</p>
-                      <div className="mt-4 grid gap-3">
-                        <label className="grid gap-2 text-sm font-semibold text-ivory">
-                          Category name
-                          <input className="focus-ring min-h-11 rounded-md border border-champagne/20 bg-ivory px-3 text-ink" defaultValue={categories.find((category) => category.id === editingCategoryId)?.label || ""} name="label" required />
-                        </label>
-                        <label className="grid gap-2 text-sm font-semibold text-ivory">
-                          Header / shop link
-                          <input className="focus-ring min-h-11 rounded-md border border-champagne/20 bg-ivory px-3 text-ink" defaultValue={categories.find((category) => category.id === editingCategoryId)?.href || ""} name="href" placeholder="/shop#accessories" />
-                        </label>
-                        <label className="grid gap-2 text-sm font-semibold text-ivory">
-                          Parent category
-                          <select className="focus-ring min-h-11 rounded-md border border-champagne/20 bg-ivory px-3 text-ink" defaultValue={categories.find((category) => category.id === editingCategoryId)?.parent_id || ""} name="parentId">
-                            <option value="">Top level</option>
-                            {categories.filter((category) => category.id !== editingCategoryId).map((category) => (
-                              <option key={category.id} value={category.id}>{category.label}</option>
-                            ))}
-                          </select>
-                        </label>
-                        <label className="grid gap-2 text-sm font-semibold text-ivory">
-                          Sort order
-                          <input className="focus-ring min-h-11 rounded-md border border-champagne/20 bg-ivory px-3 text-ink" defaultValue={categories.find((category) => category.id === editingCategoryId)?.sort_order || 0} name="sortOrder" type="number" />
-                        </label>
-                        <label className="flex items-center gap-3 rounded-md border border-champagne/20 bg-ivory/5 px-3 py-3 text-sm font-semibold text-ivory">
-                          <input defaultChecked={Boolean(categories.find((category) => category.id === editingCategoryId)?.is_header)} name="isHeader" type="checkbox" />
-                          Show as main header tab
-                        </label>
-                        <label className="flex items-center gap-3 rounded-md border border-champagne/20 bg-ivory/5 px-3 py-3 text-sm font-semibold text-ivory">
-                          <input name="syncToEpos" type="checkbox" />
-                          Sync category change to Epos
-                        </label>
-                        <div className="flex gap-2">
-                          <button className="focus-ring rounded-md bg-champagne px-5 py-3 text-xs font-bold uppercase tracking-[0.16em] text-ink" type="submit">
-                            {editingCategoryId ? "Save" : "Add"}
-                          </button>
-                          {editingCategoryId ? (
-                            <button className="focus-ring rounded-md border border-champagne/40 px-5 py-3 text-xs font-bold uppercase tracking-[0.16em] text-champagne" onClick={() => setEditingCategoryId(null)} type="button">
-                              Cancel
-                            </button>
-                          ) : null}
-                        </div>
-                      </div>
-                    </form>
-                    <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
+                  <div className="mt-5">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <p className="max-w-3xl text-sm leading-6 text-ivory/70">Add, edit, nest, and sort the categories that power the public header dropdowns and shop links.</p>
+                      <button
+                        className="focus-ring rounded-md bg-champagne px-5 py-3 text-xs font-bold uppercase tracking-[0.16em] text-ink hover:bg-ivory"
+                        onClick={() => {
+                          setEditingCategoryId(null);
+                          setIsCategoryModalOpen(true);
+                        }}
+                        type="button"
+                      >
+                        Add Category
+                      </button>
+                    </div>
+                    <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                       {categories.map((category) => (
                         <div className="rounded-lg border border-champagne/25 bg-ink/50 p-4" key={category.id}>
                           <div className="flex items-start justify-between gap-3">
@@ -504,13 +480,90 @@ export function AdminDashboard() {
                               <p className="mt-2 text-xs text-ivory/60">{category.href}</p>
                             </div>
                             <div className="flex gap-2">
-                              <button className="focus-ring rounded-md bg-champagne px-3 py-2 text-xs font-bold text-ink" onClick={() => setEditingCategoryId(category.id)} type="button">Edit</button>
+                              <button
+                                className="focus-ring rounded-md bg-champagne px-3 py-2 text-xs font-bold text-ink"
+                                onClick={() => {
+                                  setEditingCategoryId(category.id);
+                                  setIsCategoryModalOpen(true);
+                                }}
+                                type="button"
+                              >
+                                Edit
+                              </button>
                               <button className="focus-ring rounded-md border border-ember/60 px-3 py-2 text-xs font-bold text-ember" onClick={() => handleDeleteCategory(category.id)} type="button">Delete</button>
                             </div>
                           </div>
                         </div>
                       ))}
                     </div>
+                    {isCategoryModalOpen ? (
+                      <div className="fixed inset-0 z-50 grid place-items-center bg-ink/80 px-4 py-8 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="category-modal-title">
+                        <div className="max-h-[calc(100vh-4rem)] w-full max-w-xl overflow-auto rounded-lg border border-champagne/30 bg-ink p-5 shadow-luxe">
+                          <div className="flex items-start justify-between gap-4">
+                            <div>
+                              <p className="text-xs font-bold uppercase tracking-[0.22em] text-champagne">Category Setup</p>
+                              <h3 className="mt-2 font-display text-4xl" id="category-modal-title">{selectedCategory ? "Edit Category" : "Add Category"}</h3>
+                            </div>
+                            <button
+                              className="focus-ring rounded-md border border-champagne/35 px-3 py-2 text-xs font-bold uppercase tracking-[0.14em] text-champagne hover:bg-champagne hover:text-ink"
+                              onClick={() => {
+                                setEditingCategoryId(null);
+                                setIsCategoryModalOpen(false);
+                              }}
+                              type="button"
+                            >
+                              Close
+                            </button>
+                          </div>
+                          <form className="mt-5 grid gap-3" key={selectedCategory?.id || "new-category"} onSubmit={handleCategorySubmit}>
+                            <label className="grid gap-2 text-sm font-semibold text-ivory">
+                              Category name
+                              <input className="focus-ring min-h-11 rounded-md border border-champagne/20 bg-ivory px-3 text-ink" defaultValue={selectedCategory?.label || ""} name="label" required />
+                            </label>
+                            <label className="grid gap-2 text-sm font-semibold text-ivory">
+                              Header / shop link
+                              <input className="focus-ring min-h-11 rounded-md border border-champagne/20 bg-ivory px-3 text-ink" defaultValue={selectedCategory?.href || ""} name="href" placeholder="/shop#accessories" />
+                            </label>
+                            <label className="grid gap-2 text-sm font-semibold text-ivory">
+                              Parent category
+                              <select className="focus-ring min-h-11 rounded-md border border-champagne/20 bg-ivory px-3 text-ink" defaultValue={selectedCategory?.parent_id || ""} name="parentId">
+                                <option value="">Top level</option>
+                                {categories.filter((category) => category.id !== selectedCategory?.id).map((category) => (
+                                  <option key={category.id} value={category.id}>{category.label}</option>
+                                ))}
+                              </select>
+                            </label>
+                            <label className="grid gap-2 text-sm font-semibold text-ivory">
+                              Sort order
+                              <input className="focus-ring min-h-11 rounded-md border border-champagne/20 bg-ivory px-3 text-ink" defaultValue={selectedCategory?.sort_order || 0} name="sortOrder" type="number" />
+                            </label>
+                            <label className="flex items-center gap-3 rounded-md border border-champagne/20 bg-ivory/5 px-3 py-3 text-sm font-semibold text-ivory">
+                              <input defaultChecked={Boolean(selectedCategory?.is_header)} name="isHeader" type="checkbox" />
+                              Show as main header tab
+                            </label>
+                            <label className="flex items-center gap-3 rounded-md border border-champagne/20 bg-ivory/5 px-3 py-3 text-sm font-semibold text-ivory">
+                              <input name="syncToEpos" type="checkbox" />
+                              Sync category change to Epos
+                            </label>
+                            <div className="flex flex-wrap gap-2 pt-2">
+                              <button className="focus-ring rounded-md bg-champagne px-5 py-3 text-xs font-bold uppercase tracking-[0.16em] text-ink hover:bg-ivory" type="submit">
+                                {selectedCategory ? "Save" : "Add"}
+                              </button>
+                              <button
+                                className="focus-ring rounded-md border border-champagne/40 px-5 py-3 text-xs font-bold uppercase tracking-[0.16em] text-champagne hover:bg-champagne hover:text-ink"
+                                onClick={() => {
+                                  setEditingCategoryId(null);
+                                  setIsCategoryModalOpen(false);
+                                }}
+                                type="button"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </form>
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
                 {activeTab === "discounts" ? (
