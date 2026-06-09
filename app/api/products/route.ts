@@ -27,7 +27,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const query = searchParams.get("q")?.trim() || "";
     const rows = (await getAdminProducts(query)) as ProductRow[];
-    const products = rows.filter((product) => !product.is_hidden);
+    const products = rows.filter((product) => !product.is_hidden && Number(product.stock || 0) > 0);
 
     return Response.json({ ok: true, products }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {

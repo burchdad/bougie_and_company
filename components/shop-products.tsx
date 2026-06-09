@@ -71,6 +71,30 @@ const variantWords = [
   "os"
 ];
 
+const apparelColorWords = [
+  "black",
+  "blue",
+  "brown",
+  "charcoal",
+  "coral",
+  "cream",
+  "graphite",
+  "gray",
+  "green",
+  "grey",
+  "ivory",
+  "navy",
+  "pink",
+  "purple",
+  "red",
+  "skye",
+  "tan",
+  "teal",
+  "turquoise",
+  "white",
+  "yellow"
+];
+
 const categoryKeywordMap: Record<string, string[]> = {
   accessories: ["purse", "bag", "luggage", "weekender", "coozie", "koozie", "coaster", "infusion", "cocktail", "cap", "hat"],
   "bath-body": ["bath", "body", "scrub", "salt", "bomb", "chap", "mask", "lotion", "soap", "beard", "spray", "week from hell", "shampoo"],
@@ -165,6 +189,10 @@ function stockCount(value: string | null) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function hasAvailableStock(product: Product) {
+  return stockCount(product.stock) > 0;
+}
+
 function getProductDepartment(product: Product) {
   return inferDepartment(product) || "all";
 }
@@ -222,24 +250,55 @@ function variantLabel(product: Product) {
     return skuSize[1].toUpperCase();
   }
 
+  const withoutSku = title.replace(/^[A-Z]{2,}\d+[A-Z0-9-]*\s+/i, "").trim();
+  const titleWords = withoutSku.split(/\s+/);
+  const colorWords = titleWords.filter((word) => apparelColorWords.includes(word.toLowerCase()));
+  if (colorWords.length) {
+    return colorWords.map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
+  }
+
   return sku || product.epos_product_id;
 }
 
-function groupKey(product: Product) {
-  let title = cleanProductTitle(product).toLowerCase();
+function titleWithoutLeadingSku(title: string) {
+  return title.replace(/^[A-Z]{2,}\d+[A-Z0-9-]*\s+/i, "").trim();
+}
+
+function normalizedVariantBaseTitle(product: Product) {
+  let title = titleWithoutLeadingSku(cleanProductTitle(product)).toLowerCase();
   title = title.replace(/\b(size|sz)\s*[:#-]?\s*/g, " ");
   variantWords.forEach((word) => {
     title = title.replace(new RegExp(`\\b${word.replace(" ", "\\s+")}\\b`, "gi"), " ");
   });
+
+  const words = title.split(/\s+/).filter(Boolean);
+  while (words.length > 1 && apparelColorWords.includes(words[0])) {
+    words.shift();
+  }
+
+  title = words.join(" ");
   title = title.replace(/\b\d+x\b/g, " ");
   title = title.replace(/\s*[-|/]\s*$/g, " ");
-  return title.replace(/[^a-z0-9]+/g, " ").trim() || product.epos_product_id;
+  return title.replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function groupKey(product: Product) {
+  return normalizedVariantBaseTitle(product) || product.epos_product_id;
+}
+
+function groupTitle(product: Product) {
+  const baseTitle = normalizedVariantBaseTitle(product);
+  if (!baseTitle || baseTitle === product.epos_product_id) {
+    return titleWithoutLeadingSku(cleanProductTitle(product)).replace(/\b(Size|SZ)\b\s*[:#-]?\s*/gi, "").trim();
+  }
+
+  return baseTitle.replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function groupProducts(products: Product[]) {
   const groups = new Map<string, ProductGroup>();
 
-  products.forEach((product) => {
+  products.filter(hasAvailableStock).forEach((product) => {
     const key = groupKey(product);
     const existing = groups.get(key);
 
@@ -250,7 +309,7 @@ function groupProducts(products: Product[]) {
 
     groups.set(key, {
       key,
-      title: cleanProductTitle(product).replace(/\b(Size|SZ)\b\s*[:#-]?\s*/gi, "").trim(),
+      title: groupTitle(product),
       products: [product]
     });
   });
@@ -514,16 +573,15 @@ export function ShopProducts() {
 
         {!loading && filteredGroups.length ? (
           <div className="mt-5 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-            {filteredGroups.map((group, index) => {
+            {filteredGroups.map((group) => {
               const selectedProductId = selectedVariants[group.key];
               const product = group.products.find((variant) => variant.epos_product_id === selectedProductId) || group.products[0];
-              const stock = stockCount(product.stock);
               const price = money(product.sale_price);
               const hasVariants = group.products.length > 1;
 
               return (
                 <article className="group overflow-hidden rounded-lg border border-saddle/15 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-luxe" key={group.key}>
-                  <div className="relative flex aspect-[4/3] items-end overflow-hidden bg-gradient-to-br from-espresso via-saddle to-ember p-5 text-ivory">
+                  <div className="relative aspect-[4/3] overflow-hidden bg-gradient-to-br from-espresso via-saddle to-ember">
                     <div className="absolute inset-0 opacity-30 mix-blend-soft-light luxury-pattern" />
                     {product.primary_image_url ? (
                       <Image
@@ -535,20 +593,10 @@ export function ShopProducts() {
                       />
                     ) : null}
                     {product.primary_image_url ? <div className="absolute inset-0 bg-gradient-to-t from-ink/80 via-ink/10 to-transparent" /> : null}
-                    <span className="absolute right-4 top-4 z-10 rounded-full bg-ink/50 px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] text-champagne">
-                      {String(index + 1).padStart(2, "0")}
-                    </span>
-                    <div className="relative">
-                      <ShoppingBag className="h-7 w-7 text-champagne" />
-                      <p className="mt-4 line-clamp-2 font-display text-3xl leading-tight">{group.title}</p>
-                    </div>
                   </div>
                   <div className="p-5">
                     <p className="text-xs font-bold uppercase tracking-[0.18em] text-saddle">{departmentTitle(getProductDepartment(product))}</p>
-                    <h3 className="mt-2 line-clamp-2 min-h-16 font-display text-2xl leading-tight text-ink">{group.title}</h3>
-                    <p className="mt-2 min-h-12 text-sm leading-6 text-espresso/65">
-                      {product.marketing_description || product.description || (product.sku ? `SKU ${product.sku}` : "Synced from Bougie & Company inventory.")}
-                    </p>
+                    <h3 className="mt-2 line-clamp-2 min-h-14 font-display text-2xl leading-tight text-ink">{group.title}</h3>
                     {hasVariants ? (
                       <label className="mt-4 grid gap-2 text-sm font-semibold text-espresso">
                         Select option
@@ -559,18 +607,12 @@ export function ShopProducts() {
                         >
                           {group.products.map((variant) => (
                             <option key={variant.epos_product_id} value={variant.epos_product_id}>
-                              {variantLabel(variant)} / {money(variant.sale_price)} / {stockCount(variant.stock)} in stock
+                              {variantLabel(variant)} / {money(variant.sale_price)}
                             </option>
                           ))}
                         </select>
                       </label>
                     ) : null}
-                    <div className="mt-4 flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-[0.14em]">
-                      <span className={`rounded-full px-3 py-1 ${stock > 0 ? "bg-moss/15 text-moss" : "bg-champagne/20 text-saddle"}`}>
-                        {stock > 0 ? `${stock} in stock` : "Confirm availability"}
-                      </span>
-                      {product.sku ? <span className="rounded-full bg-cream px-3 py-1 text-saddle">SKU {product.sku}</span> : null}
-                    </div>
                     <div className="mt-5 flex items-center justify-between gap-3">
                       <span className="font-bold text-espresso">{price}</span>
                       <button
