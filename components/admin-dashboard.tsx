@@ -58,6 +58,7 @@ export function AdminDashboard() {
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState("");
   const [loading, setLoading] = useState(true);
+  const [loggingIn, setLoggingIn] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState("");
@@ -97,7 +98,15 @@ export function AdminDashboard() {
     }
   }
 
-  function handleLogin(event: FormEvent<HTMLFormElement>) {
+  const productStats = useMemo(() => {
+    const featured = products.filter((product) => product.is_featured).length;
+    const hidden = products.filter((product) => product.is_hidden).length;
+    const withPhotos = products.filter((product) => product.primary_image_url).length;
+
+    return { featured, hidden, withPhotos };
+  }, [products]);
+
+  async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!adminKey.trim()) {
@@ -105,11 +114,30 @@ export function AdminDashboard() {
       return;
     }
 
-    window.localStorage.setItem(adminStorageKey, adminKey);
-    window.sessionStorage.setItem(adminSessionKey, "true");
-    setIsSignedIn(true);
+    setLoggingIn(true);
     setMessage("");
-    setActiveTab("dashboard");
+
+    try {
+      const response = await fetch("/api/admin/session", {
+        method: "POST",
+        headers: { "x-admin-key": adminKey }
+      });
+      const result = (await response.json()) as { ok: boolean; message?: string };
+
+      if (!response.ok || !result.ok) {
+        setMessage(result.message || "Invalid admin password.");
+        return;
+      }
+
+      window.localStorage.setItem(adminStorageKey, adminKey);
+      window.sessionStorage.setItem(adminSessionKey, "true");
+      setIsSignedIn(true);
+      setActiveTab("dashboard");
+    } catch {
+      setMessage("Could not reach the admin login backend.");
+    } finally {
+      setLoggingIn(false);
+    }
   }
 
   function handleLogout() {
@@ -151,8 +179,9 @@ export function AdminDashboard() {
                 />
               </span>
             </label>
-            <button className="focus-ring mt-5 rounded-full bg-champagne px-7 py-3 text-xs font-bold uppercase tracking-[0.18em] text-ink hover:bg-ivory" type="submit">
-              Sign In
+            <button className="focus-ring mt-5 inline-flex items-center gap-2 rounded-full bg-champagne px-7 py-3 text-xs font-bold uppercase tracking-[0.18em] text-ink hover:bg-ivory" disabled={loggingIn} type="submit">
+              {loggingIn ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+              {loggingIn ? "Signing In" : "Sign In"}
             </button>
             {message ? <p className="mt-4 text-sm font-semibold text-champagne">{message}</p> : null}
           </form>
@@ -244,8 +273,8 @@ export function AdminDashboard() {
   }
 
   return (
-    <section className="midnight-band min-h-screen px-4 py-12 text-ivory sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl">
+    <section className="midnight-band min-h-screen px-4 py-10 text-ivory sm:px-6 2xl:px-10">
+      <div className="mx-auto w-full max-w-[112rem]">
         <div>
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.28em] text-champagne">Admin</p>
@@ -256,7 +285,7 @@ export function AdminDashboard() {
 
         {message ? <div className="mt-6 rounded-lg border border-champagne/25 bg-ink/75 px-5 py-4 text-sm font-semibold text-champagne">{message}</div> : null}
 
-        <div className="mt-8 grid gap-6 lg:grid-cols-[15rem_1fr]">
+        <div className="mt-8 grid gap-6 lg:grid-cols-[14rem_minmax(0,1fr)] 2xl:grid-cols-[16rem_minmax(0,1fr)]">
           <aside className="flex min-h-[38rem] flex-col rounded-lg border border-champagne/25 bg-ink/80 p-4 shadow-luxe">
             <p className="px-3 text-xs font-bold uppercase tracking-[0.22em] text-champagne">Admin</p>
             <nav className="mt-4 grid gap-1">
@@ -280,38 +309,118 @@ export function AdminDashboard() {
             </button>
           </aside>
 
-          <section className="rounded-lg border border-champagne/25 bg-ink/75 p-5 shadow-luxe">
+          <section className="min-w-0 rounded-lg border border-champagne/25 bg-ink/75 p-5 shadow-luxe">
             {activeTab === "dashboard" ? (
               <div>
                 <h2 className="font-display text-4xl">Dashboard</h2>
                 <p className="mt-2 text-ivory/70">Choose a workspace from the admin menu.</p>
-                <div className="mt-6 grid gap-4 md:grid-cols-3">
+                <div className="mt-6 grid gap-4 md:grid-cols-3 xl:grid-cols-4">
                   <button className="focus-ring rounded-lg border border-champagne/25 bg-ivory/5 p-5 text-left hover:bg-ivory/10" onClick={() => setActiveTab("products")} type="button">
                     <Package className="h-7 w-7 text-champagne" />
                     <p className="mt-4 font-display text-3xl">Products</p>
-                    <p className="mt-2 text-sm text-ivory/65">Edit storefront copy and upload product photos.</p>
+                    <p className="mt-2 text-sm text-ivory/65">{products.length || "Live"} Epos products, photo uploads, and storefront copy.</p>
                   </button>
-                  <div className="rounded-lg border border-champagne/25 bg-ivory/5 p-5">
+                  <button className="focus-ring rounded-lg border border-champagne/25 bg-ivory/5 p-5 text-left hover:bg-ivory/10" onClick={() => setActiveTab("categories")} type="button">
+                    <Tags className="h-7 w-7 text-champagne" />
+                    <p className="mt-4 font-display text-3xl">Categories</p>
+                    <p className="mt-2 text-sm text-ivory/65">{shopDepartments.length} storefront departments mapped to synced products.</p>
+                  </button>
+                  <button className="focus-ring rounded-lg border border-champagne/25 bg-ivory/5 p-5 text-left hover:bg-ivory/10" onClick={() => setActiveTab("orders")} type="button">
                     <ShoppingBag className="h-7 w-7 text-champagne" />
                     <p className="mt-4 font-display text-3xl">Orders</p>
                     <p className="mt-2 text-sm text-ivory/65">Checkout/order tools will connect here next.</p>
-                  </div>
-                  <div className="rounded-lg border border-champagne/25 bg-ivory/5 p-5">
+                  </button>
+                  <button className="focus-ring rounded-lg border border-champagne/25 bg-ivory/5 p-5 text-left hover:bg-ivory/10" onClick={() => setActiveTab("settings")} type="button">
                     <Settings className="h-7 w-7 text-champagne" />
                     <p className="mt-4 font-display text-3xl">Settings</p>
                     <p className="mt-2 text-sm text-ivory/65">Storefront configuration and admin options.</p>
-                  </div>
+                  </button>
                 </div>
               </div>
             ) : null}
 
             {activeTab !== "dashboard" && activeTab !== "products" ? (
-              <div className="grid min-h-[34rem] place-items-center rounded-lg border border-dashed border-champagne/25 text-center">
-                <div>
-                  <PackageSearch className="mx-auto h-10 w-10 text-champagne" />
-                  <p className="mt-3 font-display text-3xl">{adminTabs.find((tab) => tab.id === activeTab)?.label}</p>
-                  <p className="mt-2 text-sm text-ivory/65">This workspace is ready for the next ecommerce build step.</p>
-                </div>
+              <div className="min-h-[34rem] rounded-lg border border-champagne/25 bg-ivory/5 p-5">
+                <h2 className="font-display text-4xl">{adminTabs.find((tab) => tab.id === activeTab)?.label}</h2>
+                {activeTab === "orders" ? (
+                  <div className="mt-5 grid gap-4 lg:grid-cols-3">
+                    {["Pending", "Reviewing", "Completed"].map((status) => (
+                      <div className="rounded-lg border border-champagne/25 bg-ink/50 p-4" key={status}>
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-bold uppercase tracking-[0.2em] text-champagne">{status}</p>
+                          <span className="rounded-full border border-champagne/40 px-2 text-xs">0</span>
+                        </div>
+                        <div className="mt-4 rounded-md border border-dashed border-champagne/25 p-6 text-center text-sm text-ivory/60">No orders yet</div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+                {activeTab === "categories" ? (
+                  <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    {shopDepartments.map((department) => (
+                      <div className="rounded-lg border border-champagne/25 bg-ink/50 p-4" key={department.id}>
+                        <p className="font-display text-2xl">{department.title}</p>
+                        <p className="mt-1 text-xs uppercase tracking-[0.16em] text-champagne">{department.items.length} menu terms</p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {department.items.slice(0, 8).map((item) => (
+                            <span className="rounded-full bg-ivory/10 px-3 py-1 text-xs text-ivory/75" key={item}>{item}</span>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+                {activeTab === "discounts" ? (
+                  <div className="mt-5 grid gap-4 lg:grid-cols-2">
+                    <div className="rounded-lg border border-champagne/25 bg-ink/50 p-5">
+                      <p className="font-display text-3xl">Discount Codes</p>
+                      <p className="mt-2 text-sm text-ivory/65">No active website discount codes. Checkout integration will attach these to payment/order rules.</p>
+                    </div>
+                    <div className="rounded-lg border border-champagne/25 bg-ink/50 p-5">
+                      <p className="font-display text-3xl">Gift Certificates</p>
+                      <p className="mt-2 text-sm text-ivory/65">Gift certificate products are managed in Epos and surfaced in the shop catalog.</p>
+                    </div>
+                  </div>
+                ) : null}
+                {activeTab === "shipping" ? (
+                  <div className="mt-5 grid gap-4 lg:grid-cols-3">
+                    {["Free shipping threshold", "Returns", "Fulfillment"].map((item) => (
+                      <div className="rounded-lg border border-champagne/25 bg-ink/50 p-5" key={item}>
+                        <p className="font-display text-3xl">{item}</p>
+                        <p className="mt-2 text-sm text-ivory/65">Managed from storefront content until checkout shipping rates are connected.</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+                {activeTab === "content" ? (
+                  <div className="mt-5 grid gap-4 lg:grid-cols-2">
+                    {["Shipping & Returns", "Privacy Policy", "Contact Details", "Homepage Sections"].map((item) => (
+                      <div className="rounded-lg border border-champagne/25 bg-ink/50 p-5" key={item}>
+                        <p className="font-display text-3xl">{item}</p>
+                        <p className="mt-2 text-sm text-ivory/65">Content workspace for future text editing and publishing controls.</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+                {activeTab === "settings" ? (
+                  <div className="mt-5 grid gap-4 md:grid-cols-3">
+                    <div className="rounded-lg border border-champagne/25 bg-ink/50 p-5">
+                      <p className="text-xs font-bold uppercase tracking-[0.2em] text-champagne">Photos</p>
+                      <p className="mt-3 font-display text-4xl">{productStats.withPhotos}</p>
+                      <p className="mt-2 text-sm text-ivory/65">Products with uploaded website photos.</p>
+                    </div>
+                    <div className="rounded-lg border border-champagne/25 bg-ink/50 p-5">
+                      <p className="text-xs font-bold uppercase tracking-[0.2em] text-champagne">Featured</p>
+                      <p className="mt-3 font-display text-4xl">{productStats.featured}</p>
+                      <p className="mt-2 text-sm text-ivory/65">Products marked as featured.</p>
+                    </div>
+                    <div className="rounded-lg border border-champagne/25 bg-ink/50 p-5">
+                      <p className="text-xs font-bold uppercase tracking-[0.2em] text-champagne">Hidden</p>
+                      <p className="mt-3 font-display text-4xl">{productStats.hidden}</p>
+                      <p className="mt-2 text-sm text-ivory/65">Products hidden from the public shop.</p>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             ) : null}
 
@@ -323,7 +432,7 @@ export function AdminDashboard() {
                     <p className="mt-2 text-ivory/70">Manage Epos-synced products, photos, and website presentation.</p>
                   </div>
                 </div>
-                <div className="mt-6 grid gap-6 xl:grid-cols-[20rem_1fr]">
+                <div className="mt-6 grid gap-6 xl:grid-cols-[22rem_minmax(0,1fr)] 2xl:grid-cols-[24rem_minmax(0,1fr)]">
                   <aside className="rounded-lg border border-champagne/20 bg-ink/80 p-4">
             <form className="flex gap-2" onSubmit={handleSearch}>
               <label className="relative flex-1">
@@ -368,8 +477,8 @@ export function AdminDashboard() {
           </aside>
 
           {selectedProduct ? (
-            <div className="grid gap-6 xl:grid-cols-[1fr_22rem]">
-              <form className="rounded-lg border border-champagne/20 bg-ivory p-5 text-ink shadow-luxe" onSubmit={handleSave}>
+            <div className="grid gap-6 2xl:grid-cols-[minmax(36rem,1fr)_28rem]">
+              <form className="rounded-lg border border-champagne/20 bg-ivory p-5 text-ink shadow-luxe" key={selectedProduct.epos_product_id} onSubmit={handleSave}>
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
                     <p className="text-xs font-bold uppercase tracking-[0.2em] text-saddle">Website Product</p>
@@ -415,7 +524,7 @@ export function AdminDashboard() {
                 </div>
               </form>
 
-              <aside className="rounded-lg border border-champagne/20 bg-ink/80 p-5 shadow-luxe">
+              <aside className="rounded-lg border border-champagne/20 bg-ink/80 p-5 shadow-luxe" key={`${selectedProduct.epos_product_id}-photos`}>
                 <p className="text-xs font-bold uppercase tracking-[0.2em] text-champagne">Product Photos</p>
                 <div className="mt-4 overflow-hidden rounded-lg border border-champagne/20 bg-ivory/5">
                   {selectedProduct.primary_image_url ? (
