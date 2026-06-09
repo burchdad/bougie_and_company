@@ -4,6 +4,7 @@ import Image from "next/image";
 import { Search, ShoppingBag, SlidersHorizontal, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { shopDepartments } from "@/lib/data";
+import { departmentTitle, inferDepartment } from "@/lib/product-categorization";
 
 type Product = {
   epos_product_id: string;
@@ -30,19 +31,6 @@ type ProductResponse = {
   message?: string;
 };
 
-const departmentKeywords: Record<string, string[]> = {
-  clothing: ["shirt", "tee", "t-shirt", "top", "bottom", "dress", "romper", "jumpsuit", "cardigan", "jean", "short", "pant", "skirt"],
-  "equine-jewelry": ["equine", "horse", "rein", "necklace", "bracelet", "earring"],
-  accessories: ["purse", "bag", "luggage", "weekender", "coozie", "koozie", "coaster", "infusion", "cocktail", "cap", "hat"],
-  "bath-body": ["bath", "body", "scrub", "salt", "bomb", "chap", "mask", "lotion", "soap", "beard", "spray", "week from hell"],
-  "home-collection": ["candle", "wax", "melt", "tea towel", "pillow", "coaster", "mixer", "outdoor"],
-  "mens-collection": ["men", "beard", "mechanic", "cap", "t-shirt", "body spray", "coozie"],
-  "womens-collection": ["women", "dress", "romper", "jumpsuit", "purse", "bath bomb", "body spray", "week from hell"],
-  "kitchen-selection": ["dish soap", "foaming hand", "kitchen"],
-  "gift-collection": ["gift", "certificate", "set"],
-  "jewelry-headbands": ["jewelry", "headband", "earring", "bracelet", "necklace"]
-};
-
 function money(value: string | null) {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? `$${parsed.toFixed(2)}` : "Price in store";
@@ -54,17 +42,7 @@ function stockCount(value: string | null) {
 }
 
 function getProductDepartment(product: Product) {
-  if (product.department) {
-    return product.department;
-  }
-
-  const haystack = `${product.name} ${product.description || ""}`.toLowerCase();
-  const match = shopDepartments.find((department) => departmentKeywords[department.id]?.some((keyword) => haystack.includes(keyword)));
-  return match?.id || "all";
-}
-
-function departmentTitle(id: string) {
-  return shopDepartments.find((department) => department.id === id)?.title || "All Products";
+  return inferDepartment(product) || "all";
 }
 
 export function ShopProducts() {

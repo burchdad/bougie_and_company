@@ -90,6 +90,7 @@ export function AdminDashboard() {
   const [editingDiscountId, setEditingDiscountId] = useState<number | null>(null);
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState("");
+  const [isCreatingProduct, setIsCreatingProduct] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loggingIn, setLoggingIn] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -104,7 +105,7 @@ export function AdminDashboard() {
     setIsSignedIn(Boolean(storedKey && signedIn));
   }, []);
 
-  const selectedProduct = useMemo(() => products.find((product) => product.epos_product_id === selectedId) || products[0], [products, selectedId]);
+  const selectedProduct = useMemo(() => (isCreatingProduct ? null : products.find((product) => product.epos_product_id === selectedId) || products[0]), [isCreatingProduct, products, selectedId]);
   const selectedCategory = useMemo(() => categories.find((category) => category.id === editingCategoryId) || null, [categories, editingCategoryId]);
   const selectedDiscount = useMemo(() => discounts.find((discount) => discount.id === editingDiscountId) || null, [discounts, editingDiscountId]);
 
@@ -279,23 +280,24 @@ export function AdminDashboard() {
   async function handleSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!selectedProduct) {
+    if (!selectedProduct && !isCreatingProduct) {
       return;
     }
 
     const form = new FormData(event.currentTarget);
+    const isNewProduct = isCreatingProduct;
     setSaving(true);
     setMessage("");
 
     try {
       const response = await fetch("/api/admin/products", {
-        method: "PATCH",
+        method: isNewProduct ? "POST" : "PATCH",
         headers: {
           "Content-Type": "application/json",
           ...(adminKey ? { "x-admin-key": adminKey } : {})
         },
         body: JSON.stringify({
-          eposProductId: selectedProduct.epos_product_id,
+          eposProductId: selectedProduct?.epos_product_id,
           marketingTitle: String(form.get("marketingTitle") || ""),
           marketingDescription: String(form.get("marketingDescription") || ""),
           department: String(form.get("department") || ""),
@@ -308,7 +310,7 @@ export function AdminDashboard() {
           eposStock: String(form.get("eposStock") || "")
         })
       });
-      const result = (await response.json()) as { ok: boolean; message?: string };
+      const result = (await response.json()) as { ok: boolean; message?: string; productId?: string };
 
       if (!response.ok || !result.ok) {
         setMessage(result.message || "Could not save product details.");
@@ -316,6 +318,12 @@ export function AdminDashboard() {
       }
 
       setMessage(result.message || "Product website details saved.");
+      if (isNewProduct) {
+        setIsCreatingProduct(false);
+        if (result.productId) {
+          setSelectedId(result.productId);
+        }
+      }
       await loadProducts(query);
     } catch {
       setMessage("Could not connect to the admin save backend.");
@@ -811,6 +819,17 @@ export function AdminDashboard() {
                     <h2 className="font-display text-4xl">Products</h2>
                     <p className="mt-2 text-ivory/70">Manage Epos-synced products, photos, and website presentation.</p>
                   </div>
+                  <button
+                    className="focus-ring rounded-md bg-champagne px-5 py-3 text-xs font-bold uppercase tracking-[0.16em] text-ink hover:bg-ivory"
+                    onClick={() => {
+                      setIsCreatingProduct(true);
+                      setSelectedId("");
+                      setMessage("");
+                    }}
+                    type="button"
+                  >
+                    Add Product
+                  </button>
                 </div>
                 <div className="mt-6 grid gap-6 xl:grid-cols-[22rem_minmax(0,1fr)] 2xl:grid-cols-[24rem_minmax(0,1fr)]">
                   <aside className="rounded-lg border border-champagne/20 bg-ink/80 p-4">
@@ -845,7 +864,10 @@ export function AdminDashboard() {
                   <button
                     className={`focus-ring rounded-md border p-3 text-left transition ${selectedProduct?.epos_product_id === product.epos_product_id ? "border-champagne bg-champagne/15" : "border-champagne/10 bg-ivory/5 hover:bg-ivory/10"}`}
                     key={product.epos_product_id}
-                    onClick={() => setSelectedId(product.epos_product_id)}
+                    onClick={() => {
+                      setIsCreatingProduct(false);
+                      setSelectedId(product.epos_product_id);
+                    }}
                     type="button"
                   >
                     <span className="line-clamp-2 font-semibold text-ivory">{product.marketing_title || product.name}</span>
@@ -856,55 +878,57 @@ export function AdminDashboard() {
             </div>
           </aside>
 
-          {selectedProduct ? (
+          {selectedProduct || isCreatingProduct ? (
             <div className="grid gap-6 2xl:grid-cols-[minmax(36rem,1fr)_28rem]">
-              <form className="rounded-lg border border-champagne/20 bg-ivory p-5 text-ink shadow-luxe" key={selectedProduct.epos_product_id} onSubmit={handleSave}>
+              <form className="rounded-lg border border-champagne/20 bg-ivory p-5 text-ink shadow-luxe" key={selectedProduct?.epos_product_id || "new-product"} onSubmit={handleSave}>
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
                     <p className="text-xs font-bold uppercase tracking-[0.2em] text-saddle">Website Product</p>
-                    <h2 className="mt-2 font-display text-4xl text-ink">{selectedProduct.marketing_title || selectedProduct.name}</h2>
-                    <p className="mt-2 text-sm text-espresso/65">Epos ID {selectedProduct.epos_product_id} / SKU {selectedProduct.sku || "Not set"} / {money(selectedProduct.sale_price)}</p>
+                    <h2 className="mt-2 font-display text-4xl text-ink">{isCreatingProduct ? "New Product" : selectedProduct?.marketing_title || selectedProduct?.name}</h2>
+                    <p className="mt-2 text-sm text-espresso/65">
+                      {isCreatingProduct ? "Create in Epos first, then cache the product in Neon." : `Epos ID ${selectedProduct?.epos_product_id} / SKU ${selectedProduct?.sku || "Not set"} / ${money(selectedProduct?.sale_price || null)}`}
+                    </p>
                   </div>
                   <button className="focus-ring inline-flex items-center gap-2 rounded-md bg-ink px-5 py-3 text-sm font-bold uppercase tracking-[0.16em] text-ivory hover:bg-saddle" disabled={saving} type="submit">
                     {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                    Save
+                    {isCreatingProduct ? "Create" : "Save"}
                   </button>
                 </div>
 
                 <div className="mt-6 grid gap-4">
                   <label className="grid gap-2 text-sm font-semibold text-espresso">
                     Epos product name
-                    <input className="focus-ring min-h-12 rounded-md border border-saddle/20 bg-white px-4 font-normal" defaultValue={selectedProduct.name} name="eposName" />
+                    <input className="focus-ring min-h-12 rounded-md border border-saddle/20 bg-white px-4 font-normal" defaultValue={selectedProduct?.name || ""} name="eposName" required />
                   </label>
                   <label className="grid gap-2 text-sm font-semibold text-espresso">
                     Epos product description
-                    <textarea className="focus-ring min-h-24 rounded-md border border-saddle/20 bg-white px-4 py-3 font-normal" defaultValue={selectedProduct.description || ""} name="eposDescription" />
+                    <textarea className="focus-ring min-h-24 rounded-md border border-saddle/20 bg-white px-4 py-3 font-normal" defaultValue={selectedProduct?.description || ""} name="eposDescription" />
                   </label>
-                  <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="grid gap-3 md:grid-cols-2">
                     <label className="grid gap-2 text-sm font-semibold text-espresso">
                       Epos SKU
-                      <input className="focus-ring min-h-12 rounded-md border border-saddle/20 bg-white px-4 font-normal" defaultValue={selectedProduct.sku || ""} name="eposSku" />
+                      <input className="focus-ring min-h-12 rounded-md border border-saddle/20 bg-white px-4 font-normal" defaultValue={selectedProduct?.sku || ""} name="eposSku" />
                     </label>
                     <label className="grid gap-2 text-sm font-semibold text-espresso">
                       Epos price
-                      <input className="focus-ring min-h-12 rounded-md border border-saddle/20 bg-white px-4 font-normal" defaultValue={selectedProduct.sale_price || ""} name="eposSalePrice" step="0.01" type="number" />
+                      <input className="focus-ring min-h-12 rounded-md border border-saddle/20 bg-white px-4 font-normal" defaultValue={selectedProduct?.sale_price || ""} name="eposSalePrice" step="0.01" type="number" />
                     </label>
                     <label className="grid gap-2 text-sm font-semibold text-espresso">
                       Epos stock
-                      <input className="focus-ring min-h-12 rounded-md border border-saddle/20 bg-white px-4 font-normal" defaultValue={selectedProduct.stock || ""} name="eposStock" step="1" type="number" />
+                      <input className="focus-ring min-h-12 rounded-md border border-saddle/20 bg-white px-4 font-normal" defaultValue={selectedProduct?.stock || ""} name="eposStock" step="1" type="number" />
                     </label>
                   </div>
                   <label className="grid gap-2 text-sm font-semibold text-espresso">
                     Storefront title
-                    <input className="focus-ring min-h-12 rounded-md border border-saddle/20 bg-white px-4 font-normal" defaultValue={selectedProduct.marketing_title || ""} name="marketingTitle" placeholder={selectedProduct.name} />
+                    <input className="focus-ring min-h-12 rounded-md border border-saddle/20 bg-white px-4 font-normal" defaultValue={selectedProduct?.marketing_title || ""} name="marketingTitle" placeholder={selectedProduct?.name || "Customer-facing title"} />
                   </label>
                   <label className="grid gap-2 text-sm font-semibold text-espresso">
                     Storefront description
-                    <textarea className="focus-ring min-h-32 rounded-md border border-saddle/20 bg-white px-4 py-3 font-normal" defaultValue={selectedProduct.marketing_description || ""} name="marketingDescription" placeholder={selectedProduct.description || "Short customer-facing product description"} />
+                    <textarea className="focus-ring min-h-32 rounded-md border border-saddle/20 bg-white px-4 py-3 font-normal" defaultValue={selectedProduct?.marketing_description || ""} name="marketingDescription" placeholder={selectedProduct?.description || "Short customer-facing product description"} />
                   </label>
                   <label className="grid gap-2 text-sm font-semibold text-espresso">
                     Website department
-                    <select className="focus-ring min-h-12 rounded-md border border-saddle/20 bg-white px-4 font-normal" defaultValue={selectedProduct.department || ""} name="department">
+                    <select className="focus-ring min-h-12 rounded-md border border-saddle/20 bg-white px-4 font-normal" defaultValue={selectedProduct?.department || ""} name="department">
                       <option value="">Auto categorize</option>
                       {shopDepartments.map((department) => (
                         <option key={department.id} value={department.id}>{department.title}</option>
@@ -913,23 +937,28 @@ export function AdminDashboard() {
                   </label>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <label className="flex min-h-12 items-center gap-3 rounded-md border border-saddle/15 bg-white px-4 text-sm font-semibold text-espresso">
-                      <input defaultChecked={Boolean(selectedProduct.is_featured)} name="isFeatured" type="checkbox" />
+                      <input defaultChecked={Boolean(selectedProduct?.is_featured)} name="isFeatured" type="checkbox" />
                       <Star className="h-4 w-4 text-saddle" />
                       Featured product
                     </label>
                     <label className="flex min-h-12 items-center gap-3 rounded-md border border-saddle/15 bg-white px-4 text-sm font-semibold text-espresso">
-                      <input defaultChecked={Boolean(selectedProduct.is_hidden)} name="isHidden" type="checkbox" />
+                      <input defaultChecked={Boolean(selectedProduct?.is_hidden)} name="isHidden" type="checkbox" />
                       <EyeOff className="h-4 w-4 text-saddle" />
                       Hide from shop
                     </label>
                   </div>
+                  {isCreatingProduct ? (
+                    <button className="focus-ring rounded-md border border-saddle/25 px-5 py-3 text-xs font-bold uppercase tracking-[0.16em] text-saddle hover:bg-saddle hover:text-ivory" onClick={() => setIsCreatingProduct(false)} type="button">
+                      Cancel New Product
+                    </button>
+                  ) : null}
                 </div>
               </form>
 
-              <aside className="rounded-lg border border-champagne/20 bg-ink/80 p-5 shadow-luxe" key={`${selectedProduct.epos_product_id}-photos`}>
+              <aside className="rounded-lg border border-champagne/20 bg-ink/80 p-5 shadow-luxe" key={`${selectedProduct?.epos_product_id || "new-product"}-photos`}>
                 <p className="text-xs font-bold uppercase tracking-[0.2em] text-champagne">Product Photos</p>
                 <div className="mt-4 overflow-hidden rounded-lg border border-champagne/20 bg-ivory/5">
-                  {selectedProduct.primary_image_url ? (
+                  {selectedProduct?.primary_image_url ? (
                     <Image
                       alt={selectedProduct.primary_image_alt || selectedProduct.name}
                       className="aspect-square w-full object-cover"
@@ -949,13 +978,13 @@ export function AdminDashboard() {
                 <form className="mt-5 grid gap-3" onSubmit={handleUpload}>
                   <label className="grid gap-2 text-sm font-semibold text-ivory">
                     Upload photo
-                    <input accept="image/*" className="focus-ring rounded-md border border-champagne/20 bg-ivory px-3 py-3 text-sm text-ink" name="file" required type="file" />
+                    <input accept="image/*" className="focus-ring rounded-md border border-champagne/20 bg-ivory px-3 py-3 text-sm text-ink disabled:opacity-60" disabled={isCreatingProduct} name="file" required type="file" />
                   </label>
                   <label className="grid gap-2 text-sm font-semibold text-ivory">
                     Alt text
-                    <input className="focus-ring min-h-11 rounded-md border border-champagne/20 bg-ivory px-3 text-sm text-ink" name="altText" placeholder={selectedProduct.name} />
+                    <input className="focus-ring min-h-11 rounded-md border border-champagne/20 bg-ivory px-3 text-sm text-ink disabled:opacity-60" disabled={isCreatingProduct} name="altText" placeholder={selectedProduct?.name || "Save the product before uploading photos"} />
                   </label>
-                  <button className="focus-ring inline-flex items-center justify-center gap-2 rounded-md bg-champagne px-5 py-3 text-sm font-bold uppercase tracking-[0.16em] text-ink hover:bg-ivory" disabled={uploading} type="submit">
+                  <button className="focus-ring inline-flex items-center justify-center gap-2 rounded-md bg-champagne px-5 py-3 text-sm font-bold uppercase tracking-[0.16em] text-ink hover:bg-ivory disabled:cursor-not-allowed disabled:opacity-60" disabled={uploading || isCreatingProduct} type="submit">
                     {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <UploadCloud className="h-4 w-4" />}
                     Upload
                   </button>

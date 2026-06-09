@@ -1,4 +1,6 @@
 import { getSql } from "@/lib/db";
+import { inferDepartment } from "@/lib/product-categorization";
+import { ensureCategoryTables } from "@/lib/categories";
 
 export type AdminProduct = {
   epos_product_id: string;
@@ -21,6 +23,11 @@ export type AdminProduct = {
   primary_image_alt: string | null;
 };
 
+type AdminProductRow = AdminProduct & {
+  category_slug?: string | null;
+  parent_category_slug?: string | null;
+};
+
 export function isAdminRequest(request: Request) {
   const adminKey = process.env.ADMIN_ACCESS_KEY;
 
@@ -33,6 +40,7 @@ export function isAdminRequest(request: Request) {
 }
 
 export async function ensureProductAdminTables() {
+  await ensureCategoryTables();
   const sql = getSql();
 
   await sql`
@@ -85,6 +93,8 @@ export async function getAdminProducts(query = "") {
           m.marketing_title,
           m.marketing_description,
           m.department,
+          sc.slug AS category_slug,
+          parent_sc.slug AS parent_category_slug,
           m.is_featured,
           m.is_hidden,
           i.url AS primary_image_url,
@@ -92,6 +102,8 @@ export async function getAdminProducts(query = "") {
         FROM epos_products p
         LEFT JOIN epos_product_stock s ON s.epos_product_id::text = p.epos_product_id
         LEFT JOIN product_site_meta m ON m.epos_product_id = p.epos_product_id
+        LEFT JOIN site_categories sc ON sc.epos_category_id = p.category_id::text
+        LEFT JOIN site_categories parent_sc ON parent_sc.id = sc.parent_id
         LEFT JOIN LATERAL (
           SELECT epos_stock_id, location_id
           FROM epos_product_stock
@@ -113,7 +125,7 @@ export async function getAdminProducts(query = "") {
             OR p.sku ILIKE ${`%${query}%`}
             OR p.barcode ILIKE ${`%${query}%`}
           )
-        GROUP BY p.epos_product_id, p.name, p.description, p.sku, p.barcode, p.category_id, p.sale_price, stock_row.epos_stock_id, stock_row.location_id, p.synced_at, m.marketing_title, m.marketing_description, m.department, m.is_featured, m.is_hidden, i.url, i.alt_text
+        GROUP BY p.epos_product_id, p.name, p.description, p.sku, p.barcode, p.category_id, p.sale_price, stock_row.epos_stock_id, stock_row.location_id, p.synced_at, m.marketing_title, m.marketing_description, m.department, sc.slug, parent_sc.slug, m.is_featured, m.is_hidden, i.url, i.alt_text
         ORDER BY p.name ASC
         LIMIT 300
       `
@@ -133,6 +145,8 @@ export async function getAdminProducts(query = "") {
           m.marketing_title,
           m.marketing_description,
           m.department,
+          sc.slug AS category_slug,
+          parent_sc.slug AS parent_category_slug,
           m.is_featured,
           m.is_hidden,
           i.url AS primary_image_url,
@@ -140,6 +154,8 @@ export async function getAdminProducts(query = "") {
         FROM epos_products p
         LEFT JOIN epos_product_stock s ON s.epos_product_id::text = p.epos_product_id
         LEFT JOIN product_site_meta m ON m.epos_product_id = p.epos_product_id
+        LEFT JOIN site_categories sc ON sc.epos_category_id = p.category_id::text
+        LEFT JOIN site_categories parent_sc ON parent_sc.id = sc.parent_id
         LEFT JOIN LATERAL (
           SELECT epos_stock_id, location_id
           FROM epos_product_stock
@@ -155,10 +171,13 @@ export async function getAdminProducts(query = "") {
           LIMIT 1
         ) i ON TRUE
         WHERE p.is_deleted = FALSE
-        GROUP BY p.epos_product_id, p.name, p.description, p.sku, p.barcode, p.category_id, p.sale_price, stock_row.epos_stock_id, stock_row.location_id, p.synced_at, m.marketing_title, m.marketing_description, m.department, m.is_featured, m.is_hidden, i.url, i.alt_text
+        GROUP BY p.epos_product_id, p.name, p.description, p.sku, p.barcode, p.category_id, p.sale_price, stock_row.epos_stock_id, stock_row.location_id, p.synced_at, m.marketing_title, m.marketing_description, m.department, sc.slug, parent_sc.slug, m.is_featured, m.is_hidden, i.url, i.alt_text
         ORDER BY p.name ASC
         LIMIT 300
       `;
 
-  return rows as AdminProduct[];
+  return (rows as AdminProductRow[]).map((row) => ({
+    ...row,
+    department: inferDepartment(row)
+  }));
 }

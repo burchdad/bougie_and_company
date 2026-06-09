@@ -100,7 +100,7 @@ export function getEposString(record: Record<string, unknown>, keys: string[]) {
   return null;
 }
 
-export async function updateEposProduct(productId: string, raw: Record<string, unknown>, fields: { name: string; description: string; sku: string; salePrice: number | null }) {
+export async function updateEposProduct(productId: string, raw: Record<string, unknown>, fields: { name: string; description: string; sku: string; salePrice: number | null; categoryId?: string | null }) {
   return eposFetch<Record<string, unknown>>(`Product/${productId}`, {
     method: "PUT",
     body: JSON.stringify({
@@ -109,7 +109,21 @@ export async function updateEposProduct(productId: string, raw: Record<string, u
       Name: fields.name,
       Description: fields.description,
       Sku: fields.sku,
-      SalePrice: fields.salePrice
+      SalePrice: fields.salePrice,
+      ...(fields.categoryId ? { CategoryId: Number(fields.categoryId) } : {})
+    })
+  });
+}
+
+export async function createEposProduct(fields: { name: string; description: string; sku: string; salePrice: number | null; categoryId?: string | null }) {
+  return eposFetch<Record<string, unknown>>("Product", {
+    method: "POST",
+    body: JSON.stringify({
+      Name: fields.name,
+      Description: fields.description,
+      Sku: fields.sku,
+      SalePrice: fields.salePrice,
+      ...(fields.categoryId ? { CategoryId: Number(fields.categoryId) } : {})
     })
   });
 }
@@ -121,6 +135,17 @@ export async function updateEposProductStock(stockId: string, raw: Record<string
       ...raw,
       Id: Number(stockId),
       CurrentStock: currentStock
+    })
+  });
+}
+
+export async function createEposProductStock(fields: { productId: string; currentStock: number; locationId?: string | null }) {
+  return eposFetch<Record<string, unknown>>("ProductStock", {
+    method: "POST",
+    body: JSON.stringify({
+      ProductId: Number(fields.productId),
+      CurrentStock: fields.currentStock,
+      ...(fields.locationId ? { LocationId: Number(fields.locationId) } : {})
     })
   });
 }
