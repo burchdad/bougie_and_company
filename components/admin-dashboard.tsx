@@ -483,15 +483,16 @@ export function AdminDashboard() {
     setMessage("");
 
     try {
-      const response = await fetch("/api/admin/products/images/import", {
+      const response = await fetch("/api/admin/import-epos-images", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           ...(adminKey ? { "x-admin-key": adminKey } : {})
         },
-        body: JSON.stringify({ skipExisting: true })
+        body: JSON.stringify({ skipExisting: true, limit: 25 })
       });
-      const result = (await response.json()) as {
+      const text = await response.text();
+      let result: {
         ok: boolean;
         message?: string;
         result?: {
@@ -501,8 +502,16 @@ export function AdminDashboard() {
           skippedExisting: number;
           skippedDuplicate: number;
           failed: number;
+          remainingWithoutPhotos: number;
         };
       };
+
+      try {
+        result = JSON.parse(text);
+      } catch {
+        setMessage(`Epos image import returned an unexpected response: ${text.slice(0, 180) || response.statusText}`);
+        return;
+      }
 
       if (!response.ok || !result.ok) {
         setMessage(result.message || "Could not import Epos product images.");
@@ -512,7 +521,7 @@ export function AdminDashboard() {
       const counts = result.result;
       setMessage(
         counts
-          ? `${result.message} Scanned ${counts.productsScanned}, found ${counts.imageUrlsFound} image URL${counts.imageUrlsFound === 1 ? "" : "s"}, skipped ${counts.skippedExisting} product${counts.skippedExisting === 1 ? "" : "s"} with existing photos, failed ${counts.failed}.`
+          ? `${result.message} Found ${counts.imageUrlsFound} image URL${counts.imageUrlsFound === 1 ? "" : "s"}, skipped ${counts.skippedExisting} existing, failed ${counts.failed}. ${counts.remainingWithoutPhotos} product${counts.remainingWithoutPhotos === 1 ? "" : "s"} still have no photo.`
           : result.message || "Epos image import complete."
       );
       await loadProducts(query);

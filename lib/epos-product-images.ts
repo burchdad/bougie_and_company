@@ -1,7 +1,6 @@
 import { put } from "@vercel/blob";
 import { ensureProductAdminTables } from "@/lib/admin-products";
 import { getSql } from "@/lib/db";
-import { syncEposProducts } from "@/lib/epos-sync";
 
 const imageKeyPattern = /(image|photo|picture|thumbnail|media|avatar|icon)/i;
 const imageUrlPattern = /^https?:\/\/.+\.(avif|gif|jpe?g|png|webp)(\?.*)?$/i;
@@ -13,6 +12,7 @@ type ImageImportResult = {
   skippedExisting: number;
   skippedDuplicate: number;
   failed: number;
+  remainingWithoutPhotos: number;
 };
 
 function collectImageUrls(value: unknown, parentKey = "", urls = new Set<string>()) {
@@ -66,18 +66,33 @@ function safeName(value: string) {
   return value.replace(/[^a-z0-9._-]/gi, "-").replace(/-+/g, "-").toLowerCase();
 }
 
-export async function importEposProductImages({ skipExisting = true } = {}) {
+export async function importEposProductImages({ skipExisting = true, limit = 25 } = {}) {
   await ensureProductAdminTables();
-  await syncEposProducts();
 
   const sql = getSql();
-  const products = await sql`
+  const products = skipExisting
+    ? await sql`
+        SELECT p.epos_product_id, p.name, p.raw, COUNT(i.id)::int AS image_count
+        FROM epos_products p
+        LEFT JOIN product_images i ON i.epos_product_id = p.epos_product_id
+        WHERE p.is_deleted = FALSE
+          AND NOT EXISTS (
+            SELECT 1
+            FROM product_images existing
+            WHERE existing.epos_product_id = p.epos_product_id
+          )
+        GROUP BY p.epos_product_id, p.name, p.raw
+        ORDER BY p.name ASC
+        LIMIT ${limit}
+      `
+    : await sql`
     SELECT p.epos_product_id, p.name, p.raw, COUNT(i.id)::int AS image_count
     FROM epos_products p
     LEFT JOIN product_images i ON i.epos_product_id = p.epos_product_id
     WHERE p.is_deleted = FALSE
     GROUP BY p.epos_product_id, p.name, p.raw
     ORDER BY p.name ASC
+        LIMIT ${limit}
   `;
 
   const result: ImageImportResult = {
@@ -86,7 +101,8 @@ export async function importEposProductImages({ skipExisting = true } = {}) {
     uploaded: 0,
     skippedExisting: 0,
     skippedDuplicate: 0,
-    failed: 0
+    failed: 0,
+    remainingWithoutPhotos: 0
   };
 
   const existingPathRows = await sql`SELECT pathname FROM product_images WHERE pathname IS NOT NULL`;
@@ -147,6 +163,18 @@ export async function importEposProductImages({ skipExisting = true } = {}) {
       }
     }
   }
+
+  const remainingRows = await sql`
+    SELECT COUNT(*)::int AS count
+    FROM epos_products p
+    WHERE p.is_deleted = FALSE
+      AND NOT EXISTS (
+        SELECT 1
+        FROM product_images i
+        WHERE i.epos_product_id = p.epos_product_id
+      )
+  `;
+  result.remainingWithoutPhotos = Number(remainingRows[0]?.count || 0);
 
   return result;
 }
