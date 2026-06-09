@@ -9,6 +9,8 @@ export type AdminProduct = {
   category_id: string | null;
   sale_price: string | null;
   stock: string | null;
+  stock_id: string | null;
+  stock_location_id: string | null;
   synced_at: string;
   marketing_title: string | null;
   marketing_description: string | null;
@@ -77,6 +79,8 @@ export async function getAdminProducts(query = "") {
           p.category_id::text,
           p.sale_price::text,
           COALESCE(SUM(s.current_stock), 0)::text AS stock,
+          stock_row.epos_stock_id AS stock_id,
+          stock_row.location_id::text AS stock_location_id,
           p.synced_at::text,
           m.marketing_title,
           m.marketing_description,
@@ -88,6 +92,13 @@ export async function getAdminProducts(query = "") {
         FROM epos_products p
         LEFT JOIN epos_product_stock s ON s.epos_product_id::text = p.epos_product_id
         LEFT JOIN product_site_meta m ON m.epos_product_id = p.epos_product_id
+        LEFT JOIN LATERAL (
+          SELECT epos_stock_id, location_id
+          FROM epos_product_stock
+          WHERE epos_product_id::text = p.epos_product_id
+          ORDER BY location_id ASC NULLS LAST, epos_stock_id ASC
+          LIMIT 1
+        ) stock_row ON TRUE
         LEFT JOIN LATERAL (
           SELECT url, alt_text
           FROM product_images
@@ -102,7 +113,7 @@ export async function getAdminProducts(query = "") {
             OR p.sku ILIKE ${`%${query}%`}
             OR p.barcode ILIKE ${`%${query}%`}
           )
-        GROUP BY p.epos_product_id, p.name, p.description, p.sku, p.barcode, p.category_id, p.sale_price, p.synced_at, m.marketing_title, m.marketing_description, m.department, m.is_featured, m.is_hidden, i.url, i.alt_text
+        GROUP BY p.epos_product_id, p.name, p.description, p.sku, p.barcode, p.category_id, p.sale_price, stock_row.epos_stock_id, stock_row.location_id, p.synced_at, m.marketing_title, m.marketing_description, m.department, m.is_featured, m.is_hidden, i.url, i.alt_text
         ORDER BY p.name ASC
         LIMIT 300
       `
@@ -116,6 +127,8 @@ export async function getAdminProducts(query = "") {
           p.category_id::text,
           p.sale_price::text,
           COALESCE(SUM(s.current_stock), 0)::text AS stock,
+          stock_row.epos_stock_id AS stock_id,
+          stock_row.location_id::text AS stock_location_id,
           p.synced_at::text,
           m.marketing_title,
           m.marketing_description,
@@ -128,6 +141,13 @@ export async function getAdminProducts(query = "") {
         LEFT JOIN epos_product_stock s ON s.epos_product_id::text = p.epos_product_id
         LEFT JOIN product_site_meta m ON m.epos_product_id = p.epos_product_id
         LEFT JOIN LATERAL (
+          SELECT epos_stock_id, location_id
+          FROM epos_product_stock
+          WHERE epos_product_id::text = p.epos_product_id
+          ORDER BY location_id ASC NULLS LAST, epos_stock_id ASC
+          LIMIT 1
+        ) stock_row ON TRUE
+        LEFT JOIN LATERAL (
           SELECT url, alt_text
           FROM product_images
           WHERE epos_product_id = p.epos_product_id
@@ -135,7 +155,7 @@ export async function getAdminProducts(query = "") {
           LIMIT 1
         ) i ON TRUE
         WHERE p.is_deleted = FALSE
-        GROUP BY p.epos_product_id, p.name, p.description, p.sku, p.barcode, p.category_id, p.sale_price, p.synced_at, m.marketing_title, m.marketing_description, m.department, m.is_featured, m.is_hidden, i.url, i.alt_text
+        GROUP BY p.epos_product_id, p.name, p.description, p.sku, p.barcode, p.category_id, p.sale_price, stock_row.epos_stock_id, stock_row.location_id, p.synced_at, m.marketing_title, m.marketing_description, m.department, m.is_featured, m.is_hidden, i.url, i.alt_text
         ORDER BY p.name ASC
         LIMIT 300
       `;

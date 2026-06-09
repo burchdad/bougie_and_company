@@ -14,6 +14,8 @@ type AdminProduct = {
   category_id: string | null;
   sale_price: string | null;
   stock: string | null;
+  stock_id: string | null;
+  stock_location_id: string | null;
   synced_at: string;
   marketing_title: string | null;
   marketing_description: string | null;
@@ -22,6 +24,17 @@ type AdminProduct = {
   is_hidden: boolean | null;
   primary_image_url: string | null;
   primary_image_alt: string | null;
+};
+
+type SiteCategory = {
+  id: number;
+  label: string;
+  slug: string;
+  href: string;
+  parent_id: number | null;
+  sort_order: number;
+  is_header: boolean;
+  epos_category_id: string | null;
 };
 
 type ProductResponse = {
@@ -55,6 +68,8 @@ export function AdminDashboard() {
   const [isSignedIn, setIsSignedIn] = useState(false);
   const [activeTab, setActiveTab] = useState<AdminTab>("dashboard");
   const [products, setProducts] = useState<AdminProduct[]>([]);
+  const [categories, setCategories] = useState<SiteCategory[]>([]);
+  const [editingCategoryId, setEditingCategoryId] = useState<number | null>(null);
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState("");
   const [loading, setLoading] = useState(true);
@@ -95,6 +110,26 @@ export function AdminDashboard() {
       setMessage("Could not connect to the admin product backend.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function loadCategories() {
+    setMessage("");
+
+    try {
+      const response = await fetch("/api/admin/categories", {
+        headers: adminKey ? { "x-admin-key": adminKey } : {}
+      });
+      const result = (await response.json()) as { ok: boolean; categories?: SiteCategory[]; message?: string };
+
+      if (!response.ok || !result.ok) {
+        setMessage(result.message || "Could not load categories.");
+        return;
+      }
+
+      setCategories(result.categories || []);
+    } catch {
+      setMessage("Could not connect to the category backend.");
     }
   }
 
@@ -151,6 +186,9 @@ export function AdminDashboard() {
   useEffect(() => {
     if (isSignedIn && activeTab === "products" && products.length === 0) {
       loadProducts("");
+    }
+    if (isSignedIn && activeTab === "categories" && categories.length === 0) {
+      loadCategories();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, isSignedIn]);
@@ -219,7 +257,12 @@ export function AdminDashboard() {
           marketingDescription: String(form.get("marketingDescription") || ""),
           department: String(form.get("department") || ""),
           isFeatured: form.get("isFeatured") === "on",
-          isHidden: form.get("isHidden") === "on"
+          isHidden: form.get("isHidden") === "on",
+          eposName: String(form.get("eposName") || ""),
+          eposDescription: String(form.get("eposDescription") || ""),
+          eposSku: String(form.get("eposSku") || ""),
+          eposSalePrice: String(form.get("eposSalePrice") || ""),
+          eposStock: String(form.get("eposStock") || "")
         })
       });
       const result = (await response.json()) as { ok: boolean; message?: string };
@@ -235,6 +278,56 @@ export function AdminDashboard() {
       setMessage("Could not connect to the admin save backend.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleCategorySubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const id = editingCategoryId;
+    const payload = {
+      id,
+      label: String(form.get("label") || ""),
+      href: String(form.get("href") || ""),
+      parentId: form.get("parentId") ? Number(form.get("parentId")) : null,
+      sortOrder: Number(form.get("sortOrder") || 0),
+      isHeader: form.get("isHeader") === "on",
+      syncToEpos: form.get("syncToEpos") === "on"
+    };
+
+    try {
+      const response = await fetch("/api/admin/categories", {
+        method: id ? "PATCH" : "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(adminKey ? { "x-admin-key": adminKey } : {})
+        },
+        body: JSON.stringify(payload)
+      });
+      const result = (await response.json()) as { ok: boolean; message?: string };
+
+      setMessage(result.message || (result.ok ? "Category saved." : "Could not save category."));
+      if (result.ok) {
+        event.currentTarget.reset();
+        setEditingCategoryId(null);
+        await loadCategories();
+      }
+    } catch {
+      setMessage("Could not connect to the category save backend.");
+    }
+  }
+
+  async function handleDeleteCategory(id: number) {
+    try {
+      const response = await fetch(`/api/admin/categories?id=${id}`, {
+        method: "DELETE",
+        headers: adminKey ? { "x-admin-key": adminKey } : {}
+      });
+      const result = (await response.json()) as { ok: boolean; message?: string };
+      setMessage(result.message || (result.ok ? "Category removed." : "Could not remove category."));
+      await loadCategories();
+    } catch {
+      setMessage("Could not connect to the category delete backend.");
     }
   }
 
@@ -356,18 +449,68 @@ export function AdminDashboard() {
                   </div>
                 ) : null}
                 {activeTab === "categories" ? (
-                  <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                    {shopDepartments.map((department) => (
-                      <div className="rounded-lg border border-champagne/25 bg-ink/50 p-4" key={department.id}>
-                        <p className="font-display text-2xl">{department.title}</p>
-                        <p className="mt-1 text-xs uppercase tracking-[0.16em] text-champagne">{department.items.length} menu terms</p>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {department.items.slice(0, 8).map((item) => (
-                            <span className="rounded-full bg-ivory/10 px-3 py-1 text-xs text-ivory/75" key={item}>{item}</span>
-                          ))}
+                  <div className="mt-5 grid gap-5 xl:grid-cols-[24rem_1fr]">
+                    <form className="rounded-lg border border-champagne/25 bg-ink/50 p-5" key={editingCategoryId || "new-category"} onSubmit={handleCategorySubmit}>
+                      <p className="font-display text-3xl">{editingCategoryId ? "Edit Category" : "Add Category"}</p>
+                      <div className="mt-4 grid gap-3">
+                        <label className="grid gap-2 text-sm font-semibold text-ivory">
+                          Category name
+                          <input className="focus-ring min-h-11 rounded-md border border-champagne/20 bg-ivory px-3 text-ink" defaultValue={categories.find((category) => category.id === editingCategoryId)?.label || ""} name="label" required />
+                        </label>
+                        <label className="grid gap-2 text-sm font-semibold text-ivory">
+                          Header / shop link
+                          <input className="focus-ring min-h-11 rounded-md border border-champagne/20 bg-ivory px-3 text-ink" defaultValue={categories.find((category) => category.id === editingCategoryId)?.href || ""} name="href" placeholder="/shop#accessories" />
+                        </label>
+                        <label className="grid gap-2 text-sm font-semibold text-ivory">
+                          Parent category
+                          <select className="focus-ring min-h-11 rounded-md border border-champagne/20 bg-ivory px-3 text-ink" defaultValue={categories.find((category) => category.id === editingCategoryId)?.parent_id || ""} name="parentId">
+                            <option value="">Top level</option>
+                            {categories.filter((category) => category.id !== editingCategoryId).map((category) => (
+                              <option key={category.id} value={category.id}>{category.label}</option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="grid gap-2 text-sm font-semibold text-ivory">
+                          Sort order
+                          <input className="focus-ring min-h-11 rounded-md border border-champagne/20 bg-ivory px-3 text-ink" defaultValue={categories.find((category) => category.id === editingCategoryId)?.sort_order || 0} name="sortOrder" type="number" />
+                        </label>
+                        <label className="flex items-center gap-3 rounded-md border border-champagne/20 bg-ivory/5 px-3 py-3 text-sm font-semibold text-ivory">
+                          <input defaultChecked={Boolean(categories.find((category) => category.id === editingCategoryId)?.is_header)} name="isHeader" type="checkbox" />
+                          Show as main header tab
+                        </label>
+                        <label className="flex items-center gap-3 rounded-md border border-champagne/20 bg-ivory/5 px-3 py-3 text-sm font-semibold text-ivory">
+                          <input name="syncToEpos" type="checkbox" />
+                          Sync category change to Epos
+                        </label>
+                        <div className="flex gap-2">
+                          <button className="focus-ring rounded-md bg-champagne px-5 py-3 text-xs font-bold uppercase tracking-[0.16em] text-ink" type="submit">
+                            {editingCategoryId ? "Save" : "Add"}
+                          </button>
+                          {editingCategoryId ? (
+                            <button className="focus-ring rounded-md border border-champagne/40 px-5 py-3 text-xs font-bold uppercase tracking-[0.16em] text-champagne" onClick={() => setEditingCategoryId(null)} type="button">
+                              Cancel
+                            </button>
+                          ) : null}
                         </div>
                       </div>
-                    ))}
+                    </form>
+                    <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
+                      {categories.map((category) => (
+                        <div className="rounded-lg border border-champagne/25 bg-ink/50 p-4" key={category.id}>
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="font-display text-2xl">{category.label}</p>
+                              <p className="mt-1 text-xs uppercase tracking-[0.16em] text-champagne">{category.is_header ? "Header tab" : category.parent_id ? "Subcategory" : "Top level"} / order {category.sort_order}</p>
+                              <p className="mt-2 text-xs text-ivory/60">{category.href}</p>
+                            </div>
+                            <div className="flex gap-2">
+                              <button className="focus-ring rounded-md bg-champagne px-3 py-2 text-xs font-bold text-ink" onClick={() => setEditingCategoryId(category.id)} type="button">Edit</button>
+                              <button className="focus-ring rounded-md border border-ember/60 px-3 py-2 text-xs font-bold text-ember" onClick={() => handleDeleteCategory(category.id)} type="button">Delete</button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 ) : null}
                 {activeTab === "discounts" ? (
@@ -492,6 +635,28 @@ export function AdminDashboard() {
                 </div>
 
                 <div className="mt-6 grid gap-4">
+                  <label className="grid gap-2 text-sm font-semibold text-espresso">
+                    Epos product name
+                    <input className="focus-ring min-h-12 rounded-md border border-saddle/20 bg-white px-4 font-normal" defaultValue={selectedProduct.name} name="eposName" />
+                  </label>
+                  <label className="grid gap-2 text-sm font-semibold text-espresso">
+                    Epos product description
+                    <textarea className="focus-ring min-h-24 rounded-md border border-saddle/20 bg-white px-4 py-3 font-normal" defaultValue={selectedProduct.description || ""} name="eposDescription" />
+                  </label>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <label className="grid gap-2 text-sm font-semibold text-espresso">
+                      Epos SKU
+                      <input className="focus-ring min-h-12 rounded-md border border-saddle/20 bg-white px-4 font-normal" defaultValue={selectedProduct.sku || ""} name="eposSku" />
+                    </label>
+                    <label className="grid gap-2 text-sm font-semibold text-espresso">
+                      Epos price
+                      <input className="focus-ring min-h-12 rounded-md border border-saddle/20 bg-white px-4 font-normal" defaultValue={selectedProduct.sale_price || ""} name="eposSalePrice" step="0.01" type="number" />
+                    </label>
+                    <label className="grid gap-2 text-sm font-semibold text-espresso">
+                      Epos stock
+                      <input className="focus-ring min-h-12 rounded-md border border-saddle/20 bg-white px-4 font-normal" defaultValue={selectedProduct.stock || ""} name="eposStock" step="1" type="number" />
+                    </label>
+                  </div>
                   <label className="grid gap-2 text-sm font-semibold text-espresso">
                     Storefront title
                     <input className="focus-ring min-h-12 rounded-md border border-saddle/20 bg-white px-4 font-normal" defaultValue={selectedProduct.marketing_title || ""} name="marketingTitle" placeholder={selectedProduct.name} />

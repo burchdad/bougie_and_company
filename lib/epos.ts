@@ -99,3 +99,28 @@ export function getEposString(record: Record<string, unknown>, keys: string[]) {
 
   return null;
 }
+
+export async function updateEposProduct(productId: string, raw: Record<string, unknown>, fields: { name: string; description: string; sku: string; salePrice: number | null }) {
+  return eposFetch<Record<string, unknown>>(`Product/${productId}`, {
+    method: "PUT",
+    body: JSON.stringify({
+      ...raw,
+      Id: Number(productId),
+      Name: fields.name,
+      Description: fields.description,
+      Sku: fields.sku,
+      SalePrice: fields.salePrice
+    })
+  });
+}
+
+export async function updateEposProductStock(stockId: string, raw: Record<string, unknown>, currentStock: number) {
+  return eposFetch<Record<string, unknown>>(`ProductStock/${stockId}`, {
+    method: "PUT",
+    body: JSON.stringify({
+      ...raw,
+      Id: Number(stockId),
+      CurrentStock: currentStock
+    })
+  });
+}

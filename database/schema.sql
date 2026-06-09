@@ -97,3 +97,18 @@ CREATE TABLE IF NOT EXISTS product_images (
 
 CREATE INDEX IF NOT EXISTS product_images_product_idx ON product_images (epos_product_id, sort_order ASC);
 CREATE INDEX IF NOT EXISTS product_site_meta_department_idx ON product_site_meta (department);
+
+CREATE TABLE IF NOT EXISTS site_categories (
+  id BIGSERIAL PRIMARY KEY,
+  label TEXT NOT NULL,
+  slug TEXT NOT NULL,
+  href TEXT NOT NULL,
+  parent_id BIGINT REFERENCES site_categories(id) ON DELETE CASCADE,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  is_header BOOLEAN NOT NULL DEFAULT FALSE,
+  epos_category_id TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS site_categories_parent_idx ON site_categories (parent_id, sort_order ASC);
