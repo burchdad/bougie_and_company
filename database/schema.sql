@@ -112,3 +112,23 @@ CREATE TABLE IF NOT EXISTS site_categories (
 );
 
 CREATE INDEX IF NOT EXISTS site_categories_parent_idx ON site_categories (parent_id, sort_order ASC);
+
+CREATE TABLE IF NOT EXISTS site_discounts (
+  id BIGSERIAL PRIMARY KEY,
+  code TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  description TEXT,
+  discount_type TEXT NOT NULL CHECK (discount_type IN ('percentage', 'fixed')),
+  value NUMERIC(12, 2) NOT NULL,
+  minimum_order_amount NUMERIC(12, 2),
+  usage_limit INTEGER,
+  starts_at TIMESTAMPTZ,
+  ends_at TIMESTAMPTZ,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  epos_discount_reason_id TEXT,
+  epos_raw JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS site_discounts_active_idx ON site_discounts (is_active, starts_at, ends_at);

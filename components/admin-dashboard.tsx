@@ -37,6 +37,21 @@ type SiteCategory = {
   epos_category_id: string | null;
 };
 
+type SiteDiscount = {
+  id: number;
+  code: string;
+  name: string;
+  description: string | null;
+  discount_type: "percentage" | "fixed";
+  value: string;
+  minimum_order_amount: string | null;
+  usage_limit: number | null;
+  starts_at: string | null;
+  ends_at: string | null;
+  is_active: boolean;
+  epos_discount_reason_id: string | null;
+};
+
 type ProductResponse = {
   ok: boolean;
   products?: AdminProduct[];
@@ -69,8 +84,10 @@ export function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<AdminTab>("dashboard");
   const [products, setProducts] = useState<AdminProduct[]>([]);
   const [categories, setCategories] = useState<SiteCategory[]>([]);
+  const [discounts, setDiscounts] = useState<SiteDiscount[]>([]);
   const [editingCategoryId, setEditingCategoryId] = useState<number | null>(null);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [editingDiscountId, setEditingDiscountId] = useState<number | null>(null);
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState("");
   const [loading, setLoading] = useState(true);
@@ -89,6 +106,7 @@ export function AdminDashboard() {
 
   const selectedProduct = useMemo(() => products.find((product) => product.epos_product_id === selectedId) || products[0], [products, selectedId]);
   const selectedCategory = useMemo(() => categories.find((category) => category.id === editingCategoryId) || null, [categories, editingCategoryId]);
+  const selectedDiscount = useMemo(() => discounts.find((discount) => discount.id === editingDiscountId) || null, [discounts, editingDiscountId]);
 
   async function loadProducts(searchTerm = query) {
     setLoading(true);
@@ -132,6 +150,26 @@ export function AdminDashboard() {
       setCategories(result.categories || []);
     } catch {
       setMessage("Could not connect to the category backend.");
+    }
+  }
+
+  async function loadDiscounts() {
+    setMessage("");
+
+    try {
+      const response = await fetch("/api/admin/discounts", {
+        headers: adminKey ? { "x-admin-key": adminKey } : {}
+      });
+      const result = (await response.json()) as { ok: boolean; discounts?: SiteDiscount[]; message?: string };
+
+      if (!response.ok || !result.ok) {
+        setMessage(result.message || "Could not load discounts.");
+        return;
+      }
+
+      setDiscounts(result.discounts || []);
+    } catch {
+      setMessage("Could not connect to the discount backend.");
     }
   }
 
@@ -191,6 +229,9 @@ export function AdminDashboard() {
     }
     if (isSignedIn && activeTab === "categories" && categories.length === 0) {
       loadCategories();
+    }
+    if (isSignedIn && activeTab === "discounts" && discounts.length === 0) {
+      loadDiscounts();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, isSignedIn]);
@@ -335,6 +376,62 @@ export function AdminDashboard() {
       await loadCategories();
     } catch {
       setMessage("Could not connect to the category delete backend.");
+    }
+  }
+
+  async function handleDiscountSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+
+    try {
+      const response = await fetch("/api/admin/discounts", {
+        method: editingDiscountId ? "PATCH" : "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(adminKey ? { "x-admin-key": adminKey } : {})
+        },
+        body: JSON.stringify({
+          id: editingDiscountId,
+          code: String(form.get("code") || ""),
+          name: String(form.get("name") || ""),
+          description: String(form.get("description") || ""),
+          discountType: String(form.get("discountType") || "percentage"),
+          value: String(form.get("value") || ""),
+          minimumOrderAmount: String(form.get("minimumOrderAmount") || ""),
+          usageLimit: String(form.get("usageLimit") || ""),
+          startsAt: String(form.get("startsAt") || ""),
+          endsAt: String(form.get("endsAt") || ""),
+          isActive: form.get("isActive") === "on",
+          syncToEpos: form.get("syncToEpos") === "on"
+        })
+      });
+      const result = (await response.json()) as { ok: boolean; message?: string };
+
+      setMessage(result.message || (result.ok ? "Discount saved." : "Could not save discount."));
+      if (result.ok) {
+        event.currentTarget.reset();
+        setEditingDiscountId(null);
+        await loadDiscounts();
+      }
+    } catch {
+      setMessage("Could not connect to the discount save backend.");
+    }
+  }
+
+  async function handleDeleteDiscount(id: number) {
+    try {
+      const response = await fetch(`/api/admin/discounts?id=${id}`, {
+        method: "DELETE",
+        headers: adminKey ? { "x-admin-key": adminKey } : {}
+      });
+      const result = (await response.json()) as { ok: boolean; message?: string };
+      setMessage(result.message || (result.ok ? "Discount removed." : "Could not remove discount."));
+      if (editingDiscountId === id) {
+        setEditingDiscountId(null);
+      }
+      await loadDiscounts();
+    } catch {
+      setMessage("Could not connect to the discount delete backend.");
     }
   }
 
@@ -567,14 +664,101 @@ export function AdminDashboard() {
                   </div>
                 ) : null}
                 {activeTab === "discounts" ? (
-                  <div className="mt-5 grid gap-4 lg:grid-cols-2">
-                    <div className="rounded-lg border border-champagne/25 bg-ink/50 p-5">
-                      <p className="font-display text-3xl">Discount Codes</p>
-                      <p className="mt-2 text-sm text-ivory/65">No active website discount codes. Checkout integration will attach these to payment/order rules.</p>
-                    </div>
-                    <div className="rounded-lg border border-champagne/25 bg-ink/50 p-5">
-                      <p className="font-display text-3xl">Gift Certificates</p>
-                      <p className="mt-2 text-sm text-ivory/65">Gift certificate products are managed in Epos and surfaced in the shop catalog.</p>
+                  <div className="mt-5 grid gap-5 xl:grid-cols-[28rem_1fr]">
+                    <form className="rounded-lg border border-champagne/25 bg-ink/50 p-5" key={selectedDiscount?.id || "new-discount"} onSubmit={handleDiscountSubmit}>
+                      <p className="font-display text-3xl">{selectedDiscount ? "Edit Discount" : "Create Discount"}</p>
+                      <p className="mt-2 text-sm leading-6 text-ivory/65">Discount rules are saved in Neon. Turn on Epos sync to create or update the matching Epos discount reason ID.</p>
+                      <div className="mt-4 grid gap-3">
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <label className="grid gap-2 text-sm font-semibold text-ivory">
+                            Code
+                            <input className="focus-ring min-h-11 rounded-md border border-champagne/20 bg-ivory px-3 uppercase text-ink" defaultValue={selectedDiscount?.code || ""} name="code" placeholder="WELCOME10" required />
+                          </label>
+                          <label className="grid gap-2 text-sm font-semibold text-ivory">
+                            Type
+                            <select className="focus-ring min-h-11 rounded-md border border-champagne/20 bg-ivory px-3 text-ink" defaultValue={selectedDiscount?.discount_type || "percentage"} name="discountType">
+                              <option value="percentage">Percentage</option>
+                              <option value="fixed">Fixed amount</option>
+                            </select>
+                          </label>
+                        </div>
+                        <label className="grid gap-2 text-sm font-semibold text-ivory">
+                          Discount name
+                          <input className="focus-ring min-h-11 rounded-md border border-champagne/20 bg-ivory px-3 text-ink" defaultValue={selectedDiscount?.name || ""} name="name" placeholder="New customer welcome" required />
+                        </label>
+                        <label className="grid gap-2 text-sm font-semibold text-ivory">
+                          Description
+                          <textarea className="focus-ring min-h-24 rounded-md border border-champagne/20 bg-ivory px-3 py-3 text-ink" defaultValue={selectedDiscount?.description || ""} name="description" placeholder="Internal note or customer-facing context" />
+                        </label>
+                        <div className="grid gap-3 sm:grid-cols-3">
+                          <label className="grid gap-2 text-sm font-semibold text-ivory">
+                            Value
+                            <input className="focus-ring min-h-11 rounded-md border border-champagne/20 bg-ivory px-3 text-ink" defaultValue={selectedDiscount?.value || ""} min="0" name="value" step="0.01" type="number" required />
+                          </label>
+                          <label className="grid gap-2 text-sm font-semibold text-ivory">
+                            Min order
+                            <input className="focus-ring min-h-11 rounded-md border border-champagne/20 bg-ivory px-3 text-ink" defaultValue={selectedDiscount?.minimum_order_amount || ""} min="0" name="minimumOrderAmount" step="0.01" type="number" />
+                          </label>
+                          <label className="grid gap-2 text-sm font-semibold text-ivory">
+                            Usage limit
+                            <input className="focus-ring min-h-11 rounded-md border border-champagne/20 bg-ivory px-3 text-ink" defaultValue={selectedDiscount?.usage_limit || ""} min="1" name="usageLimit" step="1" type="number" />
+                          </label>
+                        </div>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <label className="grid gap-2 text-sm font-semibold text-ivory">
+                            Starts
+                            <input className="focus-ring min-h-11 rounded-md border border-champagne/20 bg-ivory px-3 text-ink" defaultValue={selectedDiscount?.starts_at?.slice(0, 10) || ""} name="startsAt" type="date" />
+                          </label>
+                          <label className="grid gap-2 text-sm font-semibold text-ivory">
+                            Ends
+                            <input className="focus-ring min-h-11 rounded-md border border-champagne/20 bg-ivory px-3 text-ink" defaultValue={selectedDiscount?.ends_at?.slice(0, 10) || ""} name="endsAt" type="date" />
+                          </label>
+                        </div>
+                        <label className="flex items-center gap-3 rounded-md border border-champagne/20 bg-ivory/5 px-3 py-3 text-sm font-semibold text-ivory">
+                          <input defaultChecked={selectedDiscount ? selectedDiscount.is_active : true} name="isActive" type="checkbox" />
+                          Active on website
+                        </label>
+                        <label className="flex items-center gap-3 rounded-md border border-champagne/20 bg-ivory/5 px-3 py-3 text-sm font-semibold text-ivory">
+                          <input name="syncToEpos" type="checkbox" />
+                          Sync discount reason to Epos
+                        </label>
+                        <div className="flex flex-wrap gap-2 pt-2">
+                          <button className="focus-ring rounded-md bg-champagne px-5 py-3 text-xs font-bold uppercase tracking-[0.16em] text-ink hover:bg-ivory" type="submit">
+                            {selectedDiscount ? "Save" : "Create"}
+                          </button>
+                          {selectedDiscount ? (
+                            <button className="focus-ring rounded-md border border-champagne/40 px-5 py-3 text-xs font-bold uppercase tracking-[0.16em] text-champagne hover:bg-champagne hover:text-ink" onClick={() => setEditingDiscountId(null)} type="button">
+                              Cancel
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
+                    </form>
+                    <div className="grid content-start gap-3 md:grid-cols-2 2xl:grid-cols-3">
+                      {!discounts.length ? (
+                        <div className="rounded-lg border border-dashed border-champagne/25 bg-ink/50 p-6 text-center text-sm text-ivory/60 md:col-span-2 2xl:col-span-3">No discount codes yet.</div>
+                      ) : null}
+                      {discounts.map((discount) => (
+                        <div className="rounded-lg border border-champagne/25 bg-ink/50 p-4" key={discount.id}>
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="text-xs font-bold uppercase tracking-[0.2em] text-champagne">{discount.code}</p>
+                              <p className="mt-2 font-display text-2xl">{discount.name}</p>
+                              <p className="mt-2 text-sm text-ivory/70">
+                                {discount.discount_type === "percentage" ? `${Number(discount.value)}% off` : `$${Number(discount.value).toFixed(2)} off`}
+                                {discount.minimum_order_amount ? ` / min $${Number(discount.minimum_order_amount).toFixed(2)}` : ""}
+                              </p>
+                              <p className="mt-2 text-xs uppercase tracking-[0.14em] text-ivory/45">
+                                {discount.is_active ? "Active" : "Inactive"} / Epos {discount.epos_discount_reason_id || "not synced"}
+                              </p>
+                            </div>
+                            <div className="flex gap-2">
+                              <button className="focus-ring rounded-md bg-champagne px-3 py-2 text-xs font-bold text-ink" onClick={() => setEditingDiscountId(discount.id)} type="button">Edit</button>
+                              <button className="focus-ring rounded-md border border-ember/60 px-3 py-2 text-xs font-bold text-ember" onClick={() => handleDeleteDiscount(discount.id)} type="button">Delete</button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 ) : null}
