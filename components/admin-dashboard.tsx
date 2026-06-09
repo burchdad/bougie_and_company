@@ -14,6 +14,7 @@ type AdminProduct = {
   category_id: string | null;
   sale_price: string | null;
   stock: string | null;
+  storefront_stock_override: string | null;
   stock_id: string | null;
   stock_location_id: string | null;
   synced_at: string;
@@ -551,20 +552,23 @@ export function AdminDashboard() {
         message?: string;
         result?: {
           updated: number;
+          storefrontOverrides: number;
           failed: number;
           remainingBelowMinimum: number;
+          failures?: Array<{ productId: string; name: string; message: string }>;
         };
       };
 
-      if (!response.ok || !result.ok) {
+      if (!response.ok && !result.result) {
         setMessage(result.message || "Could not repair Epos stock.");
         return;
       }
 
       const counts = result.result;
+      const preview = counts?.failures?.slice(0, 2).map((failure) => `${failure.name}: ${failure.message}`).join(" ");
       setMessage(
         counts
-          ? `${result.message} Updated ${counts.updated}, failed ${counts.failed}, remaining ${counts.remainingBelowMinimum}.`
+          ? `${result.message} Epos failures: ${counts.failed}.${preview ? ` ${preview}` : ""}`
           : result.message || "Stock repair complete."
       );
       await loadProducts(query);

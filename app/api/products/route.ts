@@ -12,6 +12,7 @@ type ProductRow = {
   category_id: string | null;
   sale_price: string | null;
   stock: string | null;
+  storefront_stock_override: string | null;
   synced_at: string;
   marketing_title: string | null;
   marketing_description: string | null;
@@ -22,12 +23,23 @@ type ProductRow = {
   primary_image_alt: string | null;
 };
 
+function getDisplayStock(product: ProductRow) {
+  const eposStock = Number(product.stock || 0);
+  const storefrontOverride = Number(product.storefront_stock_override || 0);
+  return eposStock > 0 ? eposStock : storefrontOverride;
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const query = searchParams.get("q")?.trim() || "";
     const rows = (await getAdminProducts(query)) as ProductRow[];
-    const products = rows.filter((product) => !product.is_hidden && Number(product.stock || 0) > 0);
+    const products = rows
+      .filter((product) => !product.is_hidden && getDisplayStock(product) > 0)
+      .map((product) => ({
+        ...product,
+        stock: String(getDisplayStock(product))
+      }));
 
     return Response.json({ ok: true, products }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {

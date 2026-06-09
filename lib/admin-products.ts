@@ -11,6 +11,7 @@ export type AdminProduct = {
   category_id: string | null;
   sale_price: string | null;
   stock: string | null;
+  storefront_stock_override: string | null;
   stock_id: string | null;
   stock_location_id: string | null;
   synced_at: string;
@@ -49,11 +50,14 @@ export async function ensureProductAdminTables() {
       marketing_title TEXT,
       marketing_description TEXT,
       department TEXT,
+      storefront_stock_override NUMERIC,
       is_featured BOOLEAN NOT NULL DEFAULT FALSE,
       is_hidden BOOLEAN NOT NULL DEFAULT FALSE,
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `;
+
+  await sql`ALTER TABLE product_site_meta ADD COLUMN IF NOT EXISTS storefront_stock_override NUMERIC`;
 
   await sql`
     CREATE TABLE IF NOT EXISTS product_images (
@@ -87,6 +91,7 @@ export async function getAdminProducts(query = "") {
           p.category_id::text,
           p.sale_price::text,
           COALESCE(SUM(s.current_stock), 0)::text AS stock,
+          m.storefront_stock_override::text AS storefront_stock_override,
           stock_row.epos_stock_id AS stock_id,
           stock_row.location_id::text AS stock_location_id,
           p.synced_at::text,
@@ -125,7 +130,7 @@ export async function getAdminProducts(query = "") {
             OR p.sku ILIKE ${`%${query}%`}
             OR p.barcode ILIKE ${`%${query}%`}
           )
-        GROUP BY p.epos_product_id, p.name, p.description, p.sku, p.barcode, p.category_id, p.sale_price, stock_row.epos_stock_id, stock_row.location_id, p.synced_at, m.marketing_title, m.marketing_description, m.department, sc.slug, parent_sc.slug, m.is_featured, m.is_hidden, i.url, i.alt_text
+        GROUP BY p.epos_product_id, p.name, p.description, p.sku, p.barcode, p.category_id, p.sale_price, m.storefront_stock_override, stock_row.epos_stock_id, stock_row.location_id, p.synced_at, m.marketing_title, m.marketing_description, m.department, sc.slug, parent_sc.slug, m.is_featured, m.is_hidden, i.url, i.alt_text
         ORDER BY p.name ASC
         LIMIT 300
       `
@@ -139,6 +144,7 @@ export async function getAdminProducts(query = "") {
           p.category_id::text,
           p.sale_price::text,
           COALESCE(SUM(s.current_stock), 0)::text AS stock,
+          m.storefront_stock_override::text AS storefront_stock_override,
           stock_row.epos_stock_id AS stock_id,
           stock_row.location_id::text AS stock_location_id,
           p.synced_at::text,
@@ -171,7 +177,7 @@ export async function getAdminProducts(query = "") {
           LIMIT 1
         ) i ON TRUE
         WHERE p.is_deleted = FALSE
-        GROUP BY p.epos_product_id, p.name, p.description, p.sku, p.barcode, p.category_id, p.sale_price, stock_row.epos_stock_id, stock_row.location_id, p.synced_at, m.marketing_title, m.marketing_description, m.department, sc.slug, parent_sc.slug, m.is_featured, m.is_hidden, i.url, i.alt_text
+        GROUP BY p.epos_product_id, p.name, p.description, p.sku, p.barcode, p.category_id, p.sale_price, m.storefront_stock_override, stock_row.epos_stock_id, stock_row.location_id, p.synced_at, m.marketing_title, m.marketing_description, m.department, sc.slug, parent_sc.slug, m.is_featured, m.is_hidden, i.url, i.alt_text
         ORDER BY p.name ASC
         LIMIT 300
       `;
