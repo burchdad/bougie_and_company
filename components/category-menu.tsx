@@ -214,7 +214,7 @@ export function CategoryMenu() {
   }
 
   return (
-    <div className="border-y border-saddle/10 bg-ivory/95">
+    <div className="border-y border-saddle/10 bg-ivory">
       <nav className="mx-auto hidden max-w-7xl items-center justify-center gap-3 px-4 py-4 lg:flex">
         {menuItems.map((item) => (
           <div className="relative" key={item.label} onMouseEnter={() => openMenu(item.label)} onMouseLeave={scheduleClose}>

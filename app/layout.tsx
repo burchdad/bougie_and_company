@@ -58,7 +58,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="en">
       <body className={`${display.variable} ${sans.variable} font-sans antialiased`}>
         <Script id="organization-schema" type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }} />
-        <div className="sticky top-0 z-40">
+        <div className="relative z-40">
           <SiteHeader />
           <CategoryMenu />
         </div>
