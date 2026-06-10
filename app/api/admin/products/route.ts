@@ -6,6 +6,17 @@ import { inferDepartment } from "@/lib/product-categorization";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+type ProductPatchRow = {
+  raw: Record<string, unknown> | null;
+  name: string | null;
+  description: string | null;
+  sku: string | null;
+  sale_price: string | null;
+  category_id: string | null;
+  epos_stock_id: string | null;
+  stock_raw: Record<string, unknown> | null;
+};
+
 export async function GET(request: Request) {
   if (!isAdminRequest(request)) {
     return Response.json({ ok: false, message: "Admin access required." }, { status: 401 });
@@ -244,7 +255,15 @@ export async function PATCH(request: Request) {
 
   const sql = getSql();
   const productRows = await sql`
-    SELECT p.raw, s.epos_stock_id, s.raw AS stock_raw
+    SELECT
+      p.raw,
+      p.name,
+      p.description,
+      p.sku,
+      p.sale_price::text,
+      p.category_id::text,
+      s.epos_stock_id,
+      s.raw AS stock_raw
     FROM epos_products p
     LEFT JOIN LATERAL (
       SELECT epos_stock_id, raw
@@ -261,6 +280,7 @@ export async function PATCH(request: Request) {
     return Response.json({ ok: false, message: "Product not found in Neon cache." }, { status: 404 });
   }
 
+  const productRow = productRows[0] as ProductPatchRow;
   const eposName = body.eposName?.trim() || body.marketingTitle?.trim() || "Untitled product";
   const eposDescription = body.eposDescription?.trim() || body.marketingDescription?.trim() || eposName;
   const eposSku = body.eposSku?.trim() || "";
@@ -273,26 +293,36 @@ export async function PATCH(request: Request) {
   }
 
   const eposCategoryId = await getEposCategoryIdForDepartment(department);
+  let detailFallbackMessage: string | null = null;
   let stockFallbackMessage: string | null = null;
+  const currentSalePrice = productRow.sale_price !== null && productRow.sale_price !== undefined ? Number(productRow.sale_price) : null;
+  const productDetailsChanged =
+    eposName !== (productRow.name || "") ||
+    eposDescription !== (productRow.description || "") ||
+    eposSku !== (productRow.sku || "") ||
+    (Number.isFinite(Number(eposSalePrice)) ? Number(eposSalePrice) : null) !== (Number.isFinite(Number(currentSalePrice)) ? Number(currentSalePrice) : null) ||
+    (eposCategoryId ? eposCategoryId !== String(productRow.category_id || "") : false);
 
-  try {
-    await updateEposProduct(body.eposProductId, productRows[0].raw as Record<string, unknown>, {
-      name: eposName,
-      description: eposDescription,
-      sku: eposSku,
-      salePrice: eposSalePrice,
-      categoryId: eposCategoryId
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Epos update failed.";
-    console.error(message);
-    return Response.json({ ok: false, message: `Epos rejected the update: ${message}` }, { status: 502 });
+  if (productDetailsChanged) {
+    try {
+      await updateEposProduct(body.eposProductId, productRow.raw || {}, {
+        name: eposName,
+        description: eposDescription,
+        sku: eposSku,
+        salePrice: eposSalePrice,
+        categoryId: eposCategoryId
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Epos update failed.";
+      console.error(message);
+      detailFallbackMessage = ` Epos rejected the product detail update, so those fields were saved to the website cache only: ${message}.`;
+    }
   }
 
   if (eposStock !== null) {
     try {
-      if (productRows[0].epos_stock_id) {
-        await updateEposProductStock(String(productRows[0].epos_stock_id), productRows[0].stock_raw as Record<string, unknown>, eposStock);
+      if (productRow.epos_stock_id) {
+        await updateEposProductStock(String(productRow.epos_stock_id), productRow.stock_raw || {}, eposStock);
       } else {
         const stock = await createEposProductStock({ productId: body.eposProductId, currentStock: eposStock });
         const stockId = getEposId(stock);
@@ -345,13 +375,13 @@ export async function PATCH(request: Request) {
     WHERE epos_product_id = ${body.eposProductId}
   `;
 
-  if (eposStock !== null && productRows[0].epos_stock_id) {
+  if (eposStock !== null && productRow.epos_stock_id) {
     await sql`
       UPDATE epos_product_stock
       SET current_stock = ${eposStock},
         raw = jsonb_set(COALESCE(raw, '{}'::jsonb), '{CurrentStock}', to_jsonb(${eposStock}::numeric), true),
         synced_at = NOW()
-      WHERE epos_stock_id = ${String(productRows[0].epos_stock_id)}
+      WHERE epos_stock_id = ${String(productRow.epos_stock_id)}
     `;
   }
 
@@ -384,5 +414,5 @@ export async function PATCH(request: Request) {
       updated_at = NOW()
   `;
 
-  return Response.json({ ok: true, message: `Product website details saved.${stockFallbackMessage || ""}` }, { headers: { "Cache-Control": "no-store" } });
+  return Response.json({ ok: true, message: `Product website details saved.${detailFallbackMessage || ""}${stockFallbackMessage || ""}` }, { headers: { "Cache-Control": "no-store" } });
 }
