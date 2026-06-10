@@ -1,7 +1,7 @@
 import { list, put } from "@vercel/blob";
 import { ensureProductAdminTables } from "@/lib/admin-products";
 import { getSql } from "@/lib/db";
-import { fetchEposCollection, getEposString } from "@/lib/epos";
+import { eposFetch, getEposString } from "@/lib/epos";
 
 const imageKeyPattern = /(image|photo|picture|thumbnail|media|avatar|icon)/i;
 const imageUrlPattern = /^https?:\/\/.+\.(avif|gif|jpe?g|png|webp)(\?.*)?$/i;
@@ -10,6 +10,8 @@ type ImageImportResult = {
   productsScanned: number;
   eposImageRecordsFound: number;
   eposImageRecordsMatched: number;
+  productImageLookups: number;
+  productImageRecordsFound: number;
   blobImagesFound: number;
   blobImagesMatched: number;
   blobImagesAlreadyLinked: number;
@@ -156,6 +158,28 @@ function findNestedValue(record: unknown, keys: string[], seen = new Set<unknown
   return null;
 }
 
+function collectRecords(value: unknown, records: EposImageRecord[] = [], seen = new Set<unknown>()) {
+  if (!value || typeof value !== "object" || seen.has(value)) {
+    return records;
+  }
+
+  seen.add(value);
+
+  if (Array.isArray(value)) {
+    value.forEach((item) => collectRecords(item, records, seen));
+    return records;
+  }
+
+  const object = value as EposImageRecord;
+  if (collectImageUrls(object).size) {
+    records.push(object);
+  }
+
+  Object.values(object).forEach((child) => collectRecords(child, records, seen));
+
+  return records;
+}
+
 function getNestedString(record: unknown, keys: string[]) {
   const value = findNestedValue(record, keys);
   if (typeof value === "string" && value.trim()) {
@@ -179,14 +203,42 @@ function getImageRecordProductId(record: EposImageRecord) {
   return null;
 }
 
+async function fetchEposRecords(resource: string) {
+  const records: EposImageRecord[] = [];
+
+  for (let page = 1; page <= 50; page += 1) {
+    const separator = resource.includes("?") ? "&" : "?";
+    const response = await eposFetch<unknown>(`${resource}${separator}page=${page}`);
+    const pageRecords = collectRecords(response);
+    records.push(...pageRecords);
+
+    if (!Array.isArray(response) || response.length === 0 || response.length < 200) {
+      break;
+    }
+  }
+
+  return records;
+}
+
 async function fetchEposImageRecords() {
-  const resources = ["ProductImage", "ProductImages", "Product/Image", "ProductImages/Get"];
+  const resources = [
+    "ProductImage",
+    "ProductImages",
+    "ProductImage/Get",
+    "ProductImages/Get",
+    "ProductAttachment",
+    "ProductAttachments",
+    "ProductMedia",
+    "ProductImages/GetProductImages",
+    "Image",
+    "Images"
+  ];
   const records: EposImageRecord[] = [];
   const seen = new Set<string>();
 
   for (const resource of resources) {
     try {
-      const resourceRecords = await fetchEposCollection<EposImageRecord>(resource, 50);
+      const resourceRecords = await fetchEposRecords(resource);
       for (const record of resourceRecords) {
         const fingerprint = JSON.stringify(record);
         if (!seen.has(fingerprint)) {
@@ -200,6 +252,53 @@ async function fetchEposImageRecords() {
   }
 
   return records;
+}
+
+function productImageResources(productId: string) {
+  const encodedId = encodeURIComponent(productId);
+  return [
+    `Product/${encodedId}/Image`,
+    `Product/${encodedId}/Images`,
+    `Product/${encodedId}/ProductImage`,
+    `Product/${encodedId}/ProductImages`,
+    `Product/${encodedId}/Attachment`,
+    `Product/${encodedId}/Attachments`,
+    `Product/${encodedId}/Media`,
+    `ProductImage?ProductId=${encodedId}`,
+    `ProductImage?productId=${encodedId}`,
+    `ProductImages?ProductId=${encodedId}`,
+    `ProductImages?productId=${encodedId}`,
+    `ProductAttachment?ProductId=${encodedId}`,
+    `ProductAttachments?ProductId=${encodedId}`
+  ];
+}
+
+async function fetchProductImageRecords(productId: string) {
+  const records: EposImageRecord[] = [];
+  const seen = new Set<string>();
+  let lookups = 0;
+
+  for (const resource of productImageResources(productId)) {
+    lookups += 1;
+    try {
+      const resourceRecords = await fetchEposRecords(resource);
+      for (const record of resourceRecords) {
+        const fingerprint = JSON.stringify(record);
+        if (!seen.has(fingerprint)) {
+          seen.add(fingerprint);
+          records.push(record);
+        }
+      }
+
+      if (records.length) {
+        break;
+      }
+    } catch {
+      // Epos image routes are not consistent across stores; keep trying product-scoped shapes.
+    }
+  }
+
+  return { records, lookups };
 }
 
 function addUrls(target: Map<string, Set<string>>, key: string | null, urls: Set<string>) {
@@ -243,6 +342,21 @@ function buildImageUrlIndexes(records: EposImageRecord[]) {
   });
 
   return { byProductId, bySku, byName, matchedRecords };
+}
+
+function collectIndexedImageUrls(record: EposImageRecord, productId: string, productSku: string | null, productName: string | null) {
+  const index = buildImageUrlIndexes([record]);
+  const skuKey = normalizedLookup(productSku);
+  const nameKey = normalizedLookup(productName);
+
+  return [
+    ...new Set([
+      ...collectImageUrls(record),
+      ...(index.byProductId.get(productId) || []),
+      ...(skuKey ? index.bySku.get(skuKey) || [] : []),
+      ...(nameKey ? index.byName.get(nameKey) || [] : [])
+    ])
+  ];
 }
 
 async function listProductBlobs(maxBlobs = 5000) {
@@ -377,6 +491,8 @@ export async function importEposProductImages({ skipExisting = true, limit = 25 
     productsScanned: products.length,
     eposImageRecordsFound: eposImageRecords.length,
     eposImageRecordsMatched: imageIndexes.matchedRecords,
+    productImageLookups: 0,
+    productImageRecordsFound: 0,
     blobImagesFound: blobRepair.found,
     blobImagesMatched: blobRepair.matched,
     blobImagesAlreadyLinked: blobRepair.alreadyLinked,
@@ -413,6 +529,21 @@ export async function importEposProductImages({ skipExisting = true, limit = 25 
         ...(nameKey ? imageIndexes.byName.get(nameKey) || [] : [])
       ])
     ];
+
+    if (!imageUrls.length) {
+      const productImageRecords = await fetchProductImageRecords(productId);
+      result.productImageLookups += productImageRecords.lookups;
+      result.productImageRecordsFound += productImageRecords.records.length;
+
+      for (const record of productImageRecords.records) {
+        collectIndexedImageUrls(record, productId, productSku, productName).forEach((url) => {
+          if (!imageUrls.includes(url)) {
+            imageUrls.push(url);
+          }
+        });
+      }
+    }
+
     result.imageUrlsFound += imageUrls.length;
 
     for (const [index, imageUrl] of imageUrls.entries()) {
