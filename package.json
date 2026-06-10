@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "lint": "next lint",
+    "sync:epos": "node scripts/sync-epos-catalog.mjs",
     "start": "next start"
   },
   "dependencies": {

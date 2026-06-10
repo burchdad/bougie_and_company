@@ -2,6 +2,7 @@ import { recordEposSyncEvent, syncEposCatalog, updateEposSyncEvent } from "@/lib
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 function isAuthorized(request: Request) {
   const webhookSecret = process.env.EPOS_WEBHOOK_SECRET;
@@ -25,6 +26,20 @@ function getEventType(payload: unknown) {
   return typeof event === "string" && event.trim() ? event.trim() : "Batch Update";
 }
 
+function shouldImportImages(request: Request, payload: unknown) {
+  const url = new URL(request.url);
+  if (url.searchParams.get("images") === "1" || process.env.EPOS_WEBHOOK_IMPORT_IMAGES === "true") {
+    return true;
+  }
+
+  if (payload && typeof payload === "object") {
+    const body = payload as Record<string, unknown>;
+    return body.importImages === true || body.images === true;
+  }
+
+  return false;
+}
+
 export async function POST(request: Request) {
   if (!isAuthorized(request)) {
     return Response.json({ ok: false, message: "Invalid Epos webhook secret." }, { status: 401 });
@@ -43,7 +58,11 @@ export async function POST(request: Request) {
 
   try {
     eventId = await recordEposSyncEvent(getEventType(payload), payload);
-    const result = await syncEposCatalog();
+    const result = await syncEposCatalog({
+      importImages: shouldImportImages(request, payload),
+      imageLimit: 100,
+      skipExistingImages: true
+    });
 
     if (eventId) {
       await updateEposSyncEvent(eventId, "processed");

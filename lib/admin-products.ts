@@ -76,10 +76,11 @@ export async function ensureProductAdminTables() {
   await sql`CREATE INDEX IF NOT EXISTS product_site_meta_department_idx ON product_site_meta (department)`;
 }
 
-export async function getAdminProducts(query = "") {
+export async function getAdminProducts(query = "", limit = 1000) {
   await ensureProductAdminTables();
 
   const sql = getSql();
+  const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 2000);
   const rows = query
     ? await sql`
         SELECT
@@ -132,7 +133,7 @@ export async function getAdminProducts(query = "") {
           )
         GROUP BY p.epos_product_id, p.name, p.description, p.sku, p.barcode, p.category_id, p.sale_price, m.storefront_stock_override, stock_row.epos_stock_id, stock_row.location_id, p.synced_at, m.marketing_title, m.marketing_description, m.department, sc.slug, parent_sc.slug, m.is_featured, m.is_hidden, i.url, i.alt_text
         ORDER BY p.name ASC
-        LIMIT 300
+        LIMIT ${safeLimit}
       `
     : await sql`
         SELECT
@@ -179,7 +180,7 @@ export async function getAdminProducts(query = "") {
         WHERE p.is_deleted = FALSE
         GROUP BY p.epos_product_id, p.name, p.description, p.sku, p.barcode, p.category_id, p.sale_price, m.storefront_stock_override, stock_row.epos_stock_id, stock_row.location_id, p.synced_at, m.marketing_title, m.marketing_description, m.department, sc.slug, parent_sc.slug, m.is_featured, m.is_hidden, i.url, i.alt_text
         ORDER BY p.name ASC
-        LIMIT 300
+        LIMIT ${safeLimit}
       `;
 
   return (rows as AdminProductRow[]).map((row) => ({

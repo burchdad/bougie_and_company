@@ -33,7 +33,8 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const query = searchParams.get("q")?.trim() || "";
-    const rows = (await getAdminProducts(query)) as ProductRow[];
+    const requestedLimit = Number(searchParams.get("limit") || 1000);
+    const rows = (await getAdminProducts(query, Number.isFinite(requestedLimit) ? requestedLimit : 1000)) as ProductRow[];
     const products = rows
       .filter((product) => !product.is_hidden)
       .map((product) => ({

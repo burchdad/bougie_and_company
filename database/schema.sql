@@ -79,6 +79,7 @@ CREATE TABLE IF NOT EXISTS product_site_meta (
   marketing_title TEXT,
   marketing_description TEXT,
   department TEXT,
+  storefront_stock_override NUMERIC,
   is_featured BOOLEAN NOT NULL DEFAULT FALSE,
   is_hidden BOOLEAN NOT NULL DEFAULT FALSE,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

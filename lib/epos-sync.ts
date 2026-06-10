@@ -1,9 +1,11 @@
 import { getSql } from "@/lib/db";
 import { EposProduct, EposProductStock, fetchEposCollection, getEposId, getEposNumber, getEposString } from "@/lib/epos";
+import { importEposProductImages } from "@/lib/epos-product-images";
 
 type SyncResult = {
   products: number;
   stock: number;
+  images?: Awaited<ReturnType<typeof importEposProductImages>>;
 };
 
 async function ensureEposTables() {
@@ -157,11 +159,17 @@ export async function syncEposStock() {
   return stockRecords.length;
 }
 
-export async function syncEposCatalog(): Promise<SyncResult> {
+export async function syncEposCatalog(options: { importImages?: boolean; imageLimit?: number; skipExistingImages?: boolean } = {}): Promise<SyncResult> {
   const products = await syncEposProducts();
   const stock = await syncEposStock();
+  const images = options.importImages
+    ? await importEposProductImages({
+        limit: options.imageLimit,
+        skipExisting: options.skipExistingImages !== false
+      })
+    : undefined;
 
-  return { products, stock };
+  return { products, stock, ...(images ? { images } : {}) };
 }
 
 export async function recordEposSyncEvent(eventType: string, payload: unknown, status = "received") {

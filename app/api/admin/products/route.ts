@@ -23,7 +23,8 @@ export async function GET(request: Request) {
   }
 
   const { searchParams } = new URL(request.url);
-  const products = await getAdminProducts(searchParams.get("q")?.trim() || "");
+  const requestedLimit = Number(searchParams.get("limit") || 1000);
+  const products = await getAdminProducts(searchParams.get("q")?.trim() || "", Number.isFinite(requestedLimit) ? requestedLimit : 1000);
   return Response.json({ ok: true, products }, { headers: { "Cache-Control": "no-store" } });
 }
 
