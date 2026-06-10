@@ -25,6 +25,12 @@ type ImageImportResult = {
   skippedExisting: number;
   skippedDuplicate: number;
   failed: number;
+  failureSamples: Array<{
+    host: string;
+    status?: number;
+    contentType?: string | null;
+    reason: string;
+  }>;
   remainingWithoutPhotos: number;
 };
 
@@ -83,6 +89,25 @@ function extensionFrom(url: string, contentType: string | null) {
   }
 
   return "jpg";
+}
+
+function addFailureSample(result: ImageImportResult, imageUrl: string, reason: string, details: { status?: number; contentType?: string | null } = {}) {
+  if (result.failureSamples.length >= 5) {
+    return;
+  }
+
+  let host = "unknown";
+  try {
+    host = new URL(imageUrl).host;
+  } catch {
+    host = "invalid-url";
+  }
+
+  result.failureSamples.push({
+    host,
+    reason,
+    ...details
+  });
 }
 
 function safeName(value: string) {
@@ -503,6 +528,7 @@ export async function importEposProductImages({ skipExisting = true, limit = 25 
     skippedExisting: 0,
     skippedDuplicate: 0,
     failed: 0,
+    failureSamples: [],
     remainingWithoutPhotos: 0
   };
 
@@ -559,6 +585,7 @@ export async function importEposProductImages({ skipExisting = true, limit = 25 
         if (!response.ok) {
           result.failed += 1;
           failedForProduct += 1;
+          addFailureSample(result, imageUrl, "fetch-not-ok", { status: response.status, contentType: response.headers.get("content-type") });
           continue;
         }
 
@@ -566,6 +593,7 @@ export async function importEposProductImages({ skipExisting = true, limit = 25 
         if (!contentType?.startsWith("image/")) {
           result.failed += 1;
           failedForProduct += 1;
+          addFailureSample(result, imageUrl, "not-image-content-type", { status: response.status, contentType });
           continue;
         }
 
@@ -600,6 +628,7 @@ export async function importEposProductImages({ skipExisting = true, limit = 25 
         console.error(error instanceof Error ? error.message : "Epos product image import failed.");
         result.failed += 1;
         failedForProduct += 1;
+        addFailureSample(result, imageUrl, error instanceof Error ? error.message : "fetch-error");
       }
     }
 
@@ -621,12 +650,14 @@ export async function importEposProductImages({ skipExisting = true, limit = 25 
 
           if (!response.ok) {
             result.failed += 1;
+            addFailureSample(result, imageUrl, "fresh-fetch-not-ok", { status: response.status, contentType: response.headers.get("content-type") });
             continue;
           }
 
           const contentType = response.headers.get("content-type");
           if (!contentType?.startsWith("image/")) {
             result.failed += 1;
+            addFailureSample(result, imageUrl, "fresh-not-image-content-type", { status: response.status, contentType });
             continue;
           }
 
@@ -659,6 +690,7 @@ export async function importEposProductImages({ skipExisting = true, limit = 25 
         } catch (error) {
           console.error(error instanceof Error ? error.message : "Epos product image import failed.");
           result.failed += 1;
+          addFailureSample(result, imageUrl, error instanceof Error ? error.message : "fresh-fetch-error");
         }
       }
     }
