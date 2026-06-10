@@ -564,9 +564,10 @@ export function AdminDashboard() {
           "Content-Type": "application/json",
           ...(adminKey ? { "x-admin-key": adminKey } : {})
         },
-        body: JSON.stringify({ importImages: true, imageLimit: 250, skipExistingImages: true })
+        body: JSON.stringify({ importImages: false })
       });
-      const result = (await response.json()) as {
+      const text = await response.text();
+      let result: {
         ok: boolean;
         message?: string;
         products?: number;
@@ -590,15 +591,22 @@ export function AdminDashboard() {
         };
       };
 
+      try {
+        result = JSON.parse(text);
+      } catch {
+        setMessage(`Epos catalog sync returned an unexpected response: ${text.slice(0, 180) || response.statusText}`);
+        return;
+      }
+
       if (!response.ok || !result.ok) {
-        setMessage(result.message || "Could not sync Epos catalog.");
+        setMessage(result.message || `Could not sync Epos catalog. HTTP ${response.status}`);
         return;
       }
 
       const imageText = result.images
         ? ` Blob scan found ${result.images.blobImagesFound ?? 0} existing image file${result.images.blobImagesFound === 1 ? "" : "s"}: ${result.images.blobImagesMatched ?? 0} matched products, ${result.images.blobImagesAlreadyLinked ?? 0} already linked, ${result.images.blobImagesLinked ?? 0} newly linked, ${result.images.blobImagesUnmatched ?? 0} unmatched. Epos image records: ${result.images.eposImageRecordsFound ?? 0} found, ${result.images.eposImageRecordsMatched ?? 0} matched. Uploaded ${result.images.uploaded} image${result.images.uploaded === 1 ? "" : "s"} from ${result.images.imageUrlsFound} URL${result.images.imageUrlsFound === 1 ? "" : "s"}; ${result.images.remainingWithoutPhotos} product${result.images.remainingWithoutPhotos === 1 ? "" : "s"} still have no photo.${result.images.blobImageRepairError ? ` Blob scan error: ${result.images.blobImageRepairError}` : ""}`
         : "";
-      setMessage(`Epos sync complete. Pulled ${result.products || 0} products and ${result.stock || 0} stock record${result.stock === 1 ? "" : "s"}.${imageText}`);
+      setMessage(`Epos sync complete. Pulled ${result.products || 0} products and ${result.stock || 0} stock record${result.stock === 1 ? "" : "s"}.${imageText} Use Import Epos Images separately for photo repair/import.`);
       await loadProducts(query);
     } catch {
       setMessage("Could not connect to the Epos catalog sync backend.");
