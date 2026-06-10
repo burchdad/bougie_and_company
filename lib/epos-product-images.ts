@@ -261,6 +261,7 @@ async function fetchEposImageRecords() {
 function productImageResources(productId: string) {
   const encodedId = encodeURIComponent(productId);
   return [
+    `Product/${encodedId}`,
     `Product/${encodedId}/Images`,
     `ProductImage?ProductId=${encodedId}`,
     `ProductImages?ProductId=${encodedId}`,
@@ -548,18 +549,23 @@ export async function importEposProductImages({ skipExisting = true, limit = 25 
 
     result.imageUrlsFound += imageUrls.length;
 
+    let uploadedForProduct = 0;
+    let failedForProduct = 0;
+
     for (const [index, imageUrl] of imageUrls.entries()) {
       try {
         const response = await fetch(imageUrl, { cache: "no-store" });
 
         if (!response.ok) {
           result.failed += 1;
+          failedForProduct += 1;
           continue;
         }
 
         const contentType = response.headers.get("content-type");
         if (!contentType?.startsWith("image/")) {
           result.failed += 1;
+          failedForProduct += 1;
           continue;
         }
 
@@ -589,9 +595,71 @@ export async function importEposProductImages({ skipExisting = true, limit = 25 
 
         existingPathnames.add(blob.pathname);
         result.uploaded += 1;
+        uploadedForProduct += 1;
       } catch (error) {
         console.error(error instanceof Error ? error.message : "Epos product image import failed.");
         result.failed += 1;
+        failedForProduct += 1;
+      }
+    }
+
+    if (uploadedForProduct === 0 && failedForProduct > 0 && Date.now() - startedAt <= imageImportBudgetMs) {
+      const productImageRecords = await fetchProductImageRecords(productId);
+      result.productImageLookups += productImageRecords.lookups;
+      result.productImageRecordsFound += productImageRecords.records.length;
+
+      const freshImageUrls = [
+        ...new Set(
+          productImageRecords.records.flatMap((record) => collectIndexedImageUrls(record, productId, productSku, productName)).filter((url) => !imageUrls.includes(url))
+        )
+      ];
+      result.imageUrlsFound += freshImageUrls.length;
+
+      for (const [index, imageUrl] of freshImageUrls.entries()) {
+        try {
+          const response = await fetch(imageUrl, { cache: "no-store" });
+
+          if (!response.ok) {
+            result.failed += 1;
+            continue;
+          }
+
+          const contentType = response.headers.get("content-type");
+          if (!contentType?.startsWith("image/")) {
+            result.failed += 1;
+            continue;
+          }
+
+          const extension = extensionFrom(imageUrl, contentType);
+          const folderName = safeName(productSku || productName || productId) || safeName(productId);
+          const pathname = `products/${folderName}/epos-${safeName(productSku || productId)}-${index}.${extension}`;
+
+          if (existingPathnames.has(pathname)) {
+            result.skippedDuplicate += 1;
+            continue;
+          }
+
+          const blob = await put(pathname, await response.blob(), {
+            access: "public",
+            contentType,
+            addRandomSuffix: true
+          });
+
+          if (index === 0) {
+            await sql`UPDATE product_images SET is_primary = FALSE WHERE epos_product_id = ${productId}`;
+          }
+
+          await sql`
+            INSERT INTO product_images (epos_product_id, url, pathname, alt_text, sort_order, is_primary)
+            VALUES (${productId}, ${blob.url}, ${blob.pathname}, ${String(product.name)}, ${index}, ${index === 0})
+          `;
+
+          existingPathnames.add(blob.pathname);
+          result.uploaded += 1;
+        } catch (error) {
+          console.error(error instanceof Error ? error.message : "Epos product image import failed.");
+          result.failed += 1;
+        }
       }
     }
   }
