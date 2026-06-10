@@ -91,6 +91,34 @@ function extensionFrom(url: string, contentType: string | null) {
   return "jpg";
 }
 
+function isUsableImageResponse(imageUrl: string, contentType: string | null) {
+  return Boolean(contentType?.startsWith("image/") || contentType?.includes("application/octet-stream") || imageUrlPattern.test(imageUrl));
+}
+
+function imageContentTypeFrom(extension: string, contentType: string | null) {
+  if (contentType?.startsWith("image/")) {
+    return contentType;
+  }
+
+  if (extension === "png") {
+    return "image/png";
+  }
+
+  if (extension === "webp") {
+    return "image/webp";
+  }
+
+  if (extension === "gif") {
+    return "image/gif";
+  }
+
+  if (extension === "avif") {
+    return "image/avif";
+  }
+
+  return "image/jpeg";
+}
+
 function addFailureSample(result: ImageImportResult, imageUrl: string, reason: string, details: { status?: number; contentType?: string | null } = {}) {
   if (result.failureSamples.length >= 5) {
     return;
@@ -590,7 +618,7 @@ export async function importEposProductImages({ skipExisting = true, limit = 25 
         }
 
         const contentType = response.headers.get("content-type");
-        if (!contentType?.startsWith("image/")) {
+        if (!isUsableImageResponse(imageUrl, contentType)) {
           result.failed += 1;
           failedForProduct += 1;
           addFailureSample(result, imageUrl, "not-image-content-type", { status: response.status, contentType });
@@ -598,6 +626,7 @@ export async function importEposProductImages({ skipExisting = true, limit = 25 
         }
 
         const extension = extensionFrom(imageUrl, contentType);
+        const uploadContentType = imageContentTypeFrom(extension, contentType);
         const folderName = safeName(productSku || productName || productId) || safeName(productId);
         const pathname = `products/${folderName}/epos-${safeName(productSku || productId)}-${index}.${extension}`;
 
@@ -608,7 +637,7 @@ export async function importEposProductImages({ skipExisting = true, limit = 25 
 
         const blob = await put(pathname, await response.blob(), {
           access: "public",
-          contentType,
+          contentType: uploadContentType,
           addRandomSuffix: true
         });
 
@@ -655,13 +684,14 @@ export async function importEposProductImages({ skipExisting = true, limit = 25 
           }
 
           const contentType = response.headers.get("content-type");
-          if (!contentType?.startsWith("image/")) {
+          if (!isUsableImageResponse(imageUrl, contentType)) {
             result.failed += 1;
             addFailureSample(result, imageUrl, "fresh-not-image-content-type", { status: response.status, contentType });
             continue;
           }
 
           const extension = extensionFrom(imageUrl, contentType);
+          const uploadContentType = imageContentTypeFrom(extension, contentType);
           const folderName = safeName(productSku || productName || productId) || safeName(productId);
           const pathname = `products/${folderName}/epos-${safeName(productSku || productId)}-${index}.${extension}`;
 
@@ -672,7 +702,7 @@ export async function importEposProductImages({ skipExisting = true, limit = 25 
 
           const blob = await put(pathname, await response.blob(), {
             access: "public",
-            contentType,
+            contentType: uploadContentType,
             addRandomSuffix: true
           });
 
