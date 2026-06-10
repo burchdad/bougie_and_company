@@ -35,7 +35,7 @@ export async function GET(request: Request) {
     const query = searchParams.get("q")?.trim() || "";
     const rows = (await getAdminProducts(query)) as ProductRow[];
     const products = rows
-      .filter((product) => !product.is_hidden && getDisplayStock(product) > 0)
+      .filter((product) => !product.is_hidden)
       .map((product) => ({
         ...product,
         stock: String(getDisplayStock(product))

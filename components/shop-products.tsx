@@ -298,7 +298,7 @@ function groupTitle(product: Product) {
 function groupProducts(products: Product[]) {
   const groups = new Map<string, ProductGroup>();
 
-  products.filter(hasAvailableStock).forEach((product) => {
+  products.forEach((product) => {
     const key = groupKey(product);
     const existing = groups.get(key);
 
@@ -316,7 +316,10 @@ function groupProducts(products: Product[]) {
 
   return [...groups.values()].map((group) => ({
     ...group,
-    products: group.products.sort((a, b) => variantLabel(a).localeCompare(variantLabel(b), undefined, { numeric: true }))
+    products: group.products.sort((a, b) => {
+      const stockSort = Number(hasAvailableStock(b)) - Number(hasAvailableStock(a));
+      return stockSort || variantLabel(a).localeCompare(variantLabel(b), undefined, { numeric: true });
+    })
   }));
 }
 
@@ -449,6 +452,10 @@ export function ShopProducts() {
   const activeCategoryLabel = activeDepartment === "all" ? "All Products" : filterCategories.find((category) => category.id === activeDepartment)?.label || departmentTitle(activeDepartment);
 
   function addToCart(product: Product) {
+    if (!hasAvailableStock(product)) {
+      return;
+    }
+
     window.dispatchEvent(
       new CustomEvent("bougie:add-to-cart", {
         detail: {
@@ -575,12 +582,13 @@ export function ShopProducts() {
           <div className="mt-5 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
             {filteredGroups.map((group) => {
               const selectedProductId = selectedVariants[group.key];
-              const product = group.products.find((variant) => variant.epos_product_id === selectedProductId) || group.products[0];
+              const product = group.products.find((variant) => variant.epos_product_id === selectedProductId) || group.products.find(hasAvailableStock) || group.products[0];
               const price = money(product.sale_price);
               const hasVariants = group.products.length > 1;
+              const isOutOfStock = !hasAvailableStock(product);
 
               return (
-                <article className="group overflow-hidden rounded-lg border border-saddle/15 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-luxe" key={group.key}>
+                <article className={`group overflow-hidden rounded-lg border border-saddle/15 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-luxe ${isOutOfStock ? "opacity-90" : ""}`} key={group.key}>
                   <div className="relative aspect-[4/3] overflow-hidden bg-gradient-to-br from-espresso via-saddle to-ember">
                     <div className="absolute inset-0 opacity-30 mix-blend-soft-light luxury-pattern" />
                     {product.primary_image_url ? (
@@ -593,6 +601,13 @@ export function ShopProducts() {
                       />
                     ) : null}
                     {product.primary_image_url ? <div className="absolute inset-0 bg-gradient-to-t from-ink/80 via-ink/10 to-transparent" /> : null}
+                    {isOutOfStock ? (
+                      <div className="absolute inset-0 z-10 grid place-items-center bg-ink/55 px-6 text-center backdrop-blur-[1px]">
+                        <span className="rotate-[-8deg] rounded-md border-2 border-champagne bg-ink/85 px-5 py-3 text-sm font-black uppercase tracking-[0.24em] text-champagne shadow-luxe">
+                          Out of Stock
+                        </span>
+                      </div>
+                    ) : null}
                   </div>
                   <div className="p-5">
                     <p className="text-xs font-bold uppercase tracking-[0.18em] text-saddle">{departmentTitle(getProductDepartment(product))}</p>
@@ -608,6 +623,7 @@ export function ShopProducts() {
                           {group.products.map((variant) => (
                             <option key={variant.epos_product_id} value={variant.epos_product_id}>
                               {variantLabel(variant)} / {money(variant.sale_price)}
+                              {!hasAvailableStock(variant) ? " / Out of stock" : ""}
                             </option>
                           ))}
                         </select>
@@ -617,12 +633,12 @@ export function ShopProducts() {
                       <span className="font-bold text-espresso">{price}</span>
                       <button
                         className="focus-ring inline-flex items-center gap-2 rounded-md bg-ink px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] text-ivory hover:bg-saddle disabled:cursor-not-allowed disabled:bg-espresso/30"
-                        disabled={price === "Price in store"}
+                        disabled={price === "Price in store" || isOutOfStock}
                         onClick={() => addToCart(product)}
                         type="button"
                       >
                         <ShoppingBag className="h-4 w-4" />
-                        Add
+                        {isOutOfStock ? "Sold Out" : "Add"}
                       </button>
                     </div>
                   </div>
