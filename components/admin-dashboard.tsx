@@ -106,6 +106,7 @@ export function AdminDashboard() {
   const [loggingIn, setLoggingIn] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [syncingCatalog, setSyncingCatalog] = useState(false);
   const [importingImages, setImportingImages] = useState(false);
   const [repairingStock, setRepairingStock] = useState(false);
   const [message, setMessage] = useState("");
@@ -544,6 +545,52 @@ export function AdminDashboard() {
     }
   }
 
+  async function handleSyncEposCatalog() {
+    setSyncingCatalog(true);
+    setMessage("");
+
+    try {
+      const response = await fetch("/api/epos/sync", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(adminKey ? { "x-admin-key": adminKey } : {})
+        },
+        body: JSON.stringify({ importImages: true, imageLimit: 250, skipExistingImages: true })
+      });
+      const result = (await response.json()) as {
+        ok: boolean;
+        message?: string;
+        products?: number;
+        stock?: number;
+        images?: {
+          productsScanned: number;
+          imageUrlsFound: number;
+          uploaded: number;
+          skippedExisting: number;
+          skippedDuplicate: number;
+          failed: number;
+          remainingWithoutPhotos: number;
+        };
+      };
+
+      if (!response.ok || !result.ok) {
+        setMessage(result.message || "Could not sync Epos catalog.");
+        return;
+      }
+
+      const imageText = result.images
+        ? ` Uploaded ${result.images.uploaded} image${result.images.uploaded === 1 ? "" : "s"} from ${result.images.imageUrlsFound} URL${result.images.imageUrlsFound === 1 ? "" : "s"}; ${result.images.remainingWithoutPhotos} product${result.images.remainingWithoutPhotos === 1 ? "" : "s"} still have no photo.`
+        : "";
+      setMessage(`Epos sync complete. Pulled ${result.products || 0} products and ${result.stock || 0} stock record${result.stock === 1 ? "" : "s"}.${imageText}`);
+      await loadProducts(query);
+    } catch {
+      setMessage("Could not connect to the Epos catalog sync backend.");
+    } finally {
+      setSyncingCatalog(false);
+    }
+  }
+
   async function handleRepairStock() {
     setRepairingStock(true);
     setMessage("");
@@ -933,8 +980,16 @@ export function AdminDashboard() {
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <button
+                      className="focus-ring rounded-md bg-champagne px-5 py-3 text-xs font-bold uppercase tracking-[0.16em] text-ink hover:bg-ivory disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={syncingCatalog}
+                      onClick={handleSyncEposCatalog}
+                      type="button"
+                    >
+                      {syncingCatalog ? "Syncing" : "Sync Epos Catalog"}
+                    </button>
+                    <button
                       className="focus-ring rounded-md border border-champagne/45 px-5 py-3 text-xs font-bold uppercase tracking-[0.16em] text-champagne hover:bg-champagne hover:text-ink disabled:cursor-not-allowed disabled:opacity-60"
-                      disabled={importingImages}
+                      disabled={importingImages || syncingCatalog}
                       onClick={handleImportEposImages}
                       type="button"
                     >
@@ -942,7 +997,7 @@ export function AdminDashboard() {
                     </button>
                     <button
                       className="focus-ring rounded-md border border-champagne/45 px-5 py-3 text-xs font-bold uppercase tracking-[0.16em] text-champagne hover:bg-champagne hover:text-ink disabled:cursor-not-allowed disabled:opacity-60"
-                      disabled={repairingStock}
+                      disabled={repairingStock || syncingCatalog}
                       onClick={handleRepairStock}
                       type="button"
                     >

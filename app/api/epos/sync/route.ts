@@ -1,4 +1,5 @@
 import { syncEposCatalog } from "@/lib/epos-sync";
+import { isAdminRequest } from "@/lib/admin-products";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,6 +14,10 @@ type SyncRequestBody = {
 };
 
 function isAuthorized(request: Request) {
+  if (isAdminRequest(request)) {
+    return true;
+  }
+
   const syncSecret = process.env.EPOS_WEBHOOK_SECRET;
 
   if (!syncSecret) {
