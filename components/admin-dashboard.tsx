@@ -79,6 +79,16 @@ function money(value: string | null) {
   return Number.isFinite(parsed) && parsed > 0 ? `$${parsed.toFixed(2)}` : "No price";
 }
 
+function adminStockValue(product: AdminProduct | null | undefined) {
+  if (!product) {
+    return "";
+  }
+
+  const eposStock = Number(product.stock || 0);
+  const overrideStock = Number(product.storefront_stock_override || 0);
+  return eposStock > 0 ? product.stock || "" : overrideStock > 0 ? product.storefront_stock_override || "" : product.stock || "";
+}
+
 export function AdminDashboard() {
   const [adminKey, setAdminKey] = useState("");
   const [isSignedIn, setIsSignedIn] = useState(false);
@@ -1035,7 +1045,7 @@ export function AdminDashboard() {
                     </label>
                     <label className="grid gap-2 text-sm font-semibold text-espresso">
                       Epos stock
-                      <input className="focus-ring min-h-12 rounded-md border border-saddle/20 bg-white px-4 font-normal" defaultValue={selectedProduct?.stock || ""} name="eposStock" step="1" type="number" />
+                      <input className="focus-ring min-h-12 rounded-md border border-saddle/20 bg-white px-4 font-normal" defaultValue={adminStockValue(selectedProduct)} name="eposStock" step="1" type="number" />
                     </label>
                   </div>
                   <label className="grid gap-2 text-sm font-semibold text-espresso">

@@ -37,6 +37,28 @@ async function getEposCategoryIdForDepartment(department: string | null) {
   return rows[0]?.epos_category_id ? String(rows[0].epos_category_id) : null;
 }
 
+async function applyStorefrontStockOverride(productId: string, stock: number) {
+  const sql = getSql();
+
+  await sql`
+    INSERT INTO product_site_meta (epos_product_id, storefront_stock_override, updated_at)
+    VALUES (${productId}, ${stock}, NOW())
+    ON CONFLICT (epos_product_id)
+    DO UPDATE SET storefront_stock_override = EXCLUDED.storefront_stock_override, updated_at = NOW()
+  `;
+}
+
+async function clearStorefrontStockOverride(productId: string) {
+  const sql = getSql();
+
+  await sql`
+    UPDATE product_site_meta
+    SET storefront_stock_override = NULL,
+      updated_at = NOW()
+    WHERE epos_product_id = ${productId}
+  `;
+}
+
 export async function POST(request: Request) {
   if (!isAdminRequest(request)) {
     return Response.json({ ok: false, message: "Admin access required." }, { status: 401 });
@@ -159,6 +181,7 @@ export async function POST(request: Request) {
       }
     } catch (error) {
       console.error(error instanceof Error ? error.message : "Epos stock creation failed.");
+      await applyStorefrontStockOverride(eposProductId, eposStock);
     }
   }
 
@@ -250,6 +273,7 @@ export async function PATCH(request: Request) {
   }
 
   const eposCategoryId = await getEposCategoryIdForDepartment(department);
+  let stockFallbackMessage: string | null = null;
 
   try {
     await updateEposProduct(body.eposProductId, productRows[0].raw as Record<string, unknown>, {
@@ -259,14 +283,39 @@ export async function PATCH(request: Request) {
       salePrice: eposSalePrice,
       categoryId: eposCategoryId
     });
-
-    if (eposStock !== null && productRows[0].epos_stock_id) {
-      await updateEposProductStock(String(productRows[0].epos_stock_id), productRows[0].stock_raw as Record<string, unknown>, eposStock);
-    }
   } catch (error) {
     const message = error instanceof Error ? error.message : "Epos update failed.";
     console.error(message);
     return Response.json({ ok: false, message: `Epos rejected the update: ${message}` }, { status: 502 });
+  }
+
+  if (eposStock !== null) {
+    try {
+      if (productRows[0].epos_stock_id) {
+        await updateEposProductStock(String(productRows[0].epos_stock_id), productRows[0].stock_raw as Record<string, unknown>, eposStock);
+      } else {
+        const stock = await createEposProductStock({ productId: body.eposProductId, currentStock: eposStock });
+        const stockId = getEposId(stock);
+
+        if (!stockId) {
+          throw new Error("Epos created stock but did not return a stock ID.");
+        }
+
+        await sql`
+          INSERT INTO epos_product_stock (epos_stock_id, epos_product_id, location_id, current_stock, raw, synced_at)
+          VALUES (${stockId}, ${Number(body.eposProductId)}, ${getEposNumber(stock, ["LocationId", "locationId"])}, ${eposStock}, ${JSON.stringify(stock)}::jsonb, NOW())
+          ON CONFLICT (epos_stock_id)
+          DO UPDATE SET current_stock = EXCLUDED.current_stock, raw = EXCLUDED.raw, synced_at = NOW()
+        `;
+      }
+
+      await clearStorefrontStockOverride(body.eposProductId);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Epos stock update failed.";
+      console.error(message);
+      await applyStorefrontStockOverride(body.eposProductId, eposStock);
+      stockFallbackMessage = ` Epos rejected the stock update, so storefront stock was saved in Neon as ${eposStock}.`;
+    }
   }
 
   await sql`
@@ -335,5 +384,5 @@ export async function PATCH(request: Request) {
       updated_at = NOW()
   `;
 
-  return Response.json({ ok: true, message: "Product website details saved." }, { headers: { "Cache-Control": "no-store" } });
+  return Response.json({ ok: true, message: `Product website details saved.${stockFallbackMessage || ""}` }, { headers: { "Cache-Control": "no-store" } });
 }
