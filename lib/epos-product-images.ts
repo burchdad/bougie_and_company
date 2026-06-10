@@ -12,6 +12,7 @@ type ImageImportResult = {
   eposImageRecordsMatched: number;
   blobImagesFound: number;
   blobImagesLinked: number;
+  blobImageRepairError: string | null;
   imageUrlsFound: number;
   uploaded: number;
   skippedExisting: number;
@@ -24,6 +25,7 @@ type EposImageRecord = Record<string, unknown>;
 type BlobImageRepairResult = {
   found: number;
   linked: number;
+  error: string | null;
 };
 
 function collectImageUrls(value: unknown, parentKey = "", urls = new Set<string>()) {
@@ -88,6 +90,11 @@ function isImagePathname(pathname: string) {
 
 function blobFolderFromPathname(pathname: string) {
   const match = pathname.match(/^products\/([^/]+)\//);
+  return match?.[1] || null;
+}
+
+function blobProductIdFromPathname(pathname: string) {
+  const match = pathname.match(/(?:^|\/)epos-(\d+)-/i);
   return match?.[1] || null;
 }
 
@@ -251,7 +258,7 @@ async function linkExistingBlobImages() {
   try {
     const blobs = await listProductBlobs();
     if (!blobs.length) {
-      return { found: 0, linked: 0 } satisfies BlobImageRepairResult;
+      return { found: 0, linked: 0, error: null } satisfies BlobImageRepairResult;
     }
 
     const products = await sql`
@@ -279,7 +286,15 @@ async function linkExistingBlobImages() {
 
     for (const blob of blobs) {
       const folder = blobFolderFromPathname(blob.pathname);
-      const matches = folder ? productsByFolder.get(folder) || [] : [];
+      const productId = blobProductIdFromPathname(blob.pathname);
+      const matches = [
+        ...new Map(
+          [...(folder ? productsByFolder.get(folder) || [] : []), ...(productId ? productsByFolder.get(productId) || [] : [])].map((product) => [
+            String(product.epos_product_id),
+            product
+          ])
+        ).values()
+      ];
 
       for (const [index, product] of matches.entries()) {
         const pairKey = `${String(product.epos_product_id)}::${blob.pathname}`;
@@ -301,10 +316,11 @@ async function linkExistingBlobImages() {
       }
     }
 
-    return { found: blobs.length, linked } satisfies BlobImageRepairResult;
+    return { found: blobs.length, linked, error: null } satisfies BlobImageRepairResult;
   } catch (error) {
-    console.error(error instanceof Error ? error.message : "Existing Blob image repair failed.");
-    return { found: 0, linked: 0 } satisfies BlobImageRepairResult;
+    const message = error instanceof Error ? error.message : "Existing Blob image repair failed.";
+    console.error(message);
+    return { found: 0, linked: 0, error: message } satisfies BlobImageRepairResult;
   }
 }
 
@@ -346,6 +362,7 @@ export async function importEposProductImages({ skipExisting = true, limit = 25 
     eposImageRecordsMatched: imageIndexes.matchedRecords,
     blobImagesFound: blobRepair.found,
     blobImagesLinked: blobRepair.linked,
+    blobImageRepairError: blobRepair.error,
     imageUrlsFound: 0,
     uploaded: 0,
     skippedExisting: 0,
