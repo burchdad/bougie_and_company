@@ -1,12 +1,14 @@
 import { put } from "@vercel/blob";
 import { ensureProductAdminTables } from "@/lib/admin-products";
 import { getSql } from "@/lib/db";
+import { fetchEposCollection, getEposString } from "@/lib/epos";
 
 const imageKeyPattern = /(image|photo|picture|thumbnail|media|avatar|icon)/i;
 const imageUrlPattern = /^https?:\/\/.+\.(avif|gif|jpe?g|png|webp)(\?.*)?$/i;
 
 type ImageImportResult = {
   productsScanned: number;
+  eposImageRecordsFound: number;
   imageUrlsFound: number;
   uploaded: number;
   skippedExisting: number;
@@ -14,6 +16,8 @@ type ImageImportResult = {
   failed: number;
   remainingWithoutPhotos: number;
 };
+
+type EposImageRecord = Record<string, unknown>;
 
 function collectImageUrls(value: unknown, parentKey = "", urls = new Set<string>()) {
   if (!value) {
@@ -66,10 +70,66 @@ function safeName(value: string) {
   return value.replace(/[^a-z0-9._-]/gi, "-").replace(/-+/g, "-").toLowerCase();
 }
 
+function getImageRecordProductId(record: EposImageRecord) {
+  const value = record.ProductId ?? record.ProductID ?? record.productId ?? record.productID ?? record.product_id;
+
+  if (typeof value === "number" || typeof value === "string") {
+    return String(value);
+  }
+
+  return null;
+}
+
+async function fetchEposImageRecords() {
+  const resources = ["ProductImage", "ProductImages", "Product/Image", "ProductImages/Get"];
+
+  for (const resource of resources) {
+    try {
+      const records = await fetchEposCollection<EposImageRecord>(resource, 50);
+      if (records.length) {
+        return records;
+      }
+    } catch {
+      // Epos installations differ on image resource naming. Try the next known shape.
+    }
+  }
+
+  return [];
+}
+
+function buildImageUrlsByProductId(records: EposImageRecord[]) {
+  const byProductId = new Map<string, Set<string>>();
+
+  records.forEach((record) => {
+    const productId = getImageRecordProductId(record);
+    if (!productId) {
+      return;
+    }
+
+    const urls = collectImageUrls(record);
+    const directUrl = getEposString(record, ["ImageUrl", "ImageURL", "Url", "URL", "FileUrl", "FileURL", "ImagePath"]);
+    if (directUrl?.startsWith("http")) {
+      urls.add(directUrl);
+    }
+
+    if (!urls.size) {
+      return;
+    }
+
+    const existing = byProductId.get(productId) || new Set<string>();
+    urls.forEach((url) => existing.add(url));
+    byProductId.set(productId, existing);
+  });
+
+  return byProductId;
+}
+
 export async function importEposProductImages({ skipExisting = true, limit = 25 } = {}) {
   await ensureProductAdminTables();
 
   const sql = getSql();
+  const eposImageRecords = await fetchEposImageRecords();
+  const imageUrlsByProductId = buildImageUrlsByProductId(eposImageRecords);
   const products = skipExisting
     ? await sql`
         SELECT p.epos_product_id, p.name, p.raw, COUNT(i.id)::int AS image_count
@@ -97,6 +157,7 @@ export async function importEposProductImages({ skipExisting = true, limit = 25 
 
   const result: ImageImportResult = {
     productsScanned: products.length,
+    eposImageRecordsFound: eposImageRecords.length,
     imageUrlsFound: 0,
     uploaded: 0,
     skippedExisting: 0,
@@ -114,7 +175,8 @@ export async function importEposProductImages({ skipExisting = true, limit = 25 
       continue;
     }
 
-    const imageUrls = [...collectImageUrls(product.raw)];
+    const productId = String(product.epos_product_id);
+    const imageUrls = [...new Set([...collectImageUrls(product.raw), ...(imageUrlsByProductId.get(productId) || [])])];
     result.imageUrlsFound += imageUrls.length;
 
     for (const [index, imageUrl] of imageUrls.entries()) {
@@ -133,7 +195,7 @@ export async function importEposProductImages({ skipExisting = true, limit = 25 
         }
 
         const extension = extensionFrom(imageUrl, contentType);
-        const pathname = `products/${product.epos_product_id}/epos-${safeName(product.epos_product_id)}-${index}.${extension}`;
+        const pathname = `products/${productId}/epos-${safeName(productId)}-${index}.${extension}`;
 
         if (existingPathnames.has(pathname)) {
           result.skippedDuplicate += 1;
@@ -147,12 +209,12 @@ export async function importEposProductImages({ skipExisting = true, limit = 25 
         });
 
         if (index === 0) {
-          await sql`UPDATE product_images SET is_primary = FALSE WHERE epos_product_id = ${String(product.epos_product_id)}`;
+          await sql`UPDATE product_images SET is_primary = FALSE WHERE epos_product_id = ${productId}`;
         }
 
         await sql`
           INSERT INTO product_images (epos_product_id, url, pathname, alt_text, sort_order, is_primary)
-          VALUES (${String(product.epos_product_id)}, ${blob.url}, ${blob.pathname}, ${String(product.name)}, ${index}, ${index === 0})
+          VALUES (${productId}, ${blob.url}, ${blob.pathname}, ${String(product.name)}, ${index}, ${index === 0})
         `;
 
         existingPathnames.add(blob.pathname);
