@@ -104,7 +104,7 @@ export const shopDepartments = [
   {
     id: "mens-collection",
     title: "Men's Collection",
-    items: ["T-Shirts", "Caps", "Men's Care", "Bath Bombs", "Chap Stick", "Body Spray", "Beard Products", "Homemade Mechanic Soaps", "Luggage", "Coozies"]
+    items: ["T-Shirts", "Caps", "Men's Care", "Chap Stick", "Body Spray", "Beard Products", "Homemade Mechanic Soaps", "Luggage", "Coozies"]
   },
   {
     id: "womens-collection",

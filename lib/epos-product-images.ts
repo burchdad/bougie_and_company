@@ -1,4 +1,4 @@
-import { put } from "@vercel/blob";
+import { list, put } from "@vercel/blob";
 import { ensureProductAdminTables } from "@/lib/admin-products";
 import { getSql } from "@/lib/db";
 import { fetchEposCollection, getEposString } from "@/lib/epos";
@@ -10,6 +10,8 @@ type ImageImportResult = {
   productsScanned: number;
   eposImageRecordsFound: number;
   eposImageRecordsMatched: number;
+  blobImagesFound: number;
+  blobImagesLinked: number;
   imageUrlsFound: number;
   uploaded: number;
   skippedExisting: number;
@@ -19,6 +21,10 @@ type ImageImportResult = {
 };
 
 type EposImageRecord = Record<string, unknown>;
+type BlobImageRepairResult = {
+  found: number;
+  linked: number;
+};
 
 function collectImageUrls(value: unknown, parentKey = "", urls = new Set<string>()) {
   if (!value) {
@@ -74,6 +80,15 @@ function safeName(value: string) {
     .replace(/^-|-$/g, "")
     .toLowerCase()
     .slice(0, 90);
+}
+
+function isImagePathname(pathname: string) {
+  return /\.(avif|gif|jpe?g|png|webp)$/i.test(pathname);
+}
+
+function blobFolderFromPathname(pathname: string) {
+  const match = pathname.match(/^products\/([^/]+)\//);
+  return match?.[1] || null;
 }
 
 function normalizedLookup(value: unknown) {
@@ -217,10 +232,87 @@ function buildImageUrlIndexes(records: EposImageRecord[]) {
   return { byProductId, bySku, byName, matchedRecords };
 }
 
+async function listProductBlobs(maxBlobs = 5000) {
+  const blobs: Array<{ url: string; pathname: string }> = [];
+  let cursor: string | undefined;
+
+  do {
+    const page = await list({ prefix: "products/", limit: 1000, cursor });
+    blobs.push(...page.blobs.filter((blob) => isImagePathname(blob.pathname)).map((blob) => ({ url: blob.url, pathname: blob.pathname })));
+    cursor = page.cursor;
+  } while (cursor && blobs.length < maxBlobs);
+
+  return blobs.slice(0, maxBlobs);
+}
+
+async function linkExistingBlobImages() {
+  const sql = getSql();
+
+  try {
+    const blobs = await listProductBlobs();
+    if (!blobs.length) {
+      return { found: 0, linked: 0 } satisfies BlobImageRepairResult;
+    }
+
+    const products = await sql`
+      SELECT epos_product_id, name, sku
+      FROM epos_products
+      WHERE is_deleted = FALSE
+    `;
+    const productsByFolder = new Map<string, Array<{ epos_product_id: string; name: string; sku: string | null }>>();
+
+    products.forEach((product) => {
+      const candidates = [
+        String(product.epos_product_id),
+        typeof product.sku === "string" ? safeName(product.sku) : null,
+        typeof product.name === "string" ? safeName(product.name) : null
+      ].filter(Boolean) as string[];
+
+      candidates.forEach((candidate) => {
+        productsByFolder.set(candidate, [...(productsByFolder.get(candidate) || []), product as { epos_product_id: string; name: string; sku: string | null }]);
+      });
+    });
+
+    const existingRows = await sql`SELECT epos_product_id, pathname FROM product_images WHERE pathname IS NOT NULL`;
+    const existingPairs = new Set(existingRows.map((row) => `${String(row.epos_product_id)}::${String(row.pathname)}`));
+    let linked = 0;
+
+    for (const blob of blobs) {
+      const folder = blobFolderFromPathname(blob.pathname);
+      const matches = folder ? productsByFolder.get(folder) || [] : [];
+
+      for (const [index, product] of matches.entries()) {
+        const pairKey = `${String(product.epos_product_id)}::${blob.pathname}`;
+        if (existingPairs.has(pairKey)) {
+          continue;
+        }
+
+        const isPrimary = index === 0;
+        if (isPrimary) {
+          await sql`UPDATE product_images SET is_primary = FALSE WHERE epos_product_id = ${String(product.epos_product_id)}`;
+        }
+
+        await sql`
+          INSERT INTO product_images (epos_product_id, url, pathname, alt_text, sort_order, is_primary)
+          VALUES (${String(product.epos_product_id)}, ${blob.url}, ${blob.pathname}, ${String(product.name)}, 0, ${isPrimary})
+        `;
+        linked += 1;
+        existingPairs.add(pairKey);
+      }
+    }
+
+    return { found: blobs.length, linked } satisfies BlobImageRepairResult;
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : "Existing Blob image repair failed.");
+    return { found: 0, linked: 0 } satisfies BlobImageRepairResult;
+  }
+}
+
 export async function importEposProductImages({ skipExisting = true, limit = 25 } = {}) {
   await ensureProductAdminTables();
 
   const sql = getSql();
+  const blobRepair = await linkExistingBlobImages();
   const eposImageRecords = await fetchEposImageRecords();
   const imageIndexes = buildImageUrlIndexes(eposImageRecords);
   const products = skipExisting
@@ -252,6 +344,8 @@ export async function importEposProductImages({ skipExisting = true, limit = 25 
     productsScanned: products.length,
     eposImageRecordsFound: eposImageRecords.length,
     eposImageRecordsMatched: imageIndexes.matchedRecords,
+    blobImagesFound: blobRepair.found,
+    blobImagesLinked: blobRepair.linked,
     imageUrlsFound: 0,
     uploaded: 0,
     skippedExisting: 0,

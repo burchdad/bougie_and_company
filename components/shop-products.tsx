@@ -223,6 +223,10 @@ function productMatchesFilter(product: Product, filterId: string) {
     return true;
   }
 
+  if (filterId === "tack") {
+    return false;
+  }
+
   if (getProductDepartment(product) === filterId) {
     return true;
   }
@@ -450,6 +454,7 @@ export function ShopProducts() {
   const activeRootCategory = activePath[0];
   const visibleRefinements = useMemo(() => (activeRootCategory ? categoryDescendants(activeRootCategory.id, filterCategories) : []), [activeRootCategory, filterCategories]);
   const activeCategoryLabel = activeDepartment === "all" ? "All Products" : filterCategories.find((category) => category.id === activeDepartment)?.label || departmentTitle(activeDepartment);
+  const isComingSoonCategory = activeDepartment === "tack";
 
   function addToCart(product: Product) {
     if (!hasAvailableStock(product)) {
@@ -573,8 +578,8 @@ export function ShopProducts() {
         {!loading && !filteredGroups.length && !message ? (
           <div className="mt-5 rounded-lg border border-dashed border-saddle/25 bg-white p-8 text-center">
             <Sparkles className="mx-auto h-8 w-8 text-saddle" />
-            <p className="mt-3 font-display text-3xl text-ink">No products found here yet.</p>
-            <p className="mt-2 text-espresso/70">Try another department or clear the search.</p>
+            <p className="mt-3 font-display text-3xl text-ink">{isComingSoonCategory ? "Coming soon." : "No products found here yet."}</p>
+            <p className="mt-2 text-espresso/70">{isComingSoonCategory ? "Tack products will be added when they are ready." : "Try another department or clear the search."}</p>
           </div>
         ) : null}
 

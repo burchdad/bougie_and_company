@@ -42,6 +42,15 @@ function categoryHref(category: SiteCategory) {
   return category.parent_id ? `/shop#${category.slug}` : category.href;
 }
 
+function cleanCategoryTree(items: CategoryMenuItem[], parentLabel = ""): CategoryMenuItem[] {
+  return items
+    .filter((item) => !(parentLabel === "Men's Collection" && item.label === "Bath Bombs"))
+    .map((item) => ({
+      ...item,
+      ...(item.children?.length ? { children: cleanCategoryTree(item.children, item.label) } : {})
+    }));
+}
+
 export async function listSiteCategories() {
   await ensureCategoryTables();
   const sql = getSql();
@@ -67,7 +76,7 @@ export function buildCategoryTree(categories: SiteCategory[]) {
     });
 
   const headerCategories = categories.filter((category) => category.is_header && category.parent_id === null);
-  return headerCategories.length
+  const tree = headerCategories.length
     ? headerCategories.map((category) => {
         const children = build(category.id);
         return {
@@ -78,6 +87,8 @@ export function buildCategoryTree(categories: SiteCategory[]) {
         };
       })
     : build(null);
+
+  return cleanCategoryTree(tree);
 }
 
 export async function seedDefaultCategoriesIfEmpty() {
