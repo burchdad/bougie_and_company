@@ -513,7 +513,10 @@ export function AdminDashboard() {
           eposImageRecordsFound?: number;
           eposImageRecordsMatched?: number;
           blobImagesFound?: number;
+          blobImagesMatched?: number;
+          blobImagesAlreadyLinked?: number;
           blobImagesLinked?: number;
+          blobImagesUnmatched?: number;
           blobImageRepairError?: string | null;
           imageUrlsFound: number;
           uploaded: number;
@@ -539,7 +542,7 @@ export function AdminDashboard() {
       const counts = result.result;
       setMessage(
         counts
-          ? `${result.message} Blob scan found ${counts.blobImagesFound ?? 0} existing image file${counts.blobImagesFound === 1 ? "" : "s"} and linked ${counts.blobImagesLinked ?? 0}. Epos image records: ${counts.eposImageRecordsFound ?? 0} found, ${counts.eposImageRecordsMatched ?? 0} matched. Found ${counts.imageUrlsFound} image URL${counts.imageUrlsFound === 1 ? "" : "s"}, skipped ${counts.skippedExisting} existing, failed ${counts.failed}. ${counts.remainingWithoutPhotos} product${counts.remainingWithoutPhotos === 1 ? "" : "s"} still have no photo.${counts.blobImageRepairError ? ` Blob scan error: ${counts.blobImageRepairError}` : ""}`
+          ? `${result.message} Blob scan found ${counts.blobImagesFound ?? 0} existing image file${counts.blobImagesFound === 1 ? "" : "s"}: ${counts.blobImagesMatched ?? 0} matched products, ${counts.blobImagesAlreadyLinked ?? 0} already linked, ${counts.blobImagesLinked ?? 0} newly linked, ${counts.blobImagesUnmatched ?? 0} unmatched. Epos image records: ${counts.eposImageRecordsFound ?? 0} found, ${counts.eposImageRecordsMatched ?? 0} matched. Found ${counts.imageUrlsFound} image URL${counts.imageUrlsFound === 1 ? "" : "s"}, skipped ${counts.skippedExisting} existing, failed ${counts.failed}. ${counts.remainingWithoutPhotos} product${counts.remainingWithoutPhotos === 1 ? "" : "s"} still have no photo.${counts.blobImageRepairError ? ` Blob scan error: ${counts.blobImageRepairError}` : ""}`
           : result.message || "Epos image import complete."
       );
       await loadProducts(query);
@@ -573,7 +576,10 @@ export function AdminDashboard() {
           eposImageRecordsFound?: number;
           eposImageRecordsMatched?: number;
           blobImagesFound?: number;
+          blobImagesMatched?: number;
+          blobImagesAlreadyLinked?: number;
           blobImagesLinked?: number;
+          blobImagesUnmatched?: number;
           blobImageRepairError?: string | null;
           imageUrlsFound: number;
           uploaded: number;
@@ -590,7 +596,7 @@ export function AdminDashboard() {
       }
 
       const imageText = result.images
-        ? ` Blob scan found ${result.images.blobImagesFound ?? 0} existing image file${result.images.blobImagesFound === 1 ? "" : "s"} and linked ${result.images.blobImagesLinked ?? 0}. Epos image records: ${result.images.eposImageRecordsFound ?? 0} found, ${result.images.eposImageRecordsMatched ?? 0} matched. Uploaded ${result.images.uploaded} image${result.images.uploaded === 1 ? "" : "s"} from ${result.images.imageUrlsFound} URL${result.images.imageUrlsFound === 1 ? "" : "s"}; ${result.images.remainingWithoutPhotos} product${result.images.remainingWithoutPhotos === 1 ? "" : "s"} still have no photo.${result.images.blobImageRepairError ? ` Blob scan error: ${result.images.blobImageRepairError}` : ""}`
+        ? ` Blob scan found ${result.images.blobImagesFound ?? 0} existing image file${result.images.blobImagesFound === 1 ? "" : "s"}: ${result.images.blobImagesMatched ?? 0} matched products, ${result.images.blobImagesAlreadyLinked ?? 0} already linked, ${result.images.blobImagesLinked ?? 0} newly linked, ${result.images.blobImagesUnmatched ?? 0} unmatched. Epos image records: ${result.images.eposImageRecordsFound ?? 0} found, ${result.images.eposImageRecordsMatched ?? 0} matched. Uploaded ${result.images.uploaded} image${result.images.uploaded === 1 ? "" : "s"} from ${result.images.imageUrlsFound} URL${result.images.imageUrlsFound === 1 ? "" : "s"}; ${result.images.remainingWithoutPhotos} product${result.images.remainingWithoutPhotos === 1 ? "" : "s"} still have no photo.${result.images.blobImageRepairError ? ` Blob scan error: ${result.images.blobImageRepairError}` : ""}`
         : "";
       setMessage(`Epos sync complete. Pulled ${result.products || 0} products and ${result.stock || 0} stock record${result.stock === 1 ? "" : "s"}.${imageText}`);
       await loadProducts(query);
@@ -1026,6 +1032,11 @@ export function AdminDashboard() {
                     </button>
                   </div>
                 </div>
+                {message ? (
+                  <div className="mt-4 rounded-lg border border-champagne/25 bg-ink/85 px-4 py-3 text-sm font-semibold text-champagne" role="status">
+                    {message}
+                  </div>
+                ) : null}
                 <div className="mt-6 grid gap-6 xl:grid-cols-[22rem_minmax(0,1fr)] 2xl:grid-cols-[24rem_minmax(0,1fr)]">
                   <aside className="rounded-lg border border-champagne/20 bg-ink/80 p-4">
             <form className="flex gap-2" onSubmit={handleSearch}>

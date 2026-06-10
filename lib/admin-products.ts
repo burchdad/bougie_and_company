@@ -142,6 +142,7 @@ export async function getAdminProducts(query = "", limit = 1000) {
         WHERE p.is_deleted = FALSE
           AND (
             p.name ILIKE ${`%${query}%`}
+            OR p.epos_product_id ILIKE ${`%${query}%`}
             OR p.description ILIKE ${`%${query}%`}
             OR p.sku ILIKE ${`%${query}%`}
             OR p.barcode ILIKE ${`%${query}%`}
