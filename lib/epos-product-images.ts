@@ -9,6 +9,7 @@ const imageUrlPattern = /^https?:\/\/.+\.(avif|gif|jpe?g|png|webp)(\?.*)?$/i;
 type ImageImportResult = {
   productsScanned: number;
   eposImageRecordsFound: number;
+  eposImageRecordsMatched: number;
   imageUrlsFound: number;
   uploaded: number;
   skippedExisting: number;
@@ -67,11 +68,81 @@ function extensionFrom(url: string, contentType: string | null) {
 }
 
 function safeName(value: string) {
-  return value.replace(/[^a-z0-9._-]/gi, "-").replace(/-+/g, "-").toLowerCase();
+  return value
+    .replace(/[^a-z0-9._-]/gi, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .toLowerCase()
+    .slice(0, 90);
+}
+
+function normalizedLookup(value: unknown) {
+  if (typeof value !== "string" && typeof value !== "number") {
+    return null;
+  }
+
+  const normalized = String(value)
+    .trim()
+    .toLowerCase()
+    .replace(/^[a-z]{2,}\d+[a-z0-9-]*\s+/i, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+
+  return normalized || null;
+}
+
+function findNestedValue(record: unknown, keys: string[], seen = new Set<unknown>()): unknown {
+  if (!record || typeof record !== "object" || seen.has(record)) {
+    return null;
+  }
+
+  seen.add(record);
+
+  if (Array.isArray(record)) {
+    for (const item of record) {
+      const value = findNestedValue(item, keys, seen);
+      if (value !== null && value !== undefined && value !== "") {
+        return value;
+      }
+    }
+
+    return null;
+  }
+
+  const object = record as Record<string, unknown>;
+  for (const key of keys) {
+    const value = object[key];
+    if (value !== null && value !== undefined && value !== "") {
+      return value;
+    }
+  }
+
+  for (const child of Object.values(object)) {
+    const value = findNestedValue(child, keys, seen);
+    if (value !== null && value !== undefined && value !== "") {
+      return value;
+    }
+  }
+
+  return null;
+}
+
+function getNestedString(record: unknown, keys: string[]) {
+  const value = findNestedValue(record, keys);
+  if (typeof value === "string" && value.trim()) {
+    return value.trim();
+  }
+
+  if (typeof value === "number") {
+    return String(value);
+  }
+
+  return null;
 }
 
 function getImageRecordProductId(record: EposImageRecord) {
-  const value = record.ProductId ?? record.ProductID ?? record.productId ?? record.productID ?? record.product_id;
+  const value = findNestedValue(record, ["ProductId", "ProductID", "productId", "productID", "product_id"]);
 
   if (typeof value === "number" || typeof value === "string") {
     return String(value);
@@ -82,29 +153,47 @@ function getImageRecordProductId(record: EposImageRecord) {
 
 async function fetchEposImageRecords() {
   const resources = ["ProductImage", "ProductImages", "Product/Image", "ProductImages/Get"];
+  const records: EposImageRecord[] = [];
+  const seen = new Set<string>();
 
   for (const resource of resources) {
     try {
-      const records = await fetchEposCollection<EposImageRecord>(resource, 50);
-      if (records.length) {
-        return records;
+      const resourceRecords = await fetchEposCollection<EposImageRecord>(resource, 50);
+      for (const record of resourceRecords) {
+        const fingerprint = JSON.stringify(record);
+        if (!seen.has(fingerprint)) {
+          seen.add(fingerprint);
+          records.push(record);
+        }
       }
     } catch {
       // Epos installations differ on image resource naming. Try the next known shape.
     }
   }
 
-  return [];
+  return records;
 }
 
-function buildImageUrlsByProductId(records: EposImageRecord[]) {
+function addUrls(target: Map<string, Set<string>>, key: string | null, urls: Set<string>) {
+  if (!key || !urls.size) {
+    return;
+  }
+
+  const existing = target.get(key) || new Set<string>();
+  urls.forEach((url) => existing.add(url));
+  target.set(key, existing);
+}
+
+function buildImageUrlIndexes(records: EposImageRecord[]) {
   const byProductId = new Map<string, Set<string>>();
+  const bySku = new Map<string, Set<string>>();
+  const byName = new Map<string, Set<string>>();
+  let matchedRecords = 0;
 
   records.forEach((record) => {
     const productId = getImageRecordProductId(record);
-    if (!productId) {
-      return;
-    }
+    const sku = normalizedLookup(getNestedString(record, ["Sku", "SKU", "sku", "ProductSku", "ProductSKU", "productSku"]));
+    const name = normalizedLookup(getNestedString(record, ["Name", "name", "ProductName", "productName", "Description", "description"]));
 
     const urls = collectImageUrls(record);
     const directUrl = getEposString(record, ["ImageUrl", "ImageURL", "Url", "URL", "FileUrl", "FileURL", "ImagePath"]);
@@ -116,12 +205,16 @@ function buildImageUrlsByProductId(records: EposImageRecord[]) {
       return;
     }
 
-    const existing = byProductId.get(productId) || new Set<string>();
-    urls.forEach((url) => existing.add(url));
-    byProductId.set(productId, existing);
+    if (productId || sku || name) {
+      matchedRecords += 1;
+    }
+
+    addUrls(byProductId, productId, urls);
+    addUrls(bySku, sku, urls);
+    addUrls(byName, name, urls);
   });
 
-  return byProductId;
+  return { byProductId, bySku, byName, matchedRecords };
 }
 
 export async function importEposProductImages({ skipExisting = true, limit = 25 } = {}) {
@@ -129,10 +222,10 @@ export async function importEposProductImages({ skipExisting = true, limit = 25 
 
   const sql = getSql();
   const eposImageRecords = await fetchEposImageRecords();
-  const imageUrlsByProductId = buildImageUrlsByProductId(eposImageRecords);
+  const imageIndexes = buildImageUrlIndexes(eposImageRecords);
   const products = skipExisting
     ? await sql`
-        SELECT p.epos_product_id, p.name, p.raw, COUNT(i.id)::int AS image_count
+        SELECT p.epos_product_id, p.name, p.sku, p.raw, COUNT(i.id)::int AS image_count
         FROM epos_products p
         LEFT JOIN product_images i ON i.epos_product_id = p.epos_product_id
         WHERE p.is_deleted = FALSE
@@ -141,16 +234,16 @@ export async function importEposProductImages({ skipExisting = true, limit = 25 
             FROM product_images existing
             WHERE existing.epos_product_id = p.epos_product_id
           )
-        GROUP BY p.epos_product_id, p.name, p.raw
+        GROUP BY p.epos_product_id, p.name, p.sku, p.raw
         ORDER BY p.name ASC
         LIMIT ${limit}
       `
     : await sql`
-    SELECT p.epos_product_id, p.name, p.raw, COUNT(i.id)::int AS image_count
+    SELECT p.epos_product_id, p.name, p.sku, p.raw, COUNT(i.id)::int AS image_count
     FROM epos_products p
     LEFT JOIN product_images i ON i.epos_product_id = p.epos_product_id
     WHERE p.is_deleted = FALSE
-    GROUP BY p.epos_product_id, p.name, p.raw
+    GROUP BY p.epos_product_id, p.name, p.sku, p.raw
     ORDER BY p.name ASC
         LIMIT ${limit}
   `;
@@ -158,6 +251,7 @@ export async function importEposProductImages({ skipExisting = true, limit = 25 
   const result: ImageImportResult = {
     productsScanned: products.length,
     eposImageRecordsFound: eposImageRecords.length,
+    eposImageRecordsMatched: imageIndexes.matchedRecords,
     imageUrlsFound: 0,
     uploaded: 0,
     skippedExisting: 0,
@@ -176,7 +270,18 @@ export async function importEposProductImages({ skipExisting = true, limit = 25 
     }
 
     const productId = String(product.epos_product_id);
-    const imageUrls = [...new Set([...collectImageUrls(product.raw), ...(imageUrlsByProductId.get(productId) || [])])];
+    const productSku = typeof product.sku === "string" ? product.sku : null;
+    const productName = typeof product.name === "string" ? product.name : null;
+    const skuKey = normalizedLookup(productSku);
+    const nameKey = normalizedLookup(productName);
+    const imageUrls = [
+      ...new Set([
+        ...collectImageUrls(product.raw),
+        ...(imageIndexes.byProductId.get(productId) || []),
+        ...(skuKey ? imageIndexes.bySku.get(skuKey) || [] : []),
+        ...(nameKey ? imageIndexes.byName.get(nameKey) || [] : [])
+      ])
+    ];
     result.imageUrlsFound += imageUrls.length;
 
     for (const [index, imageUrl] of imageUrls.entries()) {
@@ -195,7 +300,8 @@ export async function importEposProductImages({ skipExisting = true, limit = 25 
         }
 
         const extension = extensionFrom(imageUrl, contentType);
-        const pathname = `products/${productId}/epos-${safeName(productId)}-${index}.${extension}`;
+        const folderName = safeName(productSku || productName || productId) || safeName(productId);
+        const pathname = `products/${folderName}/epos-${safeName(productSku || productId)}-${index}.${extension}`;
 
         if (existingPathnames.has(pathname)) {
           result.skippedDuplicate += 1;
