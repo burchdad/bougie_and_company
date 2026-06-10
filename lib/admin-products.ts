@@ -132,8 +132,19 @@ export async function getAdminProducts(query = "", limit = 1000) {
               AND p.barcode <> ''
               AND image_product.barcode = p.barcode
             )
+            OR (
+              NULLIF(regexp_replace(regexp_replace(lower(p.name), '^[a-z]+[0-9]+[a-z0-9-]*[[:space:]]+', '', 'i'), '[[:space:]]+(bath bomb|bath bombs|soap|soaps|homemade soap|handmade soap)$', '', 'i'), '') IS NOT NULL
+              AND NULLIF(regexp_replace(regexp_replace(lower(image_product.name), '^[a-z]+[0-9]+[a-z0-9-]*[[:space:]]+', '', 'i'), '[[:space:]]+(bath bomb|bath bombs|soap|soaps|homemade soap|handmade soap)$', '', 'i'), '') IS NOT NULL
+              AND regexp_replace(regexp_replace(lower(p.name), '^[a-z]+[0-9]+[a-z0-9-]*[[:space:]]+', '', 'i'), '[[:space:]]+(bath bomb|bath bombs|soap|soaps|homemade soap|handmade soap)$', '', 'i')
+                = regexp_replace(regexp_replace(lower(image_product.name), '^[a-z]+[0-9]+[a-z0-9-]*[[:space:]]+', '', 'i'), '[[:space:]]+(bath bomb|bath bombs|soap|soaps|homemade soap|handmade soap)$', '', 'i')
+            )
           ORDER BY
-            CASE WHEN i.epos_product_id = p.epos_product_id THEN 0 ELSE 1 END,
+            CASE
+              WHEN i.epos_product_id = p.epos_product_id THEN 0
+              WHEN p.sku IS NOT NULL AND p.sku <> '' AND image_product.sku = p.sku THEN 1
+              WHEN p.barcode IS NOT NULL AND p.barcode <> '' AND image_product.barcode = p.barcode THEN 2
+              ELSE 3
+            END,
             i.is_primary DESC,
             i.sort_order ASC,
             i.id ASC
@@ -201,8 +212,19 @@ export async function getAdminProducts(query = "", limit = 1000) {
               AND p.barcode <> ''
               AND image_product.barcode = p.barcode
             )
+            OR (
+              NULLIF(regexp_replace(regexp_replace(lower(p.name), '^[a-z]+[0-9]+[a-z0-9-]*[[:space:]]+', '', 'i'), '[[:space:]]+(bath bomb|bath bombs|soap|soaps|homemade soap|handmade soap)$', '', 'i'), '') IS NOT NULL
+              AND NULLIF(regexp_replace(regexp_replace(lower(image_product.name), '^[a-z]+[0-9]+[a-z0-9-]*[[:space:]]+', '', 'i'), '[[:space:]]+(bath bomb|bath bombs|soap|soaps|homemade soap|handmade soap)$', '', 'i'), '') IS NOT NULL
+              AND regexp_replace(regexp_replace(lower(p.name), '^[a-z]+[0-9]+[a-z0-9-]*[[:space:]]+', '', 'i'), '[[:space:]]+(bath bomb|bath bombs|soap|soaps|homemade soap|handmade soap)$', '', 'i')
+                = regexp_replace(regexp_replace(lower(image_product.name), '^[a-z]+[0-9]+[a-z0-9-]*[[:space:]]+', '', 'i'), '[[:space:]]+(bath bomb|bath bombs|soap|soaps|homemade soap|handmade soap)$', '', 'i')
+            )
           ORDER BY
-            CASE WHEN i.epos_product_id = p.epos_product_id THEN 0 ELSE 1 END,
+            CASE
+              WHEN i.epos_product_id = p.epos_product_id THEN 0
+              WHEN p.sku IS NOT NULL AND p.sku <> '' AND image_product.sku = p.sku THEN 1
+              WHEN p.barcode IS NOT NULL AND p.barcode <> '' AND image_product.barcode = p.barcode THEN 2
+              ELSE 3
+            END,
             i.is_primary DESC,
             i.sort_order ASC,
             i.id ASC
