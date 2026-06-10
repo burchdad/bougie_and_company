@@ -583,6 +583,7 @@ export function ShopProducts() {
             {filteredGroups.map((group) => {
               const selectedProductId = selectedVariants[group.key];
               const product = group.products.find((variant) => variant.epos_product_id === selectedProductId) || group.products.find(hasAvailableStock) || group.products[0];
+              const imageProduct = product.primary_image_url ? product : group.products.find((variant) => variant.primary_image_url) || product;
               const price = money(product.sale_price);
               const hasVariants = group.products.length > 1;
               const isOutOfStock = !hasAvailableStock(product);
@@ -591,16 +592,16 @@ export function ShopProducts() {
                 <article className={`group overflow-hidden rounded-lg border border-saddle/15 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-luxe ${isOutOfStock ? "opacity-90" : ""}`} key={group.key}>
                   <div className="relative aspect-[4/3] overflow-hidden bg-gradient-to-br from-espresso via-saddle to-ember">
                     <div className="absolute inset-0 opacity-30 mix-blend-soft-light luxury-pattern" />
-                    {product.primary_image_url ? (
+                    {imageProduct.primary_image_url ? (
                       <Image
-                        alt={product.primary_image_alt || product.marketing_title || product.name}
+                        alt={imageProduct.primary_image_alt || imageProduct.marketing_title || imageProduct.name}
                         className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
                         height={600}
-                        src={product.primary_image_url}
+                        src={imageProduct.primary_image_url}
                         width={800}
                       />
                     ) : null}
-                    {product.primary_image_url ? <div className="absolute inset-0 bg-gradient-to-t from-ink/80 via-ink/10 to-transparent" /> : null}
+                    {imageProduct.primary_image_url ? <div className="absolute inset-0 bg-gradient-to-t from-ink/80 via-ink/10 to-transparent" /> : null}
                     {isOutOfStock ? (
                       <div className="absolute inset-0 z-10 grid place-items-center bg-ink/55 px-6 text-center backdrop-blur-[1px]">
                         <span className="rotate-[-8deg] rounded-md border-2 border-champagne bg-ink/85 px-5 py-3 text-sm font-black uppercase tracking-[0.24em] text-champagne shadow-luxe">

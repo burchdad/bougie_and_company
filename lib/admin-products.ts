@@ -118,10 +118,25 @@ export async function getAdminProducts(query = "", limit = 1000) {
           LIMIT 1
         ) stock_row ON TRUE
         LEFT JOIN LATERAL (
-          SELECT url, alt_text
-          FROM product_images
-          WHERE epos_product_id = p.epos_product_id
-          ORDER BY is_primary DESC, sort_order ASC, id ASC
+          SELECT i.url, i.alt_text
+          FROM product_images i
+          LEFT JOIN epos_products image_product ON image_product.epos_product_id = i.epos_product_id
+          WHERE i.epos_product_id = p.epos_product_id
+            OR (
+              p.sku IS NOT NULL
+              AND p.sku <> ''
+              AND image_product.sku = p.sku
+            )
+            OR (
+              p.barcode IS NOT NULL
+              AND p.barcode <> ''
+              AND image_product.barcode = p.barcode
+            )
+          ORDER BY
+            CASE WHEN i.epos_product_id = p.epos_product_id THEN 0 ELSE 1 END,
+            i.is_primary DESC,
+            i.sort_order ASC,
+            i.id ASC
           LIMIT 1
         ) i ON TRUE
         WHERE p.is_deleted = FALSE
@@ -171,10 +186,25 @@ export async function getAdminProducts(query = "", limit = 1000) {
           LIMIT 1
         ) stock_row ON TRUE
         LEFT JOIN LATERAL (
-          SELECT url, alt_text
-          FROM product_images
-          WHERE epos_product_id = p.epos_product_id
-          ORDER BY is_primary DESC, sort_order ASC, id ASC
+          SELECT i.url, i.alt_text
+          FROM product_images i
+          LEFT JOIN epos_products image_product ON image_product.epos_product_id = i.epos_product_id
+          WHERE i.epos_product_id = p.epos_product_id
+            OR (
+              p.sku IS NOT NULL
+              AND p.sku <> ''
+              AND image_product.sku = p.sku
+            )
+            OR (
+              p.barcode IS NOT NULL
+              AND p.barcode <> ''
+              AND image_product.barcode = p.barcode
+            )
+          ORDER BY
+            CASE WHEN i.epos_product_id = p.epos_product_id THEN 0 ELSE 1 END,
+            i.is_primary DESC,
+            i.sort_order ASC,
+            i.id ASC
           LIMIT 1
         ) i ON TRUE
         WHERE p.is_deleted = FALSE
