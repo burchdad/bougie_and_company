@@ -5,6 +5,8 @@ import { eposFetch, getEposString } from "@/lib/epos";
 
 const imageKeyPattern = /(image|photo|picture|thumbnail|media|avatar|icon)/i;
 const imageUrlPattern = /^https?:\/\/.+\.(avif|gif|jpe?g|png|webp)(\?.*)?$/i;
+const imageImportBudgetMs = 45_000;
+const eposImageLookupTimeoutMs = 3_000;
 
 type ImageImportResult = {
   productsScanned: number;
@@ -203,12 +205,14 @@ function getImageRecordProductId(record: EposImageRecord) {
   return null;
 }
 
-async function fetchEposRecords(resource: string) {
+async function fetchEposRecords(resource: string, maxPages = 1) {
   const records: EposImageRecord[] = [];
 
-  for (let page = 1; page <= 50; page += 1) {
+  for (let page = 1; page <= maxPages; page += 1) {
     const separator = resource.includes("?") ? "&" : "?";
-    const response = await eposFetch<unknown>(`${resource}${separator}page=${page}`);
+    const response = await eposFetch<unknown>(`${resource}${separator}page=${page}`, {
+      signal: AbortSignal.timeout(eposImageLookupTimeoutMs)
+    });
     const pageRecords = collectRecords(response);
     records.push(...pageRecords);
 
@@ -238,7 +242,7 @@ async function fetchEposImageRecords() {
 
   for (const resource of resources) {
     try {
-      const resourceRecords = await fetchEposRecords(resource);
+      const resourceRecords = await fetchEposRecords(resource, 2);
       for (const record of resourceRecords) {
         const fingerprint = JSON.stringify(record);
         if (!seen.has(fingerprint)) {
@@ -257,18 +261,10 @@ async function fetchEposImageRecords() {
 function productImageResources(productId: string) {
   const encodedId = encodeURIComponent(productId);
   return [
-    `Product/${encodedId}/Image`,
     `Product/${encodedId}/Images`,
-    `Product/${encodedId}/ProductImage`,
-    `Product/${encodedId}/ProductImages`,
-    `Product/${encodedId}/Attachment`,
-    `Product/${encodedId}/Attachments`,
-    `Product/${encodedId}/Media`,
     `ProductImage?ProductId=${encodedId}`,
-    `ProductImage?productId=${encodedId}`,
     `ProductImages?ProductId=${encodedId}`,
-    `ProductImages?productId=${encodedId}`,
-    `ProductAttachment?ProductId=${encodedId}`,
+    `Product/${encodedId}/Image`,
     `ProductAttachments?ProductId=${encodedId}`
   ];
 }
@@ -456,12 +452,11 @@ async function linkExistingBlobImages() {
 }
 
 export async function importEposProductImages({ skipExisting = true, limit = 25 } = {}) {
+  const startedAt = Date.now();
   await ensureProductAdminTables();
 
   const sql = getSql();
   const blobRepair = await linkExistingBlobImages();
-  const eposImageRecords = await fetchEposImageRecords();
-  const imageIndexes = buildImageUrlIndexes(eposImageRecords);
   const products = skipExisting
     ? await sql`
         SELECT p.epos_product_id, p.name, p.sku, p.raw, COUNT(i.id)::int AS image_count
@@ -486,6 +481,9 @@ export async function importEposProductImages({ skipExisting = true, limit = 25 
     ORDER BY p.name ASC
         LIMIT ${limit}
   `;
+  const shouldGlobalScan = process.env.EPOS_IMAGE_IMPORT_GLOBAL_SCAN === "true";
+  const eposImageRecords = shouldGlobalScan ? await fetchEposImageRecords() : [];
+  const imageIndexes = buildImageUrlIndexes(eposImageRecords);
 
   const result: ImageImportResult = {
     productsScanned: products.length,
@@ -511,6 +509,10 @@ export async function importEposProductImages({ skipExisting = true, limit = 25 
   const existingPathnames = new Set(existingPathRows.map((row) => String(row.pathname)));
 
   for (const product of products) {
+    if (Date.now() - startedAt > imageImportBudgetMs) {
+      break;
+    }
+
     if (skipExisting && Number(product.image_count || 0) > 0) {
       result.skippedExisting += 1;
       continue;

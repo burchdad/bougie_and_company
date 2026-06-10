@@ -14,7 +14,7 @@ export async function POST(request: Request) {
     const body = (await request.json().catch(() => ({}))) as { skipExisting?: boolean; limit?: number };
     const result = await importEposProductImages({
       skipExisting: body.skipExisting !== false,
-      limit: Number.isFinite(Number(body.limit)) ? Math.min(Math.max(Number(body.limit), 1), 250) : 100
+      limit: Number.isFinite(Number(body.limit)) ? Math.min(Math.max(Number(body.limit), 1), 20) : 8
     });
     return Response.json(
       {

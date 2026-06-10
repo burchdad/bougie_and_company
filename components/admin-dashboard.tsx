@@ -502,7 +502,7 @@ export function AdminDashboard() {
           "Content-Type": "application/json",
           ...(adminKey ? { "x-admin-key": adminKey } : {})
         },
-        body: JSON.stringify({ skipExisting: true, limit: 150 })
+        body: JSON.stringify({ skipExisting: true, limit: 8 })
       });
       const text = await response.text();
       let result: {
