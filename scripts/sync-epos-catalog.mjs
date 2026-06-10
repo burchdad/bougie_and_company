@@ -250,7 +250,7 @@ function imageExtension(url, contentType) {
 async function importImagesFromProducts() {
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
     console.log("Skipping image import: BLOB_READ_WRITE_TOKEN is not configured.");
-    return { uploaded: 0, failed: 0, imageUrlsFound: 0 };
+    return { uploaded: 0, failed: 0, imageUrlsFound: 0, remainingWithoutPhotos: null };
   }
 
   const products = await sql`
@@ -295,7 +295,14 @@ async function importImagesFromProducts() {
     }
   }
 
-  return result;
+  const remainingRows = await sql`
+    SELECT COUNT(*)::int AS count
+    FROM epos_products p
+    WHERE p.is_deleted = FALSE
+      AND NOT EXISTS (SELECT 1 FROM product_images i WHERE i.epos_product_id = p.epos_product_id)
+  `;
+
+  return { ...result, remainingWithoutPhotos: Number(remainingRows[0]?.count || 0) };
 }
 
 await ensureTables();
