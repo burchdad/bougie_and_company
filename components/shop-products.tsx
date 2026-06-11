@@ -348,7 +348,7 @@ function categoryDescendants(categoryId: string, categories: FilterCategory[]) {
 
   const collect = (parentId: string, baseDepth: number): FilterCategory[] =>
     (byParent.get(parentId) || []).flatMap((category) => [
-      { ...category, depth: category.depth - baseDepth - 1 },
+      { ...category, depth: Math.max(0, category.depth - baseDepth) },
       ...collect(category.id, baseDepth)
     ]);
 
@@ -527,7 +527,7 @@ export function ShopProducts() {
                 <option value="">All {activeRootCategory.label}</option>
                 {visibleRefinements.map((department) => (
                   <option key={department.id} value={department.id}>
-                    {"- ".repeat(department.depth)}
+                    {"- ".repeat(Math.max(0, department.depth))}
                     {department.label}
                   </option>
                 ))}
