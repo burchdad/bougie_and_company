@@ -314,7 +314,7 @@ async function tryEposOrder(params: {
     ReferenceCode: params.orderNumber,
     Notes: notes,
     Note: notes,
-    Status: "Pending",
+    Status: 1,
     TransactionStatus: 1,
     TransactionStatusId: 1,
     Total: params.total,
