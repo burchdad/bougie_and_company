@@ -42,7 +42,8 @@ export async function eposFetch<T>(path: string, init?: RequestInit): Promise<T>
     throw new Error(`Epos request failed: ${response.status} ${response.statusText} ${body}`.trim());
   }
 
-  return (await response.json()) as T;
+  const text = await response.text();
+  return (text.trim() ? JSON.parse(text) : {}) as T;
 }
 
 export async function fetchEposCollection<T>(resource: string, maxPages = 25): Promise<T[]> {
@@ -135,6 +136,10 @@ export async function createEposProduct(fields: { name: string; description: str
     SalePrice: fields.salePrice,
     ...(fields.categoryId ? { CategoryId: Number(fields.categoryId) } : {})
   });
+}
+
+export async function deleteEposProduct(productId: string) {
+  return eposFetch<Record<string, unknown>>(`Product/${productId}`, { method: "DELETE" });
 }
 
 export async function updateEposProductStock(stockId: string, raw: Record<string, unknown>, currentStock: number) {

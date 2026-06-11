@@ -84,6 +84,14 @@ export async function ensureProductAdminTables() {
     )
   `;
 
+  await sql`
+    CREATE TABLE IF NOT EXISTS product_deletion_overrides (
+      epos_product_id TEXT PRIMARY KEY,
+      deleted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      reason TEXT
+    )
+  `;
+
   await sql`CREATE INDEX IF NOT EXISTS product_images_product_idx ON product_images (epos_product_id, sort_order ASC)`;
   await sql`CREATE INDEX IF NOT EXISTS product_site_meta_department_idx ON product_site_meta (department)`;
   await sql`CREATE INDEX IF NOT EXISTS product_site_categories_category_idx ON product_site_categories (site_category_id)`;

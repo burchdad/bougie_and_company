@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { Camera, EyeOff, FileText, Gift, KeyRound, LayoutDashboard, Loader2, Package, PackageSearch, Save, Search, Settings, ShoppingBag, Star, Tags, Truck, UploadCloud } from "lucide-react";
+import { Camera, EyeOff, FileText, Gift, KeyRound, LayoutDashboard, Loader2, Package, PackageSearch, Save, Search, Settings, ShoppingBag, Star, Tags, Trash2, Truck, UploadCloud } from "lucide-react";
 
 type AdminProduct = {
   epos_product_id: string;
@@ -198,6 +198,7 @@ export function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [loggingIn, setLoggingIn] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [syncingCatalog, setSyncingCatalog] = useState(false);
   const [importingImages, setImportingImages] = useState(false);
@@ -519,6 +520,39 @@ export function AdminDashboard() {
       setMessage("Could not connect to the admin save backend.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleDeleteProduct(product: AdminProduct) {
+    const confirmed = window.confirm(`Delete "${product.marketing_title || product.name}" from the website catalog? This will also try to delete it in Epos.`);
+
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingProductId(product.epos_product_id);
+    setMessage("");
+
+    try {
+      const response = await fetch(`/api/admin/products?id=${encodeURIComponent(product.epos_product_id)}`, {
+        method: "DELETE",
+        headers: adminKey ? { "x-admin-key": adminKey } : {}
+      });
+      const result = (await response.json()) as { ok: boolean; message?: string };
+
+      if (!response.ok || !result.ok) {
+        setMessage(result.message || "Could not delete product.");
+        return;
+      }
+
+      setMessage(result.message || "Product deleted.");
+      setSelectedId("");
+      setIsCreatingProduct(false);
+      await loadProducts(query);
+    } catch {
+      setMessage("Could not connect to the product delete backend.");
+    } finally {
+      setDeletingProductId(null);
     }
   }
 
@@ -1432,10 +1466,23 @@ export function AdminDashboard() {
                       {isCreatingProduct ? "Create in Epos first, then cache the product in Neon." : `Epos ID ${selectedProduct?.epos_product_id} / SKU ${selectedProduct?.sku || "Not set"} / ${money(selectedProduct?.sale_price || null)}`}
                     </p>
                   </div>
-                  <button className="focus-ring inline-flex items-center gap-2 rounded-md bg-ink px-5 py-3 text-sm font-bold uppercase tracking-[0.16em] text-ivory hover:bg-saddle" disabled={saving} type="submit">
-                    {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                    {isCreatingProduct ? "Create" : "Save"}
-                  </button>
+                  <div className="flex flex-wrap gap-2">
+                    {!isCreatingProduct && selectedProduct ? (
+                      <button
+                        className="focus-ring inline-flex items-center gap-2 rounded-md border border-red-900/35 bg-red-950/10 px-5 py-3 text-sm font-bold uppercase tracking-[0.16em] text-red-900 hover:bg-red-950 hover:text-ivory disabled:cursor-not-allowed disabled:opacity-60"
+                        disabled={saving || deletingProductId === selectedProduct.epos_product_id}
+                        onClick={() => handleDeleteProduct(selectedProduct)}
+                        type="button"
+                      >
+                        {deletingProductId === selectedProduct.epos_product_id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                        Delete
+                      </button>
+                    ) : null}
+                    <button className="focus-ring inline-flex items-center gap-2 rounded-md bg-ink px-5 py-3 text-sm font-bold uppercase tracking-[0.16em] text-ivory hover:bg-saddle" disabled={saving || Boolean(deletingProductId)} type="submit">
+                      {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                      {isCreatingProduct ? "Create" : "Save"}
+                    </button>
+                  </div>
                 </div>
 
                 <div className="mt-6 grid gap-4">

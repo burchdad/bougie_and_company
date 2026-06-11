@@ -144,6 +144,13 @@ async function ensureTables() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `;
+  await sql`
+    CREATE TABLE IF NOT EXISTS product_deletion_overrides (
+      epos_product_id TEXT PRIMARY KEY,
+      deleted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      reason TEXT
+    )
+  `;
   await sql`CREATE INDEX IF NOT EXISTS epos_products_name_idx ON epos_products (name)`;
   await sql`CREATE INDEX IF NOT EXISTS epos_products_sku_idx ON epos_products (sku)`;
   await sql`CREATE INDEX IF NOT EXISTS epos_product_stock_product_idx ON epos_product_stock (epos_product_id)`;
@@ -152,10 +159,21 @@ async function ensureTables() {
 
 async function syncProducts() {
   const products = await fetchCollection("Product");
+  const deletedRows = await sql`SELECT epos_product_id FROM product_deletion_overrides`;
+  const deletedProductIds = new Set(deletedRows.map((row) => String(row.epos_product_id)));
 
   for (const product of products) {
     const productId = recordId(product);
     if (!productId) {
+      continue;
+    }
+
+    if (deletedProductIds.has(productId)) {
+      await sql`
+        UPDATE epos_products
+        SET is_deleted = TRUE, synced_at = NOW()
+        WHERE epos_product_id = ${productId}
+      `;
       continue;
     }
 

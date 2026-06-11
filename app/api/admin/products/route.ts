@@ -1,6 +1,6 @@
 import { ensureProductAdminTables, getAdminProducts, isAdminRequest } from "@/lib/admin-products";
 import { getSql } from "@/lib/db";
-import { createEposProduct, createEposProductStock, getEposId, getEposNumber, getEposString, updateEposProduct, updateEposProductStock } from "@/lib/epos";
+import { createEposProduct, createEposProductStock, deleteEposProduct, getEposId, getEposNumber, getEposString, updateEposProduct, updateEposProductStock } from "@/lib/epos";
 import { inferDepartment } from "@/lib/product-categorization";
 
 export const runtime = "nodejs";
@@ -476,4 +476,63 @@ export async function PATCH(request: Request) {
   await saveProductCategoryAssignments(body.eposProductId, categoryAssignments.categoryIds);
 
   return Response.json({ ok: true, message: `Product website details saved.${detailFallbackMessage || ""}${stockFallbackMessage || ""}` }, { headers: { "Cache-Control": "no-store" } });
+}
+
+export async function DELETE(request: Request) {
+  if (!isAdminRequest(request)) {
+    return Response.json({ ok: false, message: "Admin access required." }, { status: 401 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const productId = searchParams.get("id")?.trim();
+
+  if (!productId) {
+    return Response.json({ ok: false, message: "Missing product ID." }, { status: 400 });
+  }
+
+  await ensureProductAdminTables();
+
+  const sql = getSql();
+  const productRows = await sql`
+    SELECT epos_product_id, name
+    FROM epos_products
+    WHERE epos_product_id = ${productId}
+    LIMIT 1
+  `;
+  const productName = productRows[0]?.name ? String(productRows[0].name) : "Product";
+  let eposMessage = " Product delete was sent to Epos.";
+
+  try {
+    await deleteEposProduct(productId);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Epos delete failed.";
+    console.error(message);
+    eposMessage = ` Epos did not accept the delete request, so this product is now suppressed locally and future catalog syncs will keep it off the website. ${message}`;
+  }
+
+  await sql`
+    INSERT INTO product_deletion_overrides (epos_product_id, deleted_at, reason)
+    VALUES (${productId}, NOW(), 'admin-delete')
+    ON CONFLICT (epos_product_id)
+    DO UPDATE SET deleted_at = NOW(), reason = EXCLUDED.reason
+  `;
+
+  await sql`
+    UPDATE epos_products
+    SET is_deleted = TRUE, synced_at = NOW()
+    WHERE epos_product_id = ${productId}
+  `;
+
+  await sql`DELETE FROM product_site_categories WHERE epos_product_id = ${productId}`;
+  await sql`DELETE FROM product_images WHERE epos_product_id = ${productId}`;
+  await sql`
+    UPDATE product_site_meta
+    SET is_hidden = TRUE, updated_at = NOW()
+    WHERE epos_product_id = ${productId}
+  `;
+
+  return Response.json(
+    { ok: true, message: `${productName} was removed from the website and Neon cache.${eposMessage}` },
+    { headers: { "Cache-Control": "no-store" } }
+  );
 }
