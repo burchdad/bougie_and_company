@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { KeyRound, Menu, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { useState } from "react";
 import { HeaderActions } from "@/components/header-actions";
 
@@ -31,13 +31,6 @@ export function SiteHeader() {
           <p className="mt-1 text-[0.66rem] font-bold uppercase tracking-[0.24em] text-saddle">Luxury Meets Country.</p>
         </Link>
         <div className="flex items-center justify-end gap-2">
-          <Link
-            className="focus-ring inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-bold uppercase tracking-[0.14em] text-espresso hover:bg-cream"
-            href="/admin"
-          >
-            <KeyRound className="h-4 w-4" />
-            <span className="hidden sm:inline">Admin</span>
-          </Link>
           <HeaderActions showSearch={false} />
           <button className="focus-ring rounded-full p-2.5 text-espresso hover:bg-cream lg:hidden" aria-label="Menu" onClick={() => setOpen(!open)} type="button">
             {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -51,7 +44,6 @@ export function SiteHeader() {
             <Link className="rounded-md px-3 py-3 text-sm font-bold uppercase tracking-[0.18em] text-espresso hover:bg-cream" href="/about" onClick={() => setOpen(false)}>About</Link>
             <Link className="rounded-md px-3 py-3 text-sm font-bold uppercase tracking-[0.18em] text-espresso hover:bg-cream" href="/contact" onClick={() => setOpen(false)}>Contact</Link>
             <Link className="rounded-md px-3 py-3 text-sm font-bold uppercase tracking-[0.18em] text-espresso hover:bg-cream" href="/shop" onClick={() => setOpen(false)}>Full Shop</Link>
-            <Link className="rounded-md px-3 py-3 text-sm font-bold uppercase tracking-[0.18em] text-espresso hover:bg-cream" href="/admin" onClick={() => setOpen(false)}>Admin</Link>
           </div>
         </div>
       ) : null}

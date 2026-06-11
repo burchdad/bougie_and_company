@@ -52,7 +52,7 @@ export function ContactForm() {
       setMessage(result.message || "Thank you. Your message has been sent.");
     } catch {
       setStatus("error");
-      setMessage("We could not connect to the contact backend.");
+      setMessage("We could not send your message right now. Please try again shortly.");
     } finally {
       setSubmitting(false);
     }

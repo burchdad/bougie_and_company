@@ -377,7 +377,7 @@ export function ShopProducts() {
         const result = (await response.json()) as ProductResponse;
 
         if (!response.ok || !result.ok) {
-          setMessage(result.message || "The live product catalog is not ready yet.");
+          setMessage(result.message || "The shop is still getting ready. Please check back shortly.");
           return;
         }
 
@@ -386,7 +386,7 @@ export function ShopProducts() {
         }
       } catch {
         if (!ignore) {
-          setMessage("The live product catalog could not be reached.");
+          setMessage("We could not load the shop right now. Please try again shortly.");
         }
       } finally {
         if (!ignore) {
@@ -556,10 +556,10 @@ export function ShopProducts() {
 
       <div>
         <div className="rounded-lg bg-ink p-5 text-ivory shadow-luxe">
-          <p className="text-xs font-bold uppercase tracking-[0.22em] text-champagne">Live Epos Catalog</p>
+          <p className="text-xs font-bold uppercase tracking-[0.22em] text-champagne">Now Shopping</p>
           <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
             <h2 className="font-display text-4xl">{activeCategoryLabel}</h2>
-            <p className="text-sm font-semibold text-ivory/75">{loading ? "Loading inventory..." : `${filteredGroups.length} products showing`}</p>
+            <p className="text-sm font-semibold text-ivory/75">{loading ? "Loading products..." : `${filteredGroups.length} products showing`}</p>
           </div>
         </div>
 

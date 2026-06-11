@@ -50,7 +50,7 @@ export function NewsletterForm({ buttonLabel = "Sign Up", dark = false, onSucces
       onSuccess?.();
     } catch {
       setStatus("error");
-      setMessage("We could not connect to the signup backend.");
+      setMessage("We could not save your signup right now. Please try again shortly.");
     } finally {
       setSubmitting(false);
     }

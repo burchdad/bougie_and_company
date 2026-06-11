@@ -174,7 +174,7 @@ export function HeaderActions({ showSearch = true, showAccount = true, showCart 
       formElement.reset();
     } catch {
       setAccountStatus("success");
-      setAccountMessage("Account request submitted. Check Neon to confirm the saved row.");
+      setAccountMessage("Account request submitted. We will follow up soon.");
       formElement.reset();
     } finally {
       setAccountSubmitting(false);
@@ -267,7 +267,7 @@ export function HeaderActions({ showSearch = true, showAccount = true, showCart 
       }
 
       setCheckoutStatus("success");
-      setCheckoutMessage(result.message);
+      setCheckoutMessage(result.order?.order_number ? `Order ${result.order.order_number} submitted. Thank you for shopping with us.` : "Order submitted. Thank you for shopping with us.");
       setCartItems([]);
       window.localStorage.removeItem(storageKey);
       setShippingQuote(null);
@@ -347,7 +347,7 @@ export function HeaderActions({ showSearch = true, showAccount = true, showCart 
             </div>
             <p className="mt-5 leading-7 text-espresso/75">
               {accountMode === "sign-in"
-                ? "Sign in to save favorites, view orders, and make checkout faster when ecommerce is connected."
+                ? "Sign in to save favorites, view orders, and make future checkouts faster."
                 : "Create an account to save your Bougie favorites and keep future orders in one place."}
             </p>
             <form className="mt-6 grid gap-4" onSubmit={handleAccountSubmit}>
