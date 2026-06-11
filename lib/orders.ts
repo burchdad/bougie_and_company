@@ -308,15 +308,19 @@ async function tryEposOrder(params: {
     params.payload.customer?.phone ? `Phone: ${params.payload.customer.phone}` : "",
     params.payload.notes ? `Customer note: ${params.payload.notes}` : ""
   ].filter(Boolean).join("\n");
+  const statusVariants = [
+    { Status: 1, TransactionStatus: 1, TransactionStatusId: 1 },
+    { Status: "Complete", TransactionStatus: "Complete" },
+    { Status: "Completed", TransactionStatus: "Completed" },
+    { Status: "Paid", TransactionStatus: "Paid" },
+    { Status: "Pending", TransactionStatus: "Pending" }
+  ];
   const base = {
     CustomerId: params.customerId ? Number(params.customerId) : undefined,
     Reference: params.orderNumber,
     ReferenceCode: params.orderNumber,
     Notes: notes,
     Note: notes,
-    Status: 1,
-    TransactionStatus: 1,
-    TransactionStatusId: 1,
     Total: params.total,
     TotalAmount: params.total,
     DateTime: new Date().toISOString(),
@@ -329,12 +333,12 @@ async function tryEposOrder(params: {
     OrderItems: itemLines,
     TransactionItems: itemLines
   };
-  const payloads = [
-    { ...base, OrderProducts: itemLines },
-    { ...base, Products: itemLines },
-    { ...base, Lines: itemLines },
-    base
-  ];
+  const payloads = statusVariants.flatMap((status) => [
+    { ...base, ...status, OrderProducts: itemLines },
+    { ...base, ...status, Products: itemLines },
+    { ...base, ...status, Lines: itemLines },
+    { ...base, ...status }
+  ]);
   const endpoints = ["Transaction"];
   const failures: string[] = [];
 
@@ -349,29 +353,27 @@ async function tryEposOrder(params: {
     }
   }
 
-  const transactionPayloads = [
+  const transactionPayloads = statusVariants.flatMap((status) => [
     {
+      ...status,
       CustomerId: params.customerId ? Number(params.customerId) : undefined,
       DateTime: new Date().toISOString(),
       TotalAmount: params.total,
       Total: params.total,
-      TransactionStatus: 1,
-      TransactionStatusId: 1,
       Reference: params.orderNumber,
       ReferenceCode: params.orderNumber,
       Notes: notes,
       Note: notes
     },
     {
+      ...status,
       CustomerId: params.customerId ? Number(params.customerId) : undefined,
       Date: new Date().toISOString(),
       Amount: params.total,
-      TransactionStatus: 1,
-      TransactionStatusId: 1,
       Reference: params.orderNumber,
       Notes: notes
     }
-  ];
+  ]);
 
   for (const transactionPayload of transactionPayloads) {
     try {
