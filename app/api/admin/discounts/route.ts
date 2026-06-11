@@ -19,8 +19,19 @@ function parseNullableDate(value: unknown) {
   return value && String(value).trim() !== "" ? String(value) : null;
 }
 
-function eposIdFrom(record: Record<string, unknown> | null) {
+function eposIdFrom(record: Record<string, unknown> | Record<string, unknown>[] | null): string | null {
   if (!record) {
+    return null;
+  }
+
+  if (Array.isArray(record)) {
+    for (const item of record) {
+      const id = eposIdFrom(item);
+      if (id) {
+        return id;
+      }
+    }
+
     return null;
   }
 

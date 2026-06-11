@@ -153,12 +153,12 @@ export async function syncDiscountToEpos(discount: SiteDiscount, action: "create
     { Description: name }
   ];
 
-  async function tryPayloads(path: string, method: "POST" | "PUT", payloads: Array<Record<string, unknown>>) {
+  async function tryPayloads(path: string, method: "POST" | "PUT", payloads: Array<Record<string, unknown> | Array<Record<string, unknown>>>) {
     let lastError: unknown;
 
     for (const payload of payloads) {
       try {
-        return await eposFetch<Record<string, unknown>>(path, {
+        return await eposFetch<Record<string, unknown> | Record<string, unknown>[]>(path, {
           method,
           body: JSON.stringify(payload)
         });
@@ -171,7 +171,10 @@ export async function syncDiscountToEpos(discount: SiteDiscount, action: "create
   }
 
   if (action === "create") {
-    return tryPayloads("DiscountReason", "POST", createPayloads);
+    return tryPayloads("DiscountReason", "POST", [
+      ...createPayloads.map((payload) => [payload]),
+      ...createPayloads
+    ]);
   }
 
   if (discount.epos_discount_reason_id && action === "update") {
