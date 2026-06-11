@@ -20,6 +20,7 @@ export type AdminProduct = {
   department: string | null;
   category_ids: number[];
   category_slugs: string[];
+  has_explicit_categories: boolean;
   is_featured: boolean | null;
   is_hidden: boolean | null;
   primary_image_url: string | null;
@@ -111,8 +112,9 @@ export async function getAdminProducts(query = "", limit = 1000) {
           m.marketing_title,
           m.marketing_description,
           m.department,
-          COALESCE(site_assignments.category_ids, ARRAY[]::int[]) AS category_ids,
-          COALESCE(site_assignments.category_slugs, ARRAY[]::text[]) AS category_slugs,
+          COALESCE(site_assignments.category_ids, fallback_assignments.category_ids, ARRAY[]::int[]) AS category_ids,
+          COALESCE(site_assignments.category_slugs, fallback_assignments.category_slugs, ARRAY[]::text[]) AS category_slugs,
+          (site_assignments.category_ids IS NOT NULL) AS has_explicit_categories,
           sc.slug AS category_slug,
           parent_sc.slug AS parent_category_slug,
           m.is_featured,
@@ -124,6 +126,19 @@ export async function getAdminProducts(query = "", limit = 1000) {
         LEFT JOIN product_site_meta m ON m.epos_product_id = p.epos_product_id
         LEFT JOIN site_categories sc ON sc.epos_category_id = p.category_id::text
         LEFT JOIN site_categories parent_sc ON parent_sc.id = sc.parent_id
+        LEFT JOIN LATERAL (
+          SELECT
+            ARRAY_AGG(category.id ORDER BY category.parent_id NULLS FIRST, category.sort_order ASC, category.label ASC) AS category_ids,
+            ARRAY_AGG(category.slug ORDER BY category.parent_id NULLS FIRST, category.sort_order ASC, category.label ASC) AS category_slugs
+          FROM (
+            SELECT DISTINCT c.id::int, c.slug, c.parent_id, c.sort_order, c.label
+            FROM site_categories c
+            WHERE c.epos_category_id = p.category_id::text
+              OR c.slug = m.department
+              OR c.slug = sc.slug
+              OR c.slug = parent_sc.slug
+          ) category
+        ) fallback_assignments ON TRUE
         LEFT JOIN LATERAL (
           SELECT
             ARRAY_AGG(c.id::int ORDER BY c.parent_id NULLS FIRST, c.sort_order ASC, c.label ASC) AS category_ids,
@@ -180,7 +195,7 @@ export async function getAdminProducts(query = "", limit = 1000) {
             OR p.sku ILIKE ${`%${query}%`}
             OR p.barcode ILIKE ${`%${query}%`}
           )
-        GROUP BY p.epos_product_id, p.name, p.description, p.sku, p.barcode, p.category_id, p.sale_price, m.storefront_stock_override, stock_row.epos_stock_id, stock_row.location_id, p.synced_at, m.marketing_title, m.marketing_description, m.department, site_assignments.category_ids, site_assignments.category_slugs, sc.slug, parent_sc.slug, m.is_featured, m.is_hidden, i.url, i.alt_text
+        GROUP BY p.epos_product_id, p.name, p.description, p.sku, p.barcode, p.category_id, p.sale_price, m.storefront_stock_override, stock_row.epos_stock_id, stock_row.location_id, p.synced_at, m.marketing_title, m.marketing_description, m.department, site_assignments.category_ids, site_assignments.category_slugs, fallback_assignments.category_ids, fallback_assignments.category_slugs, sc.slug, parent_sc.slug, m.is_featured, m.is_hidden, i.url, i.alt_text
         ORDER BY p.name ASC
         LIMIT ${safeLimit}
       `
@@ -201,8 +216,9 @@ export async function getAdminProducts(query = "", limit = 1000) {
           m.marketing_title,
           m.marketing_description,
           m.department,
-          COALESCE(site_assignments.category_ids, ARRAY[]::int[]) AS category_ids,
-          COALESCE(site_assignments.category_slugs, ARRAY[]::text[]) AS category_slugs,
+          COALESCE(site_assignments.category_ids, fallback_assignments.category_ids, ARRAY[]::int[]) AS category_ids,
+          COALESCE(site_assignments.category_slugs, fallback_assignments.category_slugs, ARRAY[]::text[]) AS category_slugs,
+          (site_assignments.category_ids IS NOT NULL) AS has_explicit_categories,
           sc.slug AS category_slug,
           parent_sc.slug AS parent_category_slug,
           m.is_featured,
@@ -214,6 +230,19 @@ export async function getAdminProducts(query = "", limit = 1000) {
         LEFT JOIN product_site_meta m ON m.epos_product_id = p.epos_product_id
         LEFT JOIN site_categories sc ON sc.epos_category_id = p.category_id::text
         LEFT JOIN site_categories parent_sc ON parent_sc.id = sc.parent_id
+        LEFT JOIN LATERAL (
+          SELECT
+            ARRAY_AGG(category.id ORDER BY category.parent_id NULLS FIRST, category.sort_order ASC, category.label ASC) AS category_ids,
+            ARRAY_AGG(category.slug ORDER BY category.parent_id NULLS FIRST, category.sort_order ASC, category.label ASC) AS category_slugs
+          FROM (
+            SELECT DISTINCT c.id::int, c.slug, c.parent_id, c.sort_order, c.label
+            FROM site_categories c
+            WHERE c.epos_category_id = p.category_id::text
+              OR c.slug = m.department
+              OR c.slug = sc.slug
+              OR c.slug = parent_sc.slug
+          ) category
+        ) fallback_assignments ON TRUE
         LEFT JOIN LATERAL (
           SELECT
             ARRAY_AGG(c.id::int ORDER BY c.parent_id NULLS FIRST, c.sort_order ASC, c.label ASC) AS category_ids,
@@ -263,7 +292,7 @@ export async function getAdminProducts(query = "", limit = 1000) {
           LIMIT 1
         ) i ON TRUE
         WHERE p.is_deleted = FALSE
-        GROUP BY p.epos_product_id, p.name, p.description, p.sku, p.barcode, p.category_id, p.sale_price, m.storefront_stock_override, stock_row.epos_stock_id, stock_row.location_id, p.synced_at, m.marketing_title, m.marketing_description, m.department, site_assignments.category_ids, site_assignments.category_slugs, sc.slug, parent_sc.slug, m.is_featured, m.is_hidden, i.url, i.alt_text
+        GROUP BY p.epos_product_id, p.name, p.description, p.sku, p.barcode, p.category_id, p.sale_price, m.storefront_stock_override, stock_row.epos_stock_id, stock_row.location_id, p.synced_at, m.marketing_title, m.marketing_description, m.department, site_assignments.category_ids, site_assignments.category_slugs, fallback_assignments.category_ids, fallback_assignments.category_slugs, sc.slug, parent_sc.slug, m.is_featured, m.is_hidden, i.url, i.alt_text
         ORDER BY p.name ASC
         LIMIT ${safeLimit}
       `;

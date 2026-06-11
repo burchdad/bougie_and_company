@@ -22,6 +22,7 @@ type AdminProduct = {
   department: string | null;
   category_ids: number[];
   category_slugs: string[];
+  has_explicit_categories: boolean;
   is_featured: boolean | null;
   is_hidden: boolean | null;
   primary_image_url: string | null;

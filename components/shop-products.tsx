@@ -19,6 +19,7 @@ type Product = {
   marketing_description: string | null;
   department: string | null;
   category_slugs: string[];
+  has_explicit_categories: boolean;
   is_featured: boolean | null;
   is_hidden: boolean | null;
   primary_image_url: string | null;
@@ -191,6 +192,10 @@ function productMatchesFilter(product: Product, filterId: string) {
 
   if (product.category_slugs?.includes(filterId)) {
     return true;
+  }
+
+  if (product.has_explicit_categories) {
+    return false;
   }
 
   if (getProductDepartment(product) === filterId) {
