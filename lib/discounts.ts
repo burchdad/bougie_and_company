@@ -179,10 +179,14 @@ export async function syncDiscountToEpos(discount: SiteDiscount, action: "create
 
   if (discount.epos_discount_reason_id && action === "update") {
     const id = Number(discount.epos_discount_reason_id);
+    const updatePayloads = createPayloads.map((payload) => ({ Id: id, ...payload }));
     return tryPayloads(
       `DiscountReason/${discount.epos_discount_reason_id}`,
       "PUT",
-      createPayloads.map((payload) => ({ Id: id, ...payload }))
+      [
+        ...updatePayloads.map((payload) => [payload]),
+        ...updatePayloads
+      ]
     );
   }
 
@@ -201,6 +205,10 @@ export async function syncDiscountToEpos(discount: SiteDiscount, action: "create
       const archivedDescription = `Website discount code ${discount.code} was deleted in Bougie & Company admin.`;
 
       return tryPayloads(`DiscountReason/${discount.epos_discount_reason_id}`, "PUT", [
+        [{ Id: id, Name: archivedName, Description: archivedDescription }],
+        [{ Id: id, Name: archivedName }],
+        [{ Id: id, Reason: archivedName, Description: archivedDescription }],
+        [{ Id: id, Reason: archivedName }],
         { Id: id, Name: archivedName, Description: archivedDescription },
         { Id: id, Name: archivedName },
         { Id: id, Reason: archivedName, Description: archivedDescription },
