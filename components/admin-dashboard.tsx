@@ -3,7 +3,6 @@
 import Image from "next/image";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Camera, EyeOff, FileText, Gift, KeyRound, LayoutDashboard, Loader2, Package, PackageSearch, Save, Search, Settings, ShoppingBag, Star, Tags, Truck, UploadCloud } from "lucide-react";
-import { shopDepartments } from "@/lib/data";
 
 type AdminProduct = {
   epos_product_id: string;
@@ -21,6 +20,8 @@ type AdminProduct = {
   marketing_title: string | null;
   marketing_description: string | null;
   department: string | null;
+  category_ids: number[];
+  category_slugs: string[];
   is_featured: boolean | null;
   is_hidden: boolean | null;
   primary_image_url: string | null;
@@ -117,6 +118,22 @@ function adminStockValue(product: AdminProduct | null | undefined) {
   return eposStock > 0 ? product.stock || "" : overrideStock > 0 ? product.storefront_stock_override || "" : product.stock || "";
 }
 
+function categoryDepth(category: SiteCategory, categories: SiteCategory[]) {
+  let depth = 0;
+  let currentParentId = category.parent_id;
+
+  while (currentParentId) {
+    const parent = categories.find((item) => item.id === currentParentId);
+    if (!parent) {
+      break;
+    }
+    depth += 1;
+    currentParentId = parent.parent_id;
+  }
+
+  return depth;
+}
+
 export function AdminDashboard() {
   const [adminKey, setAdminKey] = useState("");
   const [isSignedIn, setIsSignedIn] = useState(false);
@@ -154,6 +171,7 @@ export function AdminDashboard() {
   const selectedProduct = useMemo(() => (isCreatingProduct ? null : products.find((product) => product.epos_product_id === selectedId) || products[0]), [isCreatingProduct, products, selectedId]);
   const selectedCategory = useMemo(() => categories.find((category) => category.id === editingCategoryId) || null, [categories, editingCategoryId]);
   const selectedDiscount = useMemo(() => discounts.find((discount) => discount.id === editingDiscountId) || null, [discounts, editingDiscountId]);
+  const productCategoryOptions = useMemo(() => categories.map((category) => ({ ...category, depth: categoryDepth(category, categories) })), [categories]);
 
   async function loadProducts(searchTerm = query) {
     setLoading(true);
@@ -343,6 +361,9 @@ export function AdminDashboard() {
     if (isSignedIn && activeTab === "products" && products.length === 0) {
       loadProducts("");
     }
+    if (isSignedIn && activeTab === "products" && categories.length === 0) {
+      loadCategories();
+    }
     if (isSignedIn && activeTab === "categories" && categories.length === 0) {
       loadCategories();
     }
@@ -407,6 +428,7 @@ export function AdminDashboard() {
 
     const form = new FormData(event.currentTarget);
     const isNewProduct = isCreatingProduct;
+    const categoryIds = form.getAll("categoryIds").map((value) => Number(value)).filter((value) => Number.isFinite(value));
     setSaving(true);
     setMessage("");
 
@@ -422,6 +444,7 @@ export function AdminDashboard() {
           marketingTitle: String(form.get("marketingTitle") || ""),
           marketingDescription: String(form.get("marketingDescription") || ""),
           department: String(form.get("department") || ""),
+          categoryIds,
           isFeatured: form.get("isFeatured") === "on",
           isHidden: form.get("isHidden") === "on",
           eposName: String(form.get("eposName") || ""),
@@ -854,7 +877,7 @@ export function AdminDashboard() {
                   <button className="focus-ring rounded-lg border border-champagne/25 bg-ivory/5 p-5 text-left hover:bg-ivory/10" onClick={() => setActiveTab("categories")} type="button">
                     <Tags className="h-7 w-7 text-champagne" />
                     <p className="mt-4 font-display text-3xl">Categories</p>
-                    <p className="mt-2 text-sm text-ivory/65">{shopDepartments.length} storefront departments mapped to synced products.</p>
+                    <p className="mt-2 text-sm text-ivory/65">{categories.length || "Live"} storefront categories mapped to synced products.</p>
                   </button>
                   <button className="focus-ring rounded-lg border border-champagne/25 bg-ivory/5 p-5 text-left hover:bg-ivory/10" onClick={() => setActiveTab("orders")} type="button">
                     <ShoppingBag className="h-7 w-7 text-champagne" />
@@ -1375,15 +1398,30 @@ export function AdminDashboard() {
                     Storefront description
                     <textarea className="focus-ring min-h-32 rounded-md border border-saddle/20 bg-white px-4 py-3 font-normal" defaultValue={selectedProduct?.marketing_description || ""} name="marketingDescription" placeholder={selectedProduct?.description || "Short customer-facing product description"} />
                   </label>
-                  <label className="grid gap-2 text-sm font-semibold text-espresso">
-                    Website department
-                    <select className="focus-ring min-h-12 rounded-md border border-saddle/20 bg-white px-4 font-normal" defaultValue={selectedProduct?.department || ""} name="department">
-                      <option value="">Auto categorize</option>
-                      {shopDepartments.map((department) => (
-                        <option key={department.id} value={department.id}>{department.title}</option>
-                      ))}
-                    </select>
-                  </label>
+                  <input name="department" type="hidden" value={selectedProduct?.department || ""} />
+                  <fieldset className="grid gap-3 rounded-lg border border-saddle/15 bg-white p-4">
+                    <legend className="px-1 text-sm font-semibold text-espresso">Website categories</legend>
+                    <p className="text-sm leading-6 text-espresso/70">Select every menu category this product should appear in. Subcategories are included here, and selecting a subcategory also keeps it visible under its parent section.</p>
+                    {productCategoryOptions.length ? (
+                      <div className="grid max-h-72 gap-2 overflow-auto pr-1 sm:grid-cols-2">
+                        {productCategoryOptions.map((category) => {
+                          const isChecked = Boolean(selectedProduct?.category_ids?.includes(category.id));
+                          return (
+                            <label
+                              className="flex min-h-11 items-center gap-3 rounded-md border border-saddle/15 bg-cream/45 px-3 py-2 text-sm font-semibold text-espresso hover:border-saddle/35"
+                              key={category.id}
+                              style={{ paddingLeft: `${0.75 + category.depth * 1.1}rem` }}
+                            >
+                              <input defaultChecked={isChecked} name="categoryIds" type="checkbox" value={category.id} />
+                              <span>{category.depth > 0 ? "- " : ""}{category.label}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="rounded-md border border-dashed border-saddle/25 bg-cream/45 p-4 text-sm text-espresso/70">Categories are loading. Save again after they appear if you need manual placement.</div>
+                    )}
+                  </fieldset>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <label className="flex min-h-12 items-center gap-3 rounded-md border border-saddle/15 bg-white px-4 text-sm font-semibold text-espresso">
                       <input defaultChecked={Boolean(selectedProduct?.is_featured)} name="isFeatured" type="checkbox" />

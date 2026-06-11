@@ -49,6 +49,56 @@ async function getEposCategoryIdForDepartment(department: string | null) {
   return rows[0]?.epos_category_id ? String(rows[0].epos_category_id) : null;
 }
 
+async function getCategoryAssignments(categoryIds: number[]) {
+  if (!categoryIds.length) {
+    return { categoryIds: [] as number[], primarySlug: null as string | null, eposCategoryId: null as string | null };
+  }
+
+  const sql = getSql();
+  const rows = await sql`
+    WITH selected AS (
+      SELECT id, parent_id
+      FROM site_categories
+      WHERE id IN (SELECT value::bigint FROM jsonb_array_elements_text(${JSON.stringify(categoryIds)}::jsonb))
+    ),
+    expanded AS (
+      SELECT id FROM selected
+      UNION
+      SELECT parent_id AS id FROM selected WHERE parent_id IS NOT NULL
+    )
+    SELECT c.id::int, c.slug, c.epos_category_id
+    FROM site_categories c
+    JOIN expanded e ON e.id = c.id
+    ORDER BY c.parent_id NULLS FIRST, c.sort_order ASC, c.label ASC
+  `;
+
+  const assignedIds = rows.map((row) => Number(row.id)).filter((id) => Number.isFinite(id));
+  const firstWithEpos = rows.find((row) => row.epos_category_id);
+
+  return {
+    categoryIds: assignedIds,
+    primarySlug: rows[0]?.slug ? String(rows[0].slug) : null,
+    eposCategoryId: firstWithEpos?.epos_category_id ? String(firstWithEpos.epos_category_id) : null
+  };
+}
+
+async function saveProductCategoryAssignments(productId: string, categoryIds: number[]) {
+  const sql = getSql();
+
+  await sql`DELETE FROM product_site_categories WHERE epos_product_id = ${productId}`;
+
+  if (!categoryIds.length) {
+    return;
+  }
+
+  await sql`
+    INSERT INTO product_site_categories (epos_product_id, site_category_id)
+    SELECT ${productId}, value::bigint
+    FROM jsonb_array_elements_text(${JSON.stringify(categoryIds)}::jsonb)
+    ON CONFLICT DO NOTHING
+  `;
+}
+
 async function applyStorefrontStockOverride(productId: string, stock: number) {
   const sql = getSql();
 
@@ -80,6 +130,7 @@ export async function POST(request: Request) {
     marketingTitle?: string;
     marketingDescription?: string;
     department?: string;
+    categoryIds?: number[];
     isFeatured?: boolean;
     isHidden?: boolean;
     eposName?: string;
@@ -96,7 +147,9 @@ export async function POST(request: Request) {
   const eposSku = body.eposSku?.trim() || "";
   const eposSalePrice = body.eposSalePrice && body.eposSalePrice.trim() !== "" ? Number(body.eposSalePrice) : null;
   const eposStock = body.eposStock && body.eposStock.trim() !== "" ? Number(body.eposStock) : null;
-  const department = body.department?.trim() || inferDepartment({ name: eposName, description: eposDescription, sku: eposSku });
+  const categoryIds = Array.isArray(body.categoryIds) ? body.categoryIds.map(Number).filter((id) => Number.isFinite(id)) : [];
+  const categoryAssignments = await getCategoryAssignments(categoryIds);
+  const department = categoryAssignments.primarySlug || body.department?.trim() || inferDepartment({ name: eposName, description: eposDescription, sku: eposSku });
 
   if (!eposName) {
     return Response.json({ ok: false, message: "Product name is required." }, { status: 400 });
@@ -106,7 +159,7 @@ export async function POST(request: Request) {
     return Response.json({ ok: false, message: "Price and stock must be valid numbers." }, { status: 400 });
   }
 
-  const eposCategoryId = await getEposCategoryIdForDepartment(department);
+  const eposCategoryId = categoryAssignments.eposCategoryId || (await getEposCategoryIdForDepartment(department));
   let eposProduct: Record<string, unknown>;
   let eposProductId: string | null;
 
@@ -226,6 +279,8 @@ export async function POST(request: Request) {
       updated_at = NOW()
   `;
 
+  await saveProductCategoryAssignments(eposProductId, categoryAssignments.categoryIds);
+
   return Response.json({ ok: true, message: "Product created in Epos and saved to Neon.", productId: eposProductId }, { headers: { "Cache-Control": "no-store" } });
 }
 
@@ -239,6 +294,7 @@ export async function PATCH(request: Request) {
     marketingTitle?: string;
     marketingDescription?: string;
     department?: string;
+    categoryIds?: number[];
     isFeatured?: boolean;
     isHidden?: boolean;
     eposName?: string;
@@ -287,13 +343,15 @@ export async function PATCH(request: Request) {
   const eposSku = body.eposSku?.trim() || "";
   const eposSalePrice = body.eposSalePrice && body.eposSalePrice.trim() !== "" ? Number(body.eposSalePrice) : null;
   const eposStock = body.eposStock && body.eposStock.trim() !== "" ? Number(body.eposStock) : null;
-  const department = body.department?.trim() || inferDepartment({ name: eposName, description: eposDescription, sku: eposSku });
+  const categoryIds = Array.isArray(body.categoryIds) ? body.categoryIds.map(Number).filter((id) => Number.isFinite(id)) : [];
+  const categoryAssignments = await getCategoryAssignments(categoryIds);
+  const department = categoryAssignments.primarySlug || body.department?.trim() || inferDepartment({ name: eposName, description: eposDescription, sku: eposSku });
 
   if ((eposSalePrice !== null && Number.isNaN(eposSalePrice)) || (eposStock !== null && Number.isNaN(eposStock))) {
     return Response.json({ ok: false, message: "Price and stock must be valid numbers." }, { status: 400 });
   }
 
-  const eposCategoryId = await getEposCategoryIdForDepartment(department);
+  const eposCategoryId = categoryAssignments.eposCategoryId || (await getEposCategoryIdForDepartment(department));
   let detailFallbackMessage: string | null = null;
   let stockFallbackMessage: string | null = null;
   const currentSalePrice = productRow.sale_price !== null && productRow.sale_price !== undefined ? Number(productRow.sale_price) : null;
@@ -414,6 +472,8 @@ export async function PATCH(request: Request) {
       is_hidden = EXCLUDED.is_hidden,
       updated_at = NOW()
   `;
+
+  await saveProductCategoryAssignments(body.eposProductId, categoryAssignments.categoryIds);
 
   return Response.json({ ok: true, message: `Product website details saved.${detailFallbackMessage || ""}${stockFallbackMessage || ""}` }, { headers: { "Cache-Control": "no-store" } });
 }

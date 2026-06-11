@@ -18,6 +18,7 @@ type Product = {
   marketing_title: string | null;
   marketing_description: string | null;
   department: string | null;
+  category_slugs: string[];
   is_featured: boolean | null;
   is_hidden: boolean | null;
   primary_image_url: string | null;
@@ -186,6 +187,10 @@ function productMatchesFilter(product: Product, filterId: string) {
 
   if (filterId === "tack") {
     return false;
+  }
+
+  if (product.category_slugs?.includes(filterId)) {
+    return true;
   }
 
   if (getProductDepartment(product) === filterId) {

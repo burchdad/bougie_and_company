@@ -14,7 +14,12 @@ export const departmentKeywords: Record<string, string[]> = {
   "jewelry-headbands": ["jewelry", "headband", "earring", "bracelet", "necklace"]
 };
 
-export function inferDepartment(product: { department?: string | null; name?: string | null; description?: string | null; sku?: string | null; category_slug?: string | null; parent_category_slug?: string | null }) {
+export function inferDepartment(product: { department?: string | null; name?: string | null; description?: string | null; sku?: string | null; category_slug?: string | null; parent_category_slug?: string | null; category_slugs?: string[] | null }) {
+  const assignedDepartment = product.category_slugs?.find((slug) => shopDepartments.some((department) => department.id === slug));
+  if (assignedDepartment) {
+    return assignedDepartment;
+  }
+
   if (product.department) {
     return product.department;
   }

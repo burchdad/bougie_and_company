@@ -17,6 +17,8 @@ type ProductRow = {
   marketing_title: string | null;
   marketing_description: string | null;
   department: string | null;
+  category_ids: number[];
+  category_slugs: string[];
   is_featured: boolean | null;
   is_hidden: boolean | null;
   primary_image_url: string | null;

@@ -18,6 +18,8 @@ export type AdminProduct = {
   marketing_title: string | null;
   marketing_description: string | null;
   department: string | null;
+  category_ids: number[];
+  category_slugs: string[];
   is_featured: boolean | null;
   is_hidden: boolean | null;
   primary_image_url: string | null;
@@ -60,6 +62,15 @@ export async function ensureProductAdminTables() {
   await sql`ALTER TABLE product_site_meta ADD COLUMN IF NOT EXISTS storefront_stock_override NUMERIC`;
 
   await sql`
+    CREATE TABLE IF NOT EXISTS product_site_categories (
+      epos_product_id TEXT NOT NULL REFERENCES epos_products(epos_product_id) ON DELETE CASCADE,
+      site_category_id BIGINT NOT NULL REFERENCES site_categories(id) ON DELETE CASCADE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (epos_product_id, site_category_id)
+    )
+  `;
+
+  await sql`
     CREATE TABLE IF NOT EXISTS product_images (
       id BIGSERIAL PRIMARY KEY,
       epos_product_id TEXT NOT NULL REFERENCES epos_products(epos_product_id) ON DELETE CASCADE,
@@ -74,6 +85,7 @@ export async function ensureProductAdminTables() {
 
   await sql`CREATE INDEX IF NOT EXISTS product_images_product_idx ON product_images (epos_product_id, sort_order ASC)`;
   await sql`CREATE INDEX IF NOT EXISTS product_site_meta_department_idx ON product_site_meta (department)`;
+  await sql`CREATE INDEX IF NOT EXISTS product_site_categories_category_idx ON product_site_categories (site_category_id)`;
 }
 
 export async function getAdminProducts(query = "", limit = 1000) {
@@ -99,6 +111,8 @@ export async function getAdminProducts(query = "", limit = 1000) {
           m.marketing_title,
           m.marketing_description,
           m.department,
+          COALESCE(site_assignments.category_ids, ARRAY[]::int[]) AS category_ids,
+          COALESCE(site_assignments.category_slugs, ARRAY[]::text[]) AS category_slugs,
           sc.slug AS category_slug,
           parent_sc.slug AS parent_category_slug,
           m.is_featured,
@@ -110,6 +124,14 @@ export async function getAdminProducts(query = "", limit = 1000) {
         LEFT JOIN product_site_meta m ON m.epos_product_id = p.epos_product_id
         LEFT JOIN site_categories sc ON sc.epos_category_id = p.category_id::text
         LEFT JOIN site_categories parent_sc ON parent_sc.id = sc.parent_id
+        LEFT JOIN LATERAL (
+          SELECT
+            ARRAY_AGG(c.id::int ORDER BY c.parent_id NULLS FIRST, c.sort_order ASC, c.label ASC) AS category_ids,
+            ARRAY_AGG(c.slug ORDER BY c.parent_id NULLS FIRST, c.sort_order ASC, c.label ASC) AS category_slugs
+          FROM product_site_categories pc
+          JOIN site_categories c ON c.id = pc.site_category_id
+          WHERE pc.epos_product_id = p.epos_product_id
+        ) site_assignments ON TRUE
         LEFT JOIN LATERAL (
           SELECT epos_stock_id, location_id
           FROM epos_product_stock
@@ -158,7 +180,7 @@ export async function getAdminProducts(query = "", limit = 1000) {
             OR p.sku ILIKE ${`%${query}%`}
             OR p.barcode ILIKE ${`%${query}%`}
           )
-        GROUP BY p.epos_product_id, p.name, p.description, p.sku, p.barcode, p.category_id, p.sale_price, m.storefront_stock_override, stock_row.epos_stock_id, stock_row.location_id, p.synced_at, m.marketing_title, m.marketing_description, m.department, sc.slug, parent_sc.slug, m.is_featured, m.is_hidden, i.url, i.alt_text
+        GROUP BY p.epos_product_id, p.name, p.description, p.sku, p.barcode, p.category_id, p.sale_price, m.storefront_stock_override, stock_row.epos_stock_id, stock_row.location_id, p.synced_at, m.marketing_title, m.marketing_description, m.department, site_assignments.category_ids, site_assignments.category_slugs, sc.slug, parent_sc.slug, m.is_featured, m.is_hidden, i.url, i.alt_text
         ORDER BY p.name ASC
         LIMIT ${safeLimit}
       `
@@ -179,6 +201,8 @@ export async function getAdminProducts(query = "", limit = 1000) {
           m.marketing_title,
           m.marketing_description,
           m.department,
+          COALESCE(site_assignments.category_ids, ARRAY[]::int[]) AS category_ids,
+          COALESCE(site_assignments.category_slugs, ARRAY[]::text[]) AS category_slugs,
           sc.slug AS category_slug,
           parent_sc.slug AS parent_category_slug,
           m.is_featured,
@@ -190,6 +214,14 @@ export async function getAdminProducts(query = "", limit = 1000) {
         LEFT JOIN product_site_meta m ON m.epos_product_id = p.epos_product_id
         LEFT JOIN site_categories sc ON sc.epos_category_id = p.category_id::text
         LEFT JOIN site_categories parent_sc ON parent_sc.id = sc.parent_id
+        LEFT JOIN LATERAL (
+          SELECT
+            ARRAY_AGG(c.id::int ORDER BY c.parent_id NULLS FIRST, c.sort_order ASC, c.label ASC) AS category_ids,
+            ARRAY_AGG(c.slug ORDER BY c.parent_id NULLS FIRST, c.sort_order ASC, c.label ASC) AS category_slugs
+          FROM product_site_categories pc
+          JOIN site_categories c ON c.id = pc.site_category_id
+          WHERE pc.epos_product_id = p.epos_product_id
+        ) site_assignments ON TRUE
         LEFT JOIN LATERAL (
           SELECT epos_stock_id, location_id
           FROM epos_product_stock
@@ -231,13 +263,15 @@ export async function getAdminProducts(query = "", limit = 1000) {
           LIMIT 1
         ) i ON TRUE
         WHERE p.is_deleted = FALSE
-        GROUP BY p.epos_product_id, p.name, p.description, p.sku, p.barcode, p.category_id, p.sale_price, m.storefront_stock_override, stock_row.epos_stock_id, stock_row.location_id, p.synced_at, m.marketing_title, m.marketing_description, m.department, sc.slug, parent_sc.slug, m.is_featured, m.is_hidden, i.url, i.alt_text
+        GROUP BY p.epos_product_id, p.name, p.description, p.sku, p.barcode, p.category_id, p.sale_price, m.storefront_stock_override, stock_row.epos_stock_id, stock_row.location_id, p.synced_at, m.marketing_title, m.marketing_description, m.department, site_assignments.category_ids, site_assignments.category_slugs, sc.slug, parent_sc.slug, m.is_featured, m.is_hidden, i.url, i.alt_text
         ORDER BY p.name ASC
         LIMIT ${safeLimit}
       `;
 
   return (rows as AdminProductRow[]).map((row) => ({
     ...row,
+    category_ids: row.category_ids || [],
+    category_slugs: row.category_slugs || [],
     department: inferDepartment(row)
   }));
 }
