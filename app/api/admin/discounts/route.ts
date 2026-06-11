@@ -342,9 +342,17 @@ export async function DELETE(request: Request) {
       updated_at::text
   `;
 
+  let eposMessage = "";
+
   if (rows[0]) {
-    await syncDiscountToEpos(rows[0] as SiteDiscount, "delete");
+    try {
+      await syncDiscountToEpos(rows[0] as SiteDiscount, "delete");
+      eposMessage = " Epos discount reason removed.";
+    } catch (error) {
+      eposMessage = ` Epos delete failed: ${errorMessage(error)}`;
+      console.error(eposMessage);
+    }
   }
 
-  return Response.json({ ok: true, message: "Discount removed." }, { headers: { "Cache-Control": "no-store" } });
+  return Response.json({ ok: true, message: `Discount removed.${eposMessage}` }, { headers: { "Cache-Control": "no-store" } });
 }
