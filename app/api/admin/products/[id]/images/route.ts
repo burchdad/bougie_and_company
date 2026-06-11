@@ -1,3 +1,4 @@
+import { put } from "@vercel/blob";
 import { handleUpload } from "@vercel/blob/client";
 import { ensureProductAdminTables, isAdminRequest } from "@/lib/admin-products";
 import { getSql } from "@/lib/db";
@@ -28,22 +29,67 @@ async function saveProductImage(id: string, url: string, pathname: string, altTe
   return rows[0];
 }
 
+function parseClientPayload(clientPayload: string | null) {
+  if (!clientPayload) {
+    return {};
+  }
+
+  try {
+    return JSON.parse(clientPayload) as { productId?: string };
+  } catch {
+    return { productId: clientPayload };
+  }
+}
+
+async function handleServerFormUpload(request: Request, id: string) {
+  const form = await request.formData();
+  const file = form.get("file");
+  const altText = String(form.get("altText") || "").trim();
+
+  if (!(file instanceof File)) {
+    return Response.json({ ok: false, message: "Choose an image to upload." }, { status: 400 });
+  }
+
+  if (!file.type.startsWith("image/")) {
+    return Response.json({ ok: false, message: "Product photos must be image files." }, { status: 400 });
+  }
+
+  if (file.size > 4 * 1024 * 1024) {
+    return Response.json({ ok: false, message: "This image is too large for the cached upload form. Refresh the admin page and try again." }, { status: 413 });
+  }
+
+  const safeName = file.name.replace(/[^a-z0-9._-]/gi, "-").toLowerCase() || "product-photo.jpg";
+  const blob = await put(`products/${id}/${Date.now()}-${safeName}`, file, {
+    access: "public",
+    contentType: file.type
+  });
+  const image = await saveProductImage(id, blob.url, blob.pathname, altText || null);
+
+  return Response.json({ ok: true, image }, { headers: { "Cache-Control": "no-store" } });
+}
+
 export async function POST(request: Request, context: RouteContext) {
   if (!isAdminRequest(request)) {
     return Response.json({ ok: false, message: "Admin access required." }, { status: 401 });
   }
 
   const { id } = await context.params;
-  const body = await request.json();
 
   try {
+    const contentType = request.headers.get("content-type") || "";
+
+    if (contentType.includes("multipart/form-data")) {
+      return await handleServerFormUpload(request, id);
+    }
+
+    const body = await request.json();
     const response = await handleUpload({
       body,
       request,
       onBeforeGenerateToken: async (pathname, clientPayload) => {
-        const payload = clientPayload ? JSON.parse(clientPayload) as { productId?: string } : {};
+        const payload = parseClientPayload(clientPayload);
 
-        if (payload.productId !== id || !pathname.startsWith(`products/${id}/`)) {
+        if ((payload.productId && payload.productId !== id) || !pathname.startsWith(`products/${id}/`)) {
           throw new Error("Upload target does not match the selected product.");
         }
 

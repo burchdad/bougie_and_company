@@ -690,7 +690,12 @@ export function AdminDashboard() {
       await loadProducts(query);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not connect to Blob storage upload.";
-      setMessage(message.includes("413") ? "That image is too large for the old upload path. Please try again; direct Blob upload is now enabled." : message);
+      const friendlyMessage = message.includes("413")
+        ? "That image is too large for the cached upload form. Refresh the admin page and try again."
+        : message.includes("Failed to fetch")
+          ? "Could not connect to Blob storage upload. Refresh the admin page and try again."
+          : message;
+      setMessage(friendlyMessage);
     } finally {
       setUploading(false);
     }
