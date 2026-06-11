@@ -333,8 +333,8 @@ async function tryEposOrder(params: {
     { ...base, Lines: itemLines },
     base
   ];
-  const endpoints = ["Order", "Transaction", "Sale"];
-  let lastError: unknown;
+  const endpoints = ["Order", "Transaction"];
+  const failures: string[] = [];
 
   for (const endpoint of endpoints) {
     for (const orderPayload of payloads) {
@@ -342,12 +342,77 @@ async function tryEposOrder(params: {
         const raw = await eposWriteWithPayloadVariants(endpoint, "POST", orderPayload);
         return { id: getEposId(raw), endpoint, raw };
       } catch (error) {
-        lastError = error;
+        failures.push(`${endpoint}: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
   }
 
-  throw lastError;
+  const transactionPayloads = [
+    {
+      CustomerId: params.customerId ? Number(params.customerId) : undefined,
+      DateTime: new Date().toISOString(),
+      TotalAmount: params.total,
+      Total: params.total,
+      Reference: params.orderNumber,
+      ReferenceCode: params.orderNumber,
+      Notes: notes,
+      Note: notes
+    },
+    {
+      CustomerId: params.customerId ? Number(params.customerId) : undefined,
+      Date: new Date().toISOString(),
+      Amount: params.total,
+      Reference: params.orderNumber,
+      Notes: notes
+    }
+  ];
+
+  for (const transactionPayload of transactionPayloads) {
+    try {
+      const transactionRaw = await eposWriteWithPayloadVariants("Transaction", "POST", transactionPayload);
+      const transactionId = getEposId(transactionRaw);
+
+      if (!transactionId) {
+        return { id: null, endpoint: "Transaction", raw: transactionRaw };
+      }
+
+      const lineFailures: string[] = [];
+      for (const line of itemLines) {
+        const linePayload = {
+          TransactionId: Number(transactionId),
+          TransactionID: Number(transactionId),
+          ProductId: line.ProductId,
+          ProductID: line.ProductID,
+          Quantity: line.Quantity,
+          UnitPrice: line.UnitPrice,
+          Price: line.Price,
+          Total: line.Total,
+          TotalAmount: line.Total
+        };
+        let lineSynced = false;
+
+        for (const lineEndpoint of ["TransactionItem", "TransactionItems", "TransactionDetail", "TransactionDetails"]) {
+          try {
+            await eposWriteWithPayloadVariants(lineEndpoint, "POST", linePayload);
+            lineSynced = true;
+            break;
+          } catch (error) {
+            lineFailures.push(`${lineEndpoint}: ${error instanceof Error ? error.message : String(error)}`);
+          }
+        }
+
+        if (!lineSynced) {
+          throw new Error(lineFailures.slice(-4).join(" | "));
+        }
+      }
+
+      return { id: transactionId, endpoint: "Transaction", raw: transactionRaw };
+    } catch (error) {
+      failures.push(`Transaction+lines: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  throw new Error(failures.join(" | ").slice(0, 2000));
 }
 
 async function syncOrderToEpos(params: {
@@ -362,17 +427,32 @@ async function syncOrderToEpos(params: {
   total: number;
 }) {
   const customer = await tryEposCustomer(params.payload, params.address);
-  const order = await tryEposOrder({ ...params, customerId: customer.id });
 
-  return {
-    customerId: customer.id,
-    orderId: order.id,
-    raw: {
-      customer: customer.raw,
-      order: order.raw,
-      endpoint: order.endpoint
-    }
-  };
+  try {
+    const order = await tryEposOrder({ ...params, customerId: customer.id });
+
+    return {
+      ok: true as const,
+      customerId: customer.id,
+      orderId: order.id,
+      message: order.id ? "Order sent to EPOS." : "Order sent to EPOS but no order ID was returned.",
+      raw: {
+        customer: customer.raw,
+        order: order.raw,
+        endpoint: order.endpoint
+      }
+    };
+  } catch (error) {
+    return {
+      ok: false as const,
+      customerId: customer.id,
+      orderId: null,
+      message: error instanceof Error ? error.message : "EPOS order sync failed.",
+      raw: {
+        customer: customer.raw
+      }
+    };
+  }
 }
 
 export async function submitCheckoutOrder(payload: CheckoutPayload) {
@@ -510,8 +590,8 @@ export async function submitCheckoutOrder(payload: CheckoutPayload) {
       UPDATE site_orders
       SET epos_customer_id = ${epos.customerId},
         epos_order_id = ${epos.orderId},
-        epos_sync_status = ${epos.orderId ? "synced" : "submitted"},
-        epos_sync_message = ${epos.orderId ? "Order sent to EPOS." : "Order sent to EPOS but no order ID was returned."},
+        epos_sync_status = ${epos.ok && epos.orderId ? "synced" : epos.ok ? "submitted" : "failed"},
+        epos_sync_message = ${epos.message},
         epos_raw = ${JSON.stringify(epos.raw)}::jsonb,
         updated_at = NOW()
       WHERE id = ${id}
