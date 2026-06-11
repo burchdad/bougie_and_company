@@ -855,8 +855,8 @@ export function AdminDashboard() {
                   </div>
                 ) : null}
                 {activeTab === "discounts" ? (
-                  <div className="mt-5 grid gap-5 xl:grid-cols-[28rem_1fr]">
-                    <form className="rounded-lg border border-champagne/25 bg-ink/50 p-5" key={selectedDiscount?.id || "new-discount"} onSubmit={handleDiscountSubmit}>
+                  <div className="mt-5 grid gap-6 xl:grid-cols-[minmax(0,34rem)_minmax(0,1fr)]">
+                    <form className="min-w-0 rounded-lg border border-champagne/25 bg-ink/50 p-6" key={selectedDiscount?.id || "new-discount"} onSubmit={handleDiscountSubmit}>
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="font-display text-3xl">{selectedDiscount ? "Edit Discount" : "Create Discount"}</p>
@@ -869,49 +869,49 @@ export function AdminDashboard() {
                         ) : null}
                       </div>
                       <div className="mt-4 grid gap-3">
-                        <div className="grid gap-3 sm:grid-cols-2">
-                          <label className="grid gap-2 text-sm font-semibold text-ivory">
+                        <div className="grid gap-4 sm:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+                          <label className="grid min-w-0 gap-2 text-sm font-semibold text-ivory">
                             Code
-                            <input className="focus-ring min-h-11 rounded-md border border-champagne/20 bg-ivory px-3 uppercase text-ink" defaultValue={selectedDiscount?.code || ""} name="code" placeholder="WELCOME10" required />
+                            <input className="focus-ring min-h-11 w-full min-w-0 rounded-md border border-champagne/20 bg-ivory px-3 uppercase text-ink" defaultValue={selectedDiscount?.code || ""} name="code" placeholder="WELCOME10" required />
                           </label>
-                          <label className="grid gap-2 text-sm font-semibold text-ivory">
+                          <label className="grid min-w-0 gap-2 text-sm font-semibold text-ivory">
                             Type
-                            <select className="focus-ring min-h-11 rounded-md border border-champagne/20 bg-ivory px-3 text-ink" defaultValue={selectedDiscount?.discount_type || "percentage"} name="discountType">
+                            <select className="focus-ring min-h-11 w-full min-w-0 rounded-md border border-champagne/20 bg-ivory px-3 text-ink" defaultValue={selectedDiscount?.discount_type || "percentage"} name="discountType">
                               <option value="percentage">Percentage</option>
                               <option value="fixed">Fixed amount</option>
                             </select>
                           </label>
                         </div>
-                        <label className="grid gap-2 text-sm font-semibold text-ivory">
+                        <label className="grid min-w-0 gap-2 text-sm font-semibold text-ivory">
                           Discount name
-                          <input className="focus-ring min-h-11 rounded-md border border-champagne/20 bg-ivory px-3 text-ink" defaultValue={selectedDiscount?.name || ""} name="name" placeholder="New customer welcome" required />
+                          <input className="focus-ring min-h-11 w-full min-w-0 rounded-md border border-champagne/20 bg-ivory px-3 text-ink" defaultValue={selectedDiscount?.name || ""} name="name" placeholder="New customer welcome" required />
                         </label>
-                        <label className="grid gap-2 text-sm font-semibold text-ivory">
+                        <label className="grid min-w-0 gap-2 text-sm font-semibold text-ivory">
                           Description
-                          <textarea className="focus-ring min-h-24 rounded-md border border-champagne/20 bg-ivory px-3 py-3 text-ink" defaultValue={selectedDiscount?.description || ""} name="description" placeholder="Internal note or customer-facing context" />
+                          <textarea className="focus-ring min-h-24 w-full min-w-0 rounded-md border border-champagne/20 bg-ivory px-3 py-3 text-ink" defaultValue={selectedDiscount?.description || ""} name="description" placeholder="Internal note or customer-facing context" />
                         </label>
-                        <div className="grid gap-3 sm:grid-cols-3">
-                          <label className="grid gap-2 text-sm font-semibold text-ivory">
+                        <div className="grid gap-4 sm:grid-cols-3">
+                          <label className="grid min-w-0 gap-2 text-sm font-semibold text-ivory">
                             Value
-                            <input className="focus-ring min-h-11 rounded-md border border-champagne/20 bg-ivory px-3 text-ink" defaultValue={selectedDiscount?.value || ""} min="0" name="value" step="0.01" type="number" required />
+                            <input className="focus-ring min-h-11 w-full min-w-0 rounded-md border border-champagne/20 bg-ivory px-3 text-ink" defaultValue={selectedDiscount?.value || ""} min="0" name="value" step="0.01" type="number" required />
                           </label>
-                          <label className="grid gap-2 text-sm font-semibold text-ivory">
+                          <label className="grid min-w-0 gap-2 text-sm font-semibold text-ivory">
                             Min order
-                            <input className="focus-ring min-h-11 rounded-md border border-champagne/20 bg-ivory px-3 text-ink" defaultValue={selectedDiscount?.minimum_order_amount || ""} min="0" name="minimumOrderAmount" step="0.01" type="number" />
+                            <input className="focus-ring min-h-11 w-full min-w-0 rounded-md border border-champagne/20 bg-ivory px-3 text-ink" defaultValue={selectedDiscount?.minimum_order_amount || ""} min="0" name="minimumOrderAmount" step="0.01" type="number" />
                           </label>
-                          <label className="grid gap-2 text-sm font-semibold text-ivory">
+                          <label className="grid min-w-0 gap-2 text-sm font-semibold text-ivory">
                             Usage limit
-                            <input className="focus-ring min-h-11 rounded-md border border-champagne/20 bg-ivory px-3 text-ink" defaultValue={selectedDiscount?.usage_limit || ""} min="1" name="usageLimit" step="1" type="number" />
+                            <input className="focus-ring min-h-11 w-full min-w-0 rounded-md border border-champagne/20 bg-ivory px-3 text-ink" defaultValue={selectedDiscount?.usage_limit || ""} min="1" name="usageLimit" step="1" type="number" />
                           </label>
                         </div>
-                        <div className="grid gap-3 sm:grid-cols-2">
-                          <label className="grid gap-2 text-sm font-semibold text-ivory">
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <label className="grid min-w-0 gap-2 text-sm font-semibold text-ivory">
                             Starts
-                            <input className="focus-ring min-h-11 rounded-md border border-champagne/20 bg-ivory px-3 text-ink" defaultValue={selectedDiscount?.starts_at?.slice(0, 10) || ""} name="startsAt" type="date" />
+                            <input className="focus-ring min-h-11 w-full min-w-0 rounded-md border border-champagne/20 bg-ivory px-3 text-ink" defaultValue={selectedDiscount?.starts_at?.slice(0, 10) || ""} name="startsAt" type="date" />
                           </label>
-                          <label className="grid gap-2 text-sm font-semibold text-ivory">
+                          <label className="grid min-w-0 gap-2 text-sm font-semibold text-ivory">
                             Ends
-                            <input className="focus-ring min-h-11 rounded-md border border-champagne/20 bg-ivory px-3 text-ink" defaultValue={selectedDiscount?.ends_at?.slice(0, 10) || ""} name="endsAt" type="date" />
+                            <input className="focus-ring min-h-11 w-full min-w-0 rounded-md border border-champagne/20 bg-ivory px-3 text-ink" defaultValue={selectedDiscount?.ends_at?.slice(0, 10) || ""} name="endsAt" type="date" />
                           </label>
                         </div>
                         <label className="flex items-center gap-3 rounded-md border border-champagne/20 bg-ivory/5 px-3 py-3 text-sm font-semibold text-ivory">
