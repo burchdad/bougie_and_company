@@ -187,7 +187,26 @@ export async function syncDiscountToEpos(discount: SiteDiscount, action: "create
   }
 
   if (discount.epos_discount_reason_id && action === "delete") {
-    return eposFetch<Record<string, unknown>>(`DiscountReason/${discount.epos_discount_reason_id}`, { method: "DELETE" });
+    try {
+      return await eposFetch<Record<string, unknown>>(`DiscountReason/${discount.epos_discount_reason_id}`, { method: "DELETE" });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+
+      if (!message.includes("405")) {
+        throw error;
+      }
+
+      const id = Number(discount.epos_discount_reason_id);
+      const archivedName = `DELETED - ${name}`.slice(0, 255);
+      const archivedDescription = `Website discount code ${discount.code} was deleted in Bougie & Company admin.`;
+
+      return tryPayloads(`DiscountReason/${discount.epos_discount_reason_id}`, "PUT", [
+        { Id: id, Name: archivedName, Description: archivedDescription },
+        { Id: id, Name: archivedName },
+        { Id: id, Reason: archivedName, Description: archivedDescription },
+        { Id: id, Reason: archivedName }
+      ]);
+    }
   }
 
   return null;

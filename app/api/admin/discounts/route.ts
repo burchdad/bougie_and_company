@@ -347,7 +347,7 @@ export async function DELETE(request: Request) {
   if (rows[0]) {
     try {
       await syncDiscountToEpos(rows[0] as SiteDiscount, "delete");
-      eposMessage = " Epos discount reason removed.";
+      eposMessage = " Epos discount reason removed or archived.";
     } catch (error) {
       eposMessage = ` Epos delete failed: ${errorMessage(error)}`;
       console.error(eposMessage);
