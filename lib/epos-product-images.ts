@@ -510,7 +510,10 @@ export async function importEposProductImages({ skipExisting = true, limit = 25 
   await ensureProductAdminTables();
 
   const sql = getSql();
-  const blobRepair = await linkExistingBlobImages();
+  const shouldRepairBlobs = process.env.EPOS_IMAGE_REPAIR_BLOBS === "true";
+  const blobRepair = shouldRepairBlobs
+    ? await linkExistingBlobImages()
+    : ({ found: 0, matched: 0, alreadyLinked: 0, linked: 0, unmatched: 0, error: null } satisfies BlobImageRepairResult);
   const products = skipExisting
     ? await sql`
         SELECT p.epos_product_id, p.name, p.sku, p.raw, COUNT(i.id)::int AS image_count
