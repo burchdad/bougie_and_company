@@ -53,6 +53,16 @@ type SiteDiscount = {
   epos_discount_reason_id: string | null;
 };
 
+type ShippingSettings = {
+  origin_postal_code: string;
+  free_shipping_threshold: string;
+  base_rate: string;
+  per_item_rate: string;
+  texas_rate: string;
+  remote_rate: string;
+  epos_shipping_product_id: string | null;
+};
+
 type ProductResponse = {
   ok: boolean;
   products?: AdminProduct[];
@@ -96,6 +106,7 @@ export function AdminDashboard() {
   const [products, setProducts] = useState<AdminProduct[]>([]);
   const [categories, setCategories] = useState<SiteCategory[]>([]);
   const [discounts, setDiscounts] = useState<SiteDiscount[]>([]);
+  const [shippingSettings, setShippingSettings] = useState<ShippingSettings | null>(null);
   const [editingCategoryId, setEditingCategoryId] = useState<number | null>(null);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [editingDiscountId, setEditingDiscountId] = useState<number | null>(null);
@@ -109,6 +120,7 @@ export function AdminDashboard() {
   const [syncingCatalog, setSyncingCatalog] = useState(false);
   const [importingImages, setImportingImages] = useState(false);
   const [repairingStock, setRepairingStock] = useState(false);
+  const [savingShipping, setSavingShipping] = useState(false);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
@@ -188,6 +200,26 @@ export function AdminDashboard() {
     }
   }
 
+  async function loadShippingSettings() {
+    setMessage("");
+
+    try {
+      const response = await fetch("/api/admin/shipping", {
+        headers: adminKey ? { "x-admin-key": adminKey } : {}
+      });
+      const result = (await response.json()) as { ok: boolean; settings?: ShippingSettings; message?: string };
+
+      if (!response.ok || !result.ok) {
+        setMessage(result.message || "Could not load shipping settings.");
+        return;
+      }
+
+      setShippingSettings(result.settings || null);
+    } catch {
+      setMessage("Could not connect to the shipping backend.");
+    }
+  }
+
   const productStats = useMemo(() => {
     const featured = products.filter((product) => product.is_featured).length;
     const hidden = products.filter((product) => product.is_hidden).length;
@@ -247,6 +279,9 @@ export function AdminDashboard() {
     }
     if (isSignedIn && activeTab === "discounts" && discounts.length === 0) {
       loadDiscounts();
+    }
+    if (isSignedIn && activeTab === "shipping" && !shippingSettings) {
+      loadShippingSettings();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, isSignedIn]);
@@ -454,6 +489,42 @@ export function AdminDashboard() {
       await loadDiscounts();
     } catch {
       setMessage("Could not connect to the discount delete backend.");
+    }
+  }
+
+  async function handleShippingSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    setSavingShipping(true);
+    setMessage("");
+
+    try {
+      const response = await fetch("/api/admin/shipping", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(adminKey ? { "x-admin-key": adminKey } : {})
+        },
+        body: JSON.stringify({
+          originPostalCode: String(form.get("originPostalCode") || ""),
+          freeShippingThreshold: String(form.get("freeShippingThreshold") || ""),
+          baseRate: String(form.get("baseRate") || ""),
+          perItemRate: String(form.get("perItemRate") || ""),
+          texasRate: String(form.get("texasRate") || ""),
+          remoteRate: String(form.get("remoteRate") || ""),
+          syncToEpos: true
+        })
+      });
+      const result = (await response.json()) as { ok: boolean; message?: string; settings?: ShippingSettings };
+
+      setMessage(result.message || (result.ok ? "Shipping settings saved." : "Could not save shipping settings."));
+      if (result.ok) {
+        setShippingSettings(result.settings || null);
+      }
+    } catch {
+      setMessage("Could not connect to the shipping save backend.");
+    } finally {
+      setSavingShipping(false);
     }
   }
 
@@ -959,13 +1030,54 @@ export function AdminDashboard() {
                   </div>
                 ) : null}
                 {activeTab === "shipping" ? (
-                  <div className="mt-5 grid gap-4 lg:grid-cols-3">
-                    {["Free shipping threshold", "Returns", "Fulfillment"].map((item) => (
-                      <div className="rounded-lg border border-champagne/25 bg-ink/50 p-5" key={item}>
-                        <p className="font-display text-3xl">{item}</p>
-                        <p className="mt-2 text-sm text-ivory/65">Managed from storefront content until checkout shipping rates are connected.</p>
+                  <div className="mt-5 grid gap-6 xl:grid-cols-[minmax(0,34rem)_minmax(0,1fr)]">
+                    <form className="min-w-0 rounded-lg border border-champagne/25 bg-ink/50 p-6" key={shippingSettings?.epos_shipping_product_id || "shipping-settings"} onSubmit={handleShippingSubmit}>
+                      <p className="font-display text-3xl">Shipping Calculator</p>
+                      <p className="mt-2 text-sm leading-6 text-ivory/65">Customers enter a US shipping address in the cart. The site calculates shipping from these rules and keeps an Epos shipping product ready for checkout orders.</p>
+                      <div className="mt-5 grid gap-4">
+                        <label className="grid min-w-0 gap-2 text-sm font-semibold text-ivory">
+                          Origin ZIP
+                          <input className="focus-ring min-h-11 w-full rounded-md border border-champagne/20 bg-ivory px-3 text-ink" defaultValue={shippingSettings?.origin_postal_code || "75785"} name="originPostalCode" />
+                        </label>
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          <label className="grid min-w-0 gap-2 text-sm font-semibold text-ivory">
+                            Free shipping over
+                            <input className="focus-ring min-h-11 w-full rounded-md border border-champagne/20 bg-ivory px-3 text-ink" defaultValue={shippingSettings?.free_shipping_threshold || "150.00"} min="0" name="freeShippingThreshold" step="0.01" type="number" />
+                          </label>
+                          <label className="grid min-w-0 gap-2 text-sm font-semibold text-ivory">
+                            Standard base rate
+                            <input className="focus-ring min-h-11 w-full rounded-md border border-champagne/20 bg-ivory px-3 text-ink" defaultValue={shippingSettings?.base_rate || "8.95"} min="0" name="baseRate" step="0.01" type="number" />
+                          </label>
+                        </div>
+                        <div className="grid gap-4 sm:grid-cols-3">
+                          <label className="grid min-w-0 gap-2 text-sm font-semibold text-ivory">
+                            Per extra item
+                            <input className="focus-ring min-h-11 w-full rounded-md border border-champagne/20 bg-ivory px-3 text-ink" defaultValue={shippingSettings?.per_item_rate || "1.25"} min="0" name="perItemRate" step="0.01" type="number" />
+                          </label>
+                          <label className="grid min-w-0 gap-2 text-sm font-semibold text-ivory">
+                            Texas rate
+                            <input className="focus-ring min-h-11 w-full rounded-md border border-champagne/20 bg-ivory px-3 text-ink" defaultValue={shippingSettings?.texas_rate || "7.95"} min="0" name="texasRate" step="0.01" type="number" />
+                          </label>
+                          <label className="grid min-w-0 gap-2 text-sm font-semibold text-ivory">
+                            AK / HI rate
+                            <input className="focus-ring min-h-11 w-full rounded-md border border-champagne/20 bg-ivory px-3 text-ink" defaultValue={shippingSettings?.remote_rate || "19.95"} min="0" name="remoteRate" step="0.01" type="number" />
+                          </label>
+                        </div>
+                        <button className="focus-ring w-fit rounded-md bg-champagne px-5 py-3 text-xs font-bold uppercase tracking-[0.16em] text-ink hover:bg-ivory disabled:opacity-60" disabled={savingShipping} type="submit">
+                          {savingShipping ? "Saving" : "Save Shipping"}
+                        </button>
                       </div>
-                    ))}
+                    </form>
+                    <div className="grid content-start gap-4 md:grid-cols-2">
+                      <div className="rounded-lg border border-champagne/25 bg-ink/50 p-5">
+                        <p className="font-display text-3xl">Customer Address</p>
+                        <p className="mt-2 text-sm text-ivory/65">The cart panel now collects street, city, state, ZIP, and country before showing the shipping amount.</p>
+                      </div>
+                      <div className="rounded-lg border border-champagne/25 bg-ink/50 p-5">
+                        <p className="font-display text-3xl">Epos Status</p>
+                        <p className="mt-2 text-sm text-ivory/65">{shippingSettings?.epos_shipping_product_id ? `Website Shipping product ID ${shippingSettings.epos_shipping_product_id}` : "Save settings to create the Website Shipping product in Epos."}</p>
+                      </div>
+                    </div>
                   </div>
                 ) : null}
                 {activeTab === "content" ? (

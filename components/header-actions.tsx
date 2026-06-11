@@ -10,10 +10,19 @@ import { readFormResponse } from "@/lib/form-response";
 type Panel = "search" | "account" | "cart" | null;
 
 type CartItem = {
+  id?: string;
   name: string;
   price: string;
   category: string;
   quantity: number;
+};
+
+type ShippingQuote = {
+  ok: boolean;
+  message: string;
+  shippingAmount: number;
+  serviceName: string;
+  eposShippingProductId?: string | null;
 };
 
 const storageKey = "bougie-cart-preview";
@@ -38,6 +47,9 @@ export function HeaderActions({ showSearch = true, showAccount = true, showCart 
   const [accountMessage, setAccountMessage] = useState("");
   const [accountStatus, setAccountStatus] = useState<"idle" | "error" | "success">("idle");
   const [accountSubmitting, setAccountSubmitting] = useState(false);
+  const [shippingQuote, setShippingQuote] = useState<ShippingQuote | null>(null);
+  const [shippingMessage, setShippingMessage] = useState("");
+  const [shippingLoading, setShippingLoading] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -56,6 +68,8 @@ export function HeaderActions({ showSearch = true, showAccount = true, showCart 
         window.localStorage.setItem(storageKey, JSON.stringify(next));
         return next;
       });
+      setShippingQuote(null);
+      setShippingMessage("");
       setPanel("cart");
     }
 
@@ -75,6 +89,8 @@ export function HeaderActions({ showSearch = true, showAccount = true, showCart 
   const featuredSearches = ["Dresses", "Bath Salts", "Homemade Soaps", "Equine Jewelry", "Gift Certificates"];
   const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
   const subtotal = cartItems.reduce((sum, item) => sum + priceToNumber(item.price) * item.quantity, 0);
+  const shippingAmount = shippingQuote?.ok ? shippingQuote.shippingAmount : 0;
+  const cartTotal = subtotal + shippingAmount;
 
   function removeItem(name: string) {
     setCartItems((current) => {
@@ -82,6 +98,8 @@ export function HeaderActions({ showSearch = true, showAccount = true, showCart 
       window.localStorage.setItem(storageKey, JSON.stringify(next));
       return next;
     });
+    setShippingQuote(null);
+    setShippingMessage("");
   }
 
   async function handleAccountSubmit(event: FormEvent<HTMLFormElement>) {
@@ -129,6 +147,40 @@ export function HeaderActions({ showSearch = true, showAccount = true, showCart 
       formElement.reset();
     } finally {
       setAccountSubmitting(false);
+    }
+  }
+
+  async function handleShippingSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    setShippingLoading(true);
+    setShippingMessage("");
+    setShippingQuote(null);
+
+    try {
+      const response = await fetch("/api/shipping/calculate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subtotal,
+          itemCount: cartCount,
+          address: {
+            address1: String(form.get("address1") || ""),
+            city: String(form.get("city") || ""),
+            state: String(form.get("state") || ""),
+            postalCode: String(form.get("postalCode") || ""),
+            country: String(form.get("country") || "US")
+          }
+        })
+      });
+      const result = (await response.json()) as ShippingQuote;
+
+      setShippingQuote(result);
+      setShippingMessage(result.message || (result.ok ? "Shipping calculated." : "Could not calculate shipping."));
+    } catch {
+      setShippingMessage("Could not connect to the shipping calculator.");
+    } finally {
+      setShippingLoading(false);
     }
   }
 
@@ -232,21 +284,59 @@ export function HeaderActions({ showSearch = true, showAccount = true, showCart 
           <div className="flex flex-1 flex-col overflow-hidden">
             <div className="flex-1 overflow-auto p-5">
               {cartItems.length ? (
-                <div className="grid gap-3">
-                  {cartItems.map((item) => (
-                    <div className="rounded-lg border border-saddle/15 bg-white p-4" key={item.name}>
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <p className="font-display text-2xl text-ink">{item.name}</p>
-                          <p className="text-xs uppercase tracking-[0.18em] text-saddle">{item.category}</p>
-                          <p className="mt-2 text-sm text-espresso/70">Qty {item.quantity} / {item.price}</p>
+                <div className="grid gap-4">
+                  <div className="grid gap-3">
+                    {cartItems.map((item) => (
+                      <div className="rounded-lg border border-saddle/15 bg-white p-4" key={item.name}>
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <p className="font-display text-2xl text-ink">{item.name}</p>
+                            <p className="text-xs uppercase tracking-[0.18em] text-saddle">{item.category}</p>
+                            <p className="mt-2 text-sm text-espresso/70">Qty {item.quantity} / {item.price}</p>
+                          </div>
+                          <button className="focus-ring rounded-full p-2 text-espresso hover:bg-cream" aria-label={`Remove ${item.name}`} onClick={() => removeItem(item.name)} type="button">
+                            <Trash2 className="h-4 w-4" />
+                          </button>
                         </div>
-                        <button className="focus-ring rounded-full p-2 text-espresso hover:bg-cream" aria-label={`Remove ${item.name}`} onClick={() => removeItem(item.name)} type="button">
-                          <Trash2 className="h-4 w-4" />
-                        </button>
                       </div>
+                    ))}
+                  </div>
+                  <form className="rounded-lg border border-saddle/15 bg-white p-4" onSubmit={handleShippingSubmit}>
+                    <p className="font-display text-2xl text-ink">Shipping</p>
+                    <div className="mt-3 grid gap-3">
+                      <label className="grid gap-1 text-xs font-bold uppercase tracking-[0.14em] text-saddle">
+                        Street address
+                        <input className="focus-ring min-h-11 rounded-md border border-saddle/20 bg-ivory px-3 text-sm font-normal normal-case tracking-normal text-ink" name="address1" required />
+                      </label>
+                      <div className="grid gap-3 sm:grid-cols-[1fr_5rem_7rem]">
+                        <label className="grid min-w-0 gap-1 text-xs font-bold uppercase tracking-[0.14em] text-saddle">
+                          City
+                          <input className="focus-ring min-h-11 w-full rounded-md border border-saddle/20 bg-ivory px-3 text-sm font-normal normal-case tracking-normal text-ink" name="city" required />
+                        </label>
+                        <label className="grid min-w-0 gap-1 text-xs font-bold uppercase tracking-[0.14em] text-saddle">
+                          State
+                          <input className="focus-ring min-h-11 w-full rounded-md border border-saddle/20 bg-ivory px-3 text-sm font-normal uppercase tracking-normal text-ink" maxLength={2} name="state" required />
+                        </label>
+                        <label className="grid min-w-0 gap-1 text-xs font-bold uppercase tracking-[0.14em] text-saddle">
+                          ZIP
+                          <input className="focus-ring min-h-11 w-full rounded-md border border-saddle/20 bg-ivory px-3 text-sm font-normal tracking-normal text-ink" name="postalCode" required />
+                        </label>
+                      </div>
+                      <input name="country" type="hidden" value="US" />
+                      <button className="focus-ring rounded-md bg-saddle px-4 py-3 text-xs font-bold uppercase tracking-[0.16em] text-ivory hover:bg-ink disabled:opacity-60" disabled={shippingLoading} type="submit">
+                        {shippingLoading ? "Calculating" : "Calculate Shipping"}
+                      </button>
                     </div>
-                  ))}
+                    {shippingMessage ? <p className={`mt-3 text-sm ${shippingQuote?.ok ? "text-saddle" : "text-ember"}`}>{shippingMessage}</p> : null}
+                    {shippingQuote?.ok ? (
+                      <div className="mt-3 rounded-md border border-saddle/15 bg-cream p-3 text-sm text-espresso">
+                        <div className="flex items-center justify-between font-bold">
+                          <span>{shippingQuote.serviceName}</span>
+                          <span>{shippingQuote.shippingAmount === 0 ? "Free" : `$${shippingQuote.shippingAmount.toFixed(2)}`}</span>
+                        </div>
+                      </div>
+                    ) : null}
+                  </form>
                 </div>
               ) : (
                 <div className="rounded-lg border border-dashed border-saddle/25 bg-white p-6 text-center">
@@ -262,6 +352,14 @@ export function HeaderActions({ showSearch = true, showAccount = true, showCart 
               <div className="flex items-center justify-between font-bold text-ink">
                 <span>Subtotal</span>
                 <span>${subtotal.toFixed(2)}</span>
+              </div>
+              <div className="mt-2 flex items-center justify-between text-sm font-semibold text-espresso/75">
+                <span>Shipping</span>
+                <span>{shippingQuote?.ok ? (shippingAmount === 0 ? "Free" : `$${shippingAmount.toFixed(2)}`) : "Enter address"}</span>
+              </div>
+              <div className="mt-3 flex items-center justify-between border-t border-saddle/15 pt-3 font-bold text-ink">
+                <span>Total</span>
+                <span>${cartTotal.toFixed(2)}</span>
               </div>
               <button className="focus-ring mt-4 w-full rounded-md bg-ink px-5 py-4 text-sm font-bold uppercase tracking-[0.18em] text-ivory hover:bg-saddle" type="button">
                 Checkout Coming Soon
