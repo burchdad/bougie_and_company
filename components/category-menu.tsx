@@ -36,6 +36,18 @@ function normalizeMenuLinks(items: MenuItem[], parentId: string | null = null, s
   });
 }
 
+function categoryIdFromHref(href: string) {
+  return href.split("#")[1] || "all";
+}
+
+function handleCategoryClick(href: string) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.dispatchEvent(new CustomEvent("bougie:shop-category", { detail: { categoryId: categoryIdFromHref(href) } }));
+}
+
 function MenuLink({ item, nested = false }: { item: MenuItem; nested?: boolean }) {
   const [open, setOpen] = useState(false);
   const hasChildren = Boolean(item.children?.length);
@@ -45,6 +57,7 @@ function MenuLink({ item, nested = false }: { item: MenuItem; nested?: boolean }
       <Link
         className={`flex items-center justify-between gap-3 whitespace-nowrap rounded-md px-4 py-3 text-sm font-semibold uppercase tracking-[0.14em] text-espresso hover:bg-cream hover:text-saddle ${nested ? "min-w-56" : ""}`}
         href={item.href}
+        onClick={() => handleCategoryClick(item.href)}
       >
         {item.label}
         {hasChildren ? <ChevronDown className={`h-4 w-4 ${nested ? "-rotate-90" : ""}`} /> : null}
@@ -107,6 +120,7 @@ export function CategoryMenu() {
             <Link
               className="flex items-center justify-between gap-3 whitespace-nowrap rounded-md px-4 py-3 text-sm font-semibold uppercase tracking-[0.14em] text-espresso hover:bg-cream hover:text-saddle"
               href={item.href}
+              onClick={() => handleCategoryClick(item.href)}
             >
               {item.label}
               {hasChildren ? <ChevronDown className="h-4 w-4" /> : null}
@@ -134,14 +148,14 @@ export function CategoryMenu() {
               </summary>
               <div className="grid gap-1 border-t border-saddle/10 p-2">
                 {item.children.map((child) => (
-                  <Link className="rounded-md px-3 py-2 text-sm text-espresso hover:bg-cream" href={child.href} key={child.label}>
+                  <Link className="rounded-md px-3 py-2 text-sm text-espresso hover:bg-cream" href={child.href} key={child.label} onClick={() => handleCategoryClick(child.href)}>
                     {child.label}
                   </Link>
                 ))}
               </div>
             </details>
           ) : (
-            <Link className="rounded-md border border-saddle/15 bg-white px-4 py-3 text-sm font-bold uppercase tracking-[0.14em] text-espresso hover:bg-cream" href={item.href} key={item.label}>
+            <Link className="rounded-md border border-saddle/15 bg-white px-4 py-3 text-sm font-bold uppercase tracking-[0.14em] text-espresso hover:bg-cream" href={item.href} key={item.label} onClick={() => handleCategoryClick(item.href)}>
               {item.label}
             </Link>
           )

@@ -1,11 +1,9 @@
 "use client";
 
 import Image from "next/image";
-import { ShoppingBag, Sparkles } from "lucide-react";
+import { ShoppingBag, Sparkles, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { defaultMenuItems } from "@/lib/category-defaults";
 import { departmentTitle, inferDepartment } from "@/lib/product-categorization";
-import type { CategoryMenuItem } from "@/lib/category-defaults";
 
 type Product = {
   epos_product_id: string;
@@ -38,17 +36,10 @@ type ProductGroup = {
   products: Product[];
 };
 
-type FilterCategory = {
-  id: string;
-  label: string;
-  href: string;
-  depth: number;
-  parentId: string | null;
-};
-
-type CategoryResponse = {
-  ok: boolean;
-  menu?: CategoryMenuItem[];
+type DetailProduct = {
+  product: Product;
+  imageProduct: Product;
+  title: string;
 };
 
 const variantWords = [
@@ -148,36 +139,6 @@ const categoryKeywordMap: Record<string, string[]> = {
   "womens-care": ["women", "week from hell", "bath salt", "body scrub", "bath bomb", "body spray", "chap"],
   "womens-collection": ["women", "dress", "romper", "jumpsuit", "purse", "bath bomb", "body spray", "week from hell"]
 };
-
-function slugify(value: string) {
-  return value.toLowerCase().trim().replace(/&/g, " and ").replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "category";
-}
-
-function hashFromHref(href: string) {
-  const hash = href.split("#")[1];
-  return hash ? slugify(hash) : "";
-}
-
-function uniqueCategoryId(item: CategoryMenuItem, parentId: string | null, seen: Set<string>) {
-  const hrefHash = hashFromHref(item.href);
-  const labelSlug = slugify(item.label);
-  const baseId = parentId && hrefHash === parentId ? labelSlug : hrefHash || labelSlug;
-  const id = seen.has(baseId) && parentId ? `${parentId}-${labelSlug}` : baseId;
-  seen.add(id);
-  return id;
-}
-
-function flattenMenuItems(items: CategoryMenuItem[], depth = 0, parentId: string | null = null, seen = new Set<string>()): FilterCategory[] {
-  return items.flatMap((item) => {
-    const id = uniqueCategoryId(item, parentId, seen);
-    return [
-      { id, label: item.label, href: `/shop#${id}`, depth, parentId },
-      ...flattenMenuItems(item.children || [], depth + 1, id, seen)
-    ];
-  });
-}
-
-const fallbackFilterCategories = flattenMenuItems(defaultMenuItems);
 
 function money(value: string | null) {
   const parsed = Number(value);
@@ -330,8 +291,8 @@ function groupProducts(products: Product[]) {
 export function ShopProducts() {
   const [products, setProducts] = useState<Product[]>([]);
   const [activeDepartment, setActiveDepartment] = useState("all");
-  const [filterCategories, setFilterCategories] = useState<FilterCategory[]>(fallbackFilterCategories);
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
+  const [detailProduct, setDetailProduct] = useState<DetailProduct | null>(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
 
@@ -372,30 +333,6 @@ export function ShopProducts() {
   }, []);
 
   useEffect(() => {
-    let ignore = false;
-
-    async function loadCategories() {
-      try {
-        const response = await fetch("/api/categories", { cache: "no-store" });
-        const result = (await response.json()) as CategoryResponse;
-
-        if (!ignore && result.ok && result.menu?.length) {
-          setFilterCategories(flattenMenuItems(result.menu));
-        }
-      } catch {
-        if (!ignore) {
-          setFilterCategories(fallbackFilterCategories);
-        }
-      }
-    }
-
-    loadCategories();
-    return () => {
-      ignore = true;
-    };
-  }, []);
-
-  useEffect(() => {
     function applyHash() {
       const nextDepartment = window.location.hash.replace("#", "");
       if (!nextDepartment) {
@@ -403,15 +340,26 @@ export function ShopProducts() {
         return;
       }
 
-      if (nextDepartment && filterCategories.some((category) => category.id === nextDepartment)) {
+      if (nextDepartment) {
         setActiveDepartment(nextDepartment);
       }
     }
 
     applyHash();
+    function applyCategoryEvent(event: Event) {
+      const categoryId = (event as CustomEvent<{ categoryId?: string }>).detail?.categoryId || "all";
+      setActiveDepartment(categoryId);
+      window.history.replaceState(null, "", categoryId === "all" ? "/shop" : `/shop#${categoryId}`);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
     window.addEventListener("hashchange", applyHash);
-    return () => window.removeEventListener("hashchange", applyHash);
-  }, [filterCategories]);
+    window.addEventListener("bougie:shop-category", applyCategoryEvent);
+    return () => {
+      window.removeEventListener("hashchange", applyHash);
+      window.removeEventListener("bougie:shop-category", applyCategoryEvent);
+    };
+  }, []);
 
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
@@ -438,6 +386,17 @@ export function ShopProducts() {
       })
     );
   }
+
+  function openProduct(product: Product, title: string, imageProduct = product) {
+    setDetailProduct({ product, imageProduct, title });
+  }
+
+  function closeProduct() {
+    setDetailProduct(null);
+  }
+
+  const detailPrice = detailProduct ? money(detailProduct.product.sale_price) : "";
+  const detailAvailable = detailProduct ? hasAvailableStock(detailProduct.product) : false;
 
   return (
     <div className="mt-10">
@@ -474,13 +433,15 @@ export function ShopProducts() {
 
               return (
                 <article className={`group overflow-hidden rounded-lg border border-saddle/15 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-luxe ${isOutOfStock ? "opacity-90" : ""}`} key={group.key}>
-                  <div className="relative aspect-[4/3] overflow-hidden bg-gradient-to-br from-espresso via-saddle to-ember">
+                  <button className="relative block aspect-[4/3] w-full overflow-hidden bg-gradient-to-br from-espresso via-saddle to-ember text-left" onClick={() => openProduct(product, group.title, imageProduct)} type="button">
                     <div className="absolute inset-0 opacity-30 mix-blend-soft-light luxury-pattern" />
                     {imageProduct.primary_image_url ? (
                       <Image
                         alt={imageProduct.primary_image_alt || imageProduct.marketing_title || imageProduct.name}
-                        className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                        className="absolute inset-0 h-full w-full object-contain transition duration-500 group-hover:scale-105"
                         height={600}
+                        quality={92}
+                        sizes="(min-width: 1280px) 28vw, (min-width: 768px) 42vw, 92vw"
                         src={imageProduct.primary_image_url}
                         width={800}
                       />
@@ -493,10 +454,12 @@ export function ShopProducts() {
                         </span>
                       </div>
                     ) : null}
-                  </div>
+                  </button>
                   <div className="p-5">
                     <p className="text-xs font-bold uppercase tracking-[0.18em] text-saddle">{departmentTitle(getProductDepartment(product))}</p>
-                    <h3 className="mt-2 line-clamp-2 min-h-14 font-display text-2xl leading-tight text-ink">{group.title}</h3>
+                    <button className="mt-2 block text-left" onClick={() => openProduct(product, group.title, imageProduct)} type="button">
+                      <h3 className="line-clamp-2 min-h-14 font-display text-2xl leading-tight text-ink hover:text-saddle">{group.title}</h3>
+                    </button>
                     {hasVariants ? (
                       <label className="mt-4 grid gap-2 text-sm font-semibold text-espresso">
                         Select option
@@ -533,6 +496,55 @@ export function ShopProducts() {
           </div>
         ) : null}
       </div>
+      {detailProduct ? (
+        <div className="fixed inset-0 z-[120] grid place-items-center bg-ink/65 p-4 backdrop-blur-sm" onClick={closeProduct}>
+          <div aria-modal="true" className="max-h-[92vh] w-full max-w-5xl overflow-auto rounded-lg bg-ivory shadow-glow" onClick={(event) => event.stopPropagation()} role="dialog">
+            <div className="flex items-center justify-between border-b border-saddle/15 px-5 py-4">
+              <p className="text-xs font-bold uppercase tracking-[0.22em] text-saddle">Product Details</p>
+              <button className="focus-ring rounded-full p-2 text-espresso hover:bg-cream" aria-label="Close product details" onClick={closeProduct} type="button">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="grid gap-6 p-5 md:grid-cols-[1.1fr_0.9fr] md:p-7">
+              <div className="relative min-h-[22rem] overflow-hidden rounded-lg border border-saddle/15 bg-white">
+                {detailProduct.imageProduct.primary_image_url ? (
+                  <Image
+                    alt={detailProduct.imageProduct.primary_image_alt || detailProduct.imageProduct.marketing_title || detailProduct.imageProduct.name}
+                    className="object-contain"
+                    fill
+                    priority
+                    quality={95}
+                    sizes="(min-width: 768px) 52vw, 92vw"
+                    src={detailProduct.imageProduct.primary_image_url}
+                  />
+                ) : (
+                  <div className="grid h-full min-h-[22rem] place-items-center bg-gradient-to-br from-espresso via-saddle to-ember text-ivory">
+                    <Sparkles className="h-10 w-10 text-champagne" />
+                  </div>
+                )}
+              </div>
+              <div className="self-center">
+                <p className="text-xs font-bold uppercase tracking-[0.2em] text-saddle">{departmentTitle(getProductDepartment(detailProduct.product))}</p>
+                <h2 className="mt-3 font-display text-4xl leading-tight text-ink">{detailProduct.title}</h2>
+                <p className="mt-4 text-2xl font-bold text-espresso">{detailPrice}</p>
+                {detailProduct.product.marketing_description || detailProduct.product.description ? (
+                  <p className="mt-5 text-base leading-7 text-espresso/75">{detailProduct.product.marketing_description || detailProduct.product.description}</p>
+                ) : null}
+                {detailProduct.product.sku ? <p className="mt-4 text-xs font-bold uppercase tracking-[0.18em] text-saddle/75">Style {detailProduct.product.sku}</p> : null}
+                <button
+                  className="focus-ring mt-7 inline-flex w-full items-center justify-center gap-2 rounded-md bg-ink px-5 py-4 text-sm font-bold uppercase tracking-[0.18em] text-ivory hover:bg-saddle disabled:cursor-not-allowed disabled:bg-espresso/30 sm:w-auto"
+                  disabled={detailPrice === "Price in store" || !detailAvailable}
+                  onClick={() => addToCart(detailProduct.product)}
+                  type="button"
+                >
+                  <ShoppingBag className="h-4 w-4" />
+                  {detailAvailable ? "Add To Cart" : "Sold Out"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
