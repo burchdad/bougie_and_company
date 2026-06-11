@@ -424,7 +424,7 @@ export function AdminDashboard() {
           startsAt: String(form.get("startsAt") || ""),
           endsAt: String(form.get("endsAt") || ""),
           isActive: form.get("isActive") === "on",
-          syncToEpos: form.get("syncToEpos") === "on"
+          syncToEpos: true
         })
       });
       const result = (await response.json()) as { ok: boolean; message?: string };
@@ -857,8 +857,17 @@ export function AdminDashboard() {
                 {activeTab === "discounts" ? (
                   <div className="mt-5 grid gap-5 xl:grid-cols-[28rem_1fr]">
                     <form className="rounded-lg border border-champagne/25 bg-ink/50 p-5" key={selectedDiscount?.id || "new-discount"} onSubmit={handleDiscountSubmit}>
-                      <p className="font-display text-3xl">{selectedDiscount ? "Edit Discount" : "Create Discount"}</p>
-                      <p className="mt-2 text-sm leading-6 text-ivory/65">Discount rules are saved in Neon. Turn on Epos sync to create or update the matching Epos discount reason ID.</p>
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-display text-3xl">{selectedDiscount ? "Edit Discount" : "Create Discount"}</p>
+                          <p className="mt-2 text-sm leading-6 text-ivory/65">Discount codes save to Neon and register a matching Epos discount reason automatically.</p>
+                        </div>
+                        {selectedDiscount ? (
+                          <button className="focus-ring rounded-md border border-champagne/40 px-3 py-2 text-xs font-bold uppercase tracking-[0.14em] text-champagne hover:bg-champagne hover:text-ink" onClick={() => setEditingDiscountId(null)} type="button">
+                            New
+                          </button>
+                        ) : null}
+                      </div>
                       <div className="mt-4 grid gap-3">
                         <div className="grid gap-3 sm:grid-cols-2">
                           <label className="grid gap-2 text-sm font-semibold text-ivory">
@@ -909,10 +918,6 @@ export function AdminDashboard() {
                           <input defaultChecked={selectedDiscount ? selectedDiscount.is_active : true} name="isActive" type="checkbox" />
                           Active on website
                         </label>
-                        <label className="flex items-center gap-3 rounded-md border border-champagne/20 bg-ivory/5 px-3 py-3 text-sm font-semibold text-ivory">
-                          <input name="syncToEpos" type="checkbox" />
-                          Sync discount reason to Epos
-                        </label>
                         <div className="flex flex-wrap gap-2 pt-2">
                           <button className="focus-ring rounded-md bg-champagne px-5 py-3 text-xs font-bold uppercase tracking-[0.16em] text-ink hover:bg-ivory" type="submit">
                             {selectedDiscount ? "Save" : "Create"}
@@ -940,7 +945,7 @@ export function AdminDashboard() {
                                 {discount.minimum_order_amount ? ` / min $${Number(discount.minimum_order_amount).toFixed(2)}` : ""}
                               </p>
                               <p className="mt-2 text-xs uppercase tracking-[0.14em] text-ivory/45">
-                                {discount.is_active ? "Active" : "Inactive"} / Epos {discount.epos_discount_reason_id || "not synced"}
+                                {discount.is_active ? "Active" : "Inactive"} / {discount.epos_discount_reason_id ? `Epos ${discount.epos_discount_reason_id}` : "Epos not registered"}
                               </p>
                             </div>
                             <div className="flex gap-2">

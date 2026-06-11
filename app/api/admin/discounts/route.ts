@@ -28,6 +28,14 @@ function eposIdFrom(record: Record<string, unknown> | null) {
   return typeof id === "number" || typeof id === "string" ? String(id) : null;
 }
 
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "Unexpected discount error.";
+}
+
+function isUniqueCodeError(error: unknown) {
+  return errorMessage(error).includes("site_discounts_code_key") || errorMessage(error).toLowerCase().includes("duplicate key");
+}
+
 export async function GET(request: Request) {
   if (!isAdminRequest(request)) {
     return Response.json({ ok: false, message: "Admin access required." }, { status: 401 });
@@ -79,66 +87,91 @@ export async function POST(request: Request) {
     return Response.json({ ok: false, message: "Minimum order and usage limit must be valid numbers." }, { status: 400 });
   }
 
-  await ensureDiscountTables();
-  const sql = getSql();
-  const rows = await sql`
-    INSERT INTO site_discounts (
-      code,
-      name,
-      description,
-      discount_type,
-      value,
-      minimum_order_amount,
-      usage_limit,
-      starts_at,
-      ends_at,
-      is_active
-    )
-    VALUES (
-      ${code},
-      ${name},
-      ${body.description?.trim() || null},
-      ${discountType},
-      ${value},
-      ${minimumOrderAmount},
-      ${usageLimit === null ? null : Math.trunc(usageLimit)},
-      ${parseNullableDate(body.startsAt)},
-      ${parseNullableDate(body.endsAt)},
-      ${body.isActive !== false}
-    )
-    RETURNING id::int,
-      code,
-      name,
-      description,
-      discount_type,
-      value::text,
-      minimum_order_amount::text,
-      usage_limit::int,
-      starts_at::text,
-      ends_at::text,
-      is_active,
-      epos_discount_reason_id,
-      created_at::text,
-      updated_at::text
-  `;
+  try {
+    await ensureDiscountTables();
+    const sql = getSql();
+    const rows = await sql`
+      INSERT INTO site_discounts (
+        code,
+        name,
+        description,
+        discount_type,
+        value,
+        minimum_order_amount,
+        usage_limit,
+        starts_at,
+        ends_at,
+        is_active
+      )
+      VALUES (
+        ${code},
+        ${name},
+        ${body.description?.trim() || null},
+        ${discountType},
+        ${value},
+        ${minimumOrderAmount},
+        ${usageLimit === null ? null : Math.trunc(usageLimit)},
+        ${parseNullableDate(body.startsAt)},
+        ${parseNullableDate(body.endsAt)},
+        ${body.isActive !== false}
+      )
+      RETURNING id::int,
+        code,
+        name,
+        description,
+        discount_type,
+        value::text,
+        minimum_order_amount::text,
+        usage_limit::int,
+        starts_at::text,
+        ends_at::text,
+        is_active,
+        epos_discount_reason_id,
+        created_at::text,
+        updated_at::text
+    `;
 
-  const discount = rows[0] as SiteDiscount;
+    let discount = rows[0] as SiteDiscount;
+    let eposMessage = "";
 
-  if (body.syncToEpos) {
-    const eposDiscount = await syncDiscountToEpos(discount, "create");
-    const eposId = eposIdFrom(eposDiscount);
-    if (eposId) {
-      await sql`
-        UPDATE site_discounts
-        SET epos_discount_reason_id = ${eposId},
-          epos_raw = ${JSON.stringify(eposDiscount)}::jsonb,
-          updated_at = NOW()
-        WHERE id = ${discount.id}
-      `;
+    if (body.syncToEpos !== false) {
+      const eposDiscount = await syncDiscountToEpos(discount, "create");
+      const eposId = eposIdFrom(eposDiscount);
+      if (eposId) {
+        const syncedRows = await sql`
+          UPDATE site_discounts
+          SET epos_discount_reason_id = ${eposId},
+            epos_raw = ${JSON.stringify(eposDiscount)}::jsonb,
+            updated_at = NOW()
+          WHERE id = ${discount.id}
+          RETURNING id::int,
+            code,
+            name,
+            description,
+            discount_type,
+            value::text,
+            minimum_order_amount::text,
+            usage_limit::int,
+            starts_at::text,
+            ends_at::text,
+            is_active,
+            epos_discount_reason_id,
+            created_at::text,
+            updated_at::text
+        `;
+        discount = syncedRows[0] as SiteDiscount;
+        eposMessage = ` Registered in Epos as discount reason ${eposId}.`;
+      } else {
+        eposMessage = " Saved in Neon, but Epos did not return a discount reason ID.";
+      }
     }
-  }
 
-  return Response.json({ ok: true, message: "Discount created." }, { headers: { "Cache-Control": "no-store" } });
+    return Response.json({ ok: true, message: `Discount created.${eposMessage}`, discount }, { headers: { "Cache-Control": "no-store" } });
+  } catch (error) {
+    const message = isUniqueCodeError(error) ? "That discount code already exists." : errorMessage(error);
+    console.error(message);
+    return Response.json({ ok: false, message }, { status: isUniqueCodeError(error) ? 409 : 500, headers: { "Cache-Control": "no-store" } });
+  }
 }
 
 export async function PATCH(request: Request) {
@@ -184,9 +217,10 @@ export async function PATCH(request: Request) {
     return Response.json({ ok: false, message: "Minimum order and usage limit must be valid numbers." }, { status: 400 });
   }
 
-  await ensureDiscountTables();
-  const sql = getSql();
-  const rows = await sql`
+  try {
+    await ensureDiscountTables();
+    const sql = getSql();
+    const rows = await sql`
     UPDATE site_discounts
     SET code = ${code},
       name = ${name},
@@ -216,28 +250,52 @@ export async function PATCH(request: Request) {
       updated_at::text
   `;
 
-  if (!rows.length) {
-    return Response.json({ ok: false, message: "Discount not found." }, { status: 404 });
-  }
-
-  const discount = rows[0] as SiteDiscount;
-
-  if (body.syncToEpos) {
-    const action = discount.epos_discount_reason_id ? "update" : "create";
-    const eposDiscount = await syncDiscountToEpos(discount, action);
-    const eposId = eposIdFrom(eposDiscount);
-    if (eposId) {
-      await sql`
-        UPDATE site_discounts
-        SET epos_discount_reason_id = ${eposId},
-          epos_raw = ${JSON.stringify(eposDiscount)}::jsonb,
-          updated_at = NOW()
-        WHERE id = ${discount.id}
-      `;
+    if (!rows.length) {
+      return Response.json({ ok: false, message: "Discount not found." }, { status: 404 });
     }
-  }
 
-  return Response.json({ ok: true, message: "Discount saved." }, { headers: { "Cache-Control": "no-store" } });
+    let discount = rows[0] as SiteDiscount;
+    let eposMessage = "";
+
+    if (body.syncToEpos !== false) {
+      const action = discount.epos_discount_reason_id ? "update" : "create";
+      const eposDiscount = await syncDiscountToEpos(discount, action);
+      const eposId = eposIdFrom(eposDiscount);
+      if (eposId) {
+        const syncedRows = await sql`
+          UPDATE site_discounts
+          SET epos_discount_reason_id = ${eposId},
+            epos_raw = ${JSON.stringify(eposDiscount)}::jsonb,
+            updated_at = NOW()
+          WHERE id = ${discount.id}
+          RETURNING id::int,
+            code,
+            name,
+            description,
+            discount_type,
+            value::text,
+            minimum_order_amount::text,
+            usage_limit::int,
+            starts_at::text,
+            ends_at::text,
+            is_active,
+            epos_discount_reason_id,
+            created_at::text,
+            updated_at::text
+        `;
+        discount = syncedRows[0] as SiteDiscount;
+        eposMessage = ` Epos discount reason ${eposId} ${action === "create" ? "created" : "updated"}.`;
+      } else {
+        eposMessage = " Saved in Neon, but Epos did not return a discount reason ID.";
+      }
+    }
+
+    return Response.json({ ok: true, message: `Discount saved.${eposMessage}`, discount }, { headers: { "Cache-Control": "no-store" } });
+  } catch (error) {
+    const message = isUniqueCodeError(error) ? "That discount code already exists." : errorMessage(error);
+    console.error(message);
+    return Response.json({ ok: false, message }, { status: isUniqueCodeError(error) ? 409 : 500, headers: { "Cache-Control": "no-store" } });
+  }
 }
 
 export async function DELETE(request: Request) {

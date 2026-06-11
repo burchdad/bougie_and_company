@@ -18,6 +18,18 @@ export type SiteDiscount = {
   updated_at: string;
 };
 
+export type DiscountValidationResult =
+  | {
+      ok: true;
+      discount: SiteDiscount;
+      discountAmount: number;
+      subtotalAfterDiscount: number;
+    }
+  | {
+      ok: false;
+      message: string;
+    };
+
 export async function ensureDiscountTables() {
   const sql = getSql();
   await sql`
@@ -65,18 +77,74 @@ export async function listDiscounts() {
   `) as SiteDiscount[];
 }
 
+export async function getActiveDiscountByCode(codeValue: string) {
+  await ensureDiscountTables();
+  const sql = getSql();
+  const code = normalizeDiscountCode(codeValue);
+  const rows = await sql`
+    SELECT id::int,
+      code,
+      name,
+      description,
+      discount_type,
+      value::text,
+      minimum_order_amount::text,
+      usage_limit::int,
+      starts_at::text,
+      ends_at::text,
+      is_active,
+      epos_discount_reason_id,
+      created_at::text,
+      updated_at::text
+    FROM site_discounts
+    WHERE code = ${code}
+      AND is_active = TRUE
+      AND (starts_at IS NULL OR starts_at <= NOW())
+      AND (ends_at IS NULL OR ends_at >= NOW())
+    LIMIT 1
+  `;
+
+  return (rows[0] as SiteDiscount | undefined) || null;
+}
+
+export async function validateDiscountCode(codeValue: string, subtotalValue = 0): Promise<DiscountValidationResult> {
+  const discount = await getActiveDiscountByCode(codeValue);
+
+  if (!discount) {
+    return { ok: false, message: "Discount code is not active." };
+  }
+
+  const subtotal = Math.max(0, Number(subtotalValue) || 0);
+  const minimumOrderAmount = Number(discount.minimum_order_amount || 0);
+
+  if (minimumOrderAmount > 0 && subtotal < minimumOrderAmount) {
+    return { ok: false, message: `Discount requires a minimum order of $${minimumOrderAmount.toFixed(2)}.` };
+  }
+
+  const value = Number(discount.value || 0);
+  const discountAmount = discount.discount_type === "percentage" ? subtotal * (value / 100) : value;
+  const cappedDiscountAmount = Math.min(subtotal, Math.max(0, discountAmount));
+
+  return {
+    ok: true,
+    discount,
+    discountAmount: Number(cappedDiscountAmount.toFixed(2)),
+    subtotalAfterDiscount: Number(Math.max(0, subtotal - cappedDiscountAmount).toFixed(2))
+  };
+}
+
 export function normalizeDiscountCode(value: string) {
   return value.trim().toUpperCase().replace(/\s+/g, "-");
 }
 
 export function buildDiscountReasonName(discount: Pick<SiteDiscount, "code" | "name" | "discount_type" | "value">) {
   const suffix = discount.discount_type === "percentage" ? `${Number(discount.value)}%` : `$${Number(discount.value).toFixed(2)}`;
-  return `${discount.code} - ${discount.name} (${suffix})`;
+  return `${discount.code} - ${discount.name} (${suffix})`.slice(0, 255);
 }
 
 export async function syncDiscountToEpos(discount: SiteDiscount, action: "create" | "update" | "delete") {
   const name = buildDiscountReasonName(discount);
-  const description = discount.description || "Website discount created from Bougie & Company admin.";
+  const description = `Website discount code: ${discount.code}. ${discount.description || "Created from Bougie & Company admin."}`.slice(0, 1000);
 
   if (action === "create") {
     return eposFetch<Record<string, unknown>>("DiscountReason", {
