@@ -145,23 +145,42 @@ export function buildDiscountReasonName(discount: Pick<SiteDiscount, "code" | "n
 export async function syncDiscountToEpos(discount: SiteDiscount, action: "create" | "update" | "delete") {
   const name = buildDiscountReasonName(discount);
   const description = `Website discount code: ${discount.code}. ${discount.description || "Created from Bougie & Company admin."}`.slice(0, 1000);
+  const createPayloads = [
+    { Name: name, Description: description },
+    { Name: name },
+    { Reason: name, Description: description },
+    { Reason: name },
+    { Description: name }
+  ];
+
+  async function tryPayloads(path: string, method: "POST" | "PUT", payloads: Array<Record<string, unknown>>) {
+    let lastError: unknown;
+
+    for (const payload of payloads) {
+      try {
+        return await eposFetch<Record<string, unknown>>(path, {
+          method,
+          body: JSON.stringify(payload)
+        });
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    throw lastError;
+  }
 
   if (action === "create") {
-    return eposFetch<Record<string, unknown>>("DiscountReason", {
-      method: "POST",
-      body: JSON.stringify({ Name: name, Description: description })
-    });
+    return tryPayloads("DiscountReason", "POST", createPayloads);
   }
 
   if (discount.epos_discount_reason_id && action === "update") {
-    return eposFetch<Record<string, unknown>>(`DiscountReason/${discount.epos_discount_reason_id}`, {
-      method: "PUT",
-      body: JSON.stringify({
-        Id: Number(discount.epos_discount_reason_id),
-        Name: name,
-        Description: description
-      })
-    });
+    const id = Number(discount.epos_discount_reason_id);
+    return tryPayloads(
+      `DiscountReason/${discount.epos_discount_reason_id}`,
+      "PUT",
+      createPayloads.map((payload) => ({ Id: id, ...payload }))
+    );
   }
 
   if (discount.epos_discount_reason_id && action === "delete") {
