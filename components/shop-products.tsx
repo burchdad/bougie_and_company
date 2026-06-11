@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { Search, ShoppingBag, SlidersHorizontal, Sparkles } from "lucide-react";
+import { ShoppingBag, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { defaultMenuItems } from "@/lib/category-defaults";
 import { departmentTitle, inferDepartment } from "@/lib/product-categorization";
@@ -327,38 +327,8 @@ function groupProducts(products: Product[]) {
   }));
 }
 
-function categoryAncestors(category: FilterCategory | undefined, categories: FilterCategory[]) {
-  const byId = new Map(categories.map((item) => [item.id, item]));
-  const ancestors: FilterCategory[] = [];
-  let current = category;
-
-  while (current) {
-    ancestors.unshift(current);
-    current = current.parentId ? byId.get(current.parentId) : undefined;
-  }
-
-  return ancestors;
-}
-
-function categoryDescendants(categoryId: string, categories: FilterCategory[]) {
-  const byParent = new Map<string | null, FilterCategory[]>();
-  categories.forEach((category) => {
-    byParent.set(category.parentId, [...(byParent.get(category.parentId) || []), category]);
-  });
-
-  const collect = (parentId: string, baseDepth: number): FilterCategory[] =>
-    (byParent.get(parentId) || []).flatMap((category) => [
-      { ...category, depth: Math.max(0, category.depth - baseDepth) },
-      ...collect(category.id, baseDepth)
-    ]);
-
-  const parent = categories.find((category) => category.id === categoryId);
-  return parent ? collect(categoryId, parent.depth) : [];
-}
-
 export function ShopProducts() {
   const [products, setProducts] = useState<Product[]>([]);
-  const [query, setQuery] = useState("");
   const [activeDepartment, setActiveDepartment] = useState("all");
   const [filterCategories, setFilterCategories] = useState<FilterCategory[]>(fallbackFilterCategories);
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
@@ -428,6 +398,11 @@ export function ShopProducts() {
   useEffect(() => {
     function applyHash() {
       const nextDepartment = window.location.hash.replace("#", "");
+      if (!nextDepartment) {
+        setActiveDepartment("all");
+        return;
+      }
+
       if (nextDepartment && filterCategories.some((category) => category.id === nextDepartment)) {
         setActiveDepartment(nextDepartment);
       }
@@ -440,19 +415,11 @@ export function ShopProducts() {
 
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
-      const searchable = productSearchText(product);
-      const matchesQuery = !query || searchable.includes(query.toLowerCase());
-      const matchesDepartment = productMatchesFilter(product, activeDepartment);
-      return matchesQuery && matchesDepartment;
+      return productMatchesFilter(product, activeDepartment);
     });
-  }, [activeDepartment, products, query]);
+  }, [activeDepartment, products]);
 
   const filteredGroups = useMemo(() => groupProducts(filteredProducts), [filteredProducts]);
-  const topLevelCategories = useMemo(() => filterCategories.filter((category) => category.depth === 0), [filterCategories]);
-  const activeCategory = activeDepartment === "all" ? undefined : filterCategories.find((category) => category.id === activeDepartment);
-  const activePath = useMemo(() => categoryAncestors(activeCategory, filterCategories), [activeCategory, filterCategories]);
-  const activeRootCategory = activePath[0];
-  const visibleRefinements = useMemo(() => (activeRootCategory ? categoryDescendants(activeRootCategory.id, filterCategories) : []), [activeRootCategory, filterCategories]);
   const isComingSoonCategory = activeDepartment === "tack";
 
   function addToCart(product: Product) {
@@ -473,86 +440,7 @@ export function ShopProducts() {
   }
 
   return (
-    <div className="mt-10 grid gap-6 lg:grid-cols-[18rem_1fr]">
-      <aside className="rounded-lg border border-saddle/15 bg-white/90 p-4 shadow-luxe lg:sticky lg:top-44 lg:self-start">
-        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.22em] text-saddle">
-          <SlidersHorizontal className="h-4 w-4" />
-          Filter
-        </div>
-        <label className="mt-4 grid gap-2 text-sm font-semibold text-espresso">
-          Search products
-          <span className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-saddle" />
-            <input
-              className="focus-ring min-h-11 w-full rounded-md border border-saddle/20 bg-ivory pl-10 pr-3 font-normal"
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Dresses, candles, soaps..."
-              value={query}
-            />
-          </span>
-        </label>
-        <div className="mt-5 grid gap-4">
-          <label className="grid gap-2 text-sm font-semibold text-espresso">
-            Department
-            <select
-              className="focus-ring min-h-11 rounded-md border border-saddle/20 bg-cream px-3 font-bold text-espresso"
-              onChange={(event) => {
-                const nextDepartment = event.target.value;
-                setActiveDepartment(nextDepartment);
-                window.history.replaceState(null, "", nextDepartment === "all" ? "/shop" : `/shop#${nextDepartment}`);
-              }}
-              value={activeRootCategory?.id || "all"}
-            >
-              <option value="all">All Products</option>
-              {topLevelCategories.map((department) => (
-                <option key={department.id} value={department.id}>
-                  {department.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          {activeRootCategory && visibleRefinements.length ? (
-            <label className="grid gap-2 text-sm font-semibold text-espresso">
-              Category
-              <select
-                className="focus-ring min-h-11 rounded-md border border-saddle/20 bg-cream px-3 font-bold text-espresso"
-                onChange={(event) => {
-                  const nextDepartment = event.target.value || activeRootCategory.id;
-                  setActiveDepartment(nextDepartment);
-                  window.history.replaceState(null, "", `/shop#${nextDepartment}`);
-                }}
-                value={activeDepartment === activeRootCategory.id ? "" : activeDepartment}
-              >
-                <option value="">All {activeRootCategory.label}</option>
-                {visibleRefinements.map((department) => (
-                  <option key={department.id} value={department.id}>
-                    {"- ".repeat(Math.max(0, department.depth))}
-                    {department.label}
-                  </option>
-                ))}
-              </select>
-              {activePath.length > 1 ? (
-                <span className="text-xs font-semibold text-espresso/55">{activePath.map((category) => category.label).join(" / ")}</span>
-              ) : null}
-            </label>
-          ) : null}
-
-          {activeDepartment !== "all" ? (
-            <button
-              className="focus-ring rounded-md border border-saddle/20 px-3 py-2 text-center text-xs font-bold uppercase tracking-[0.16em] text-saddle hover:bg-cream"
-              onClick={() => {
-                setActiveDepartment("all");
-                window.history.replaceState(null, "", "/shop");
-              }}
-              type="button"
-            >
-              Clear filter
-            </button>
-          ) : null}
-        </div>
-      </aside>
-
+    <div className="mt-10">
       <div>
         {message ? (
           <div className="mt-5 rounded-lg border border-ember/20 bg-ember/10 p-5 text-sm font-semibold text-ember">{message}</div>
@@ -570,7 +458,7 @@ export function ShopProducts() {
           <div className="mt-5 rounded-lg border border-dashed border-saddle/25 bg-white p-8 text-center">
             <Sparkles className="mx-auto h-8 w-8 text-saddle" />
             <p className="mt-3 font-display text-3xl text-ink">{isComingSoonCategory ? "Coming soon." : "No products found here yet."}</p>
-            <p className="mt-2 text-espresso/70">{isComingSoonCategory ? "Tack products will be added when they are ready." : "Try another department or clear the search."}</p>
+            <p className="mt-2 text-espresso/70">{isComingSoonCategory ? "Tack products will be added when they are ready." : "Try another category from the shop menu."}</p>
           </div>
         ) : null}
 
