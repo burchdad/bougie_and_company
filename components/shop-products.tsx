@@ -453,7 +453,6 @@ export function ShopProducts() {
   const activePath = useMemo(() => categoryAncestors(activeCategory, filterCategories), [activeCategory, filterCategories]);
   const activeRootCategory = activePath[0];
   const visibleRefinements = useMemo(() => (activeRootCategory ? categoryDescendants(activeRootCategory.id, filterCategories) : []), [activeRootCategory, filterCategories]);
-  const activeCategoryLabel = activeDepartment === "all" ? "All Products" : filterCategories.find((category) => category.id === activeDepartment)?.label || departmentTitle(activeDepartment);
   const isComingSoonCategory = activeDepartment === "tack";
 
   function addToCart(product: Product) {
@@ -555,14 +554,6 @@ export function ShopProducts() {
       </aside>
 
       <div>
-        <div className="rounded-lg bg-ink p-5 text-ivory shadow-luxe">
-          <p className="text-xs font-bold uppercase tracking-[0.22em] text-champagne">Now Shopping</p>
-          <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
-            <h2 className="font-display text-4xl">{activeCategoryLabel}</h2>
-            <p className="text-sm font-semibold text-ivory/75">{loading ? "Loading products..." : `${filteredGroups.length} products showing`}</p>
-          </div>
-        </div>
-
         {message ? (
           <div className="mt-5 rounded-lg border border-ember/20 bg-ember/10 p-5 text-sm font-semibold text-ember">{message}</div>
         ) : null}
