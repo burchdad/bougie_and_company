@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { CheckCircle2, Search, ShoppingBag, Trash2, UserRound, X } from "lucide-react";
+import { CheckCircle2, KeyRound, Search, ShoppingBag, Trash2, UserRound, X } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { bestSellers, shopDepartments } from "@/lib/data";
@@ -372,9 +372,15 @@ export function HeaderActions({ showSearch = true, showAccount = true, showCart 
               </button>
             </form>
             {accountMessage ? <p className={`mt-4 text-sm ${accountStatus === "success" ? "text-saddle" : "text-ember"}`}>{accountMessage}</p> : null}
-            <Link className="mt-5 inline-flex text-sm font-bold uppercase tracking-[0.16em] text-saddle hover:text-ink" href="/contact" onClick={() => setPanel(null)}>
-              Need help?
-            </Link>
+            <div className="mt-6 grid gap-3 border-t border-saddle/15 pt-5">
+              <Link className="focus-ring inline-flex items-center justify-center gap-2 rounded-md border border-saddle/20 px-4 py-3 text-xs font-bold uppercase tracking-[0.16em] text-saddle hover:bg-cream hover:text-ink" href="/admin" onClick={() => setPanel(null)}>
+                <KeyRound className="h-4 w-4" />
+                Admin Sign-In
+              </Link>
+              <Link className="inline-flex justify-center text-sm font-bold uppercase tracking-[0.16em] text-saddle hover:text-ink" href="/contact" onClick={() => setPanel(null)}>
+                Need help?
+              </Link>
+            </div>
           </div>
         ) : null}
 

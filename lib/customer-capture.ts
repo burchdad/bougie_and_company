@@ -38,11 +38,17 @@ export async function ensureCustomerCaptureTables() {
     CREATE TABLE IF NOT EXISTS newsletter_subscribers (
       id BIGSERIAL PRIMARY KEY,
       email TEXT NOT NULL UNIQUE,
+      first_name TEXT,
+      last_name TEXT,
       source TEXT NOT NULL DEFAULT 'website',
+      marketing_eligible BOOLEAN NOT NULL DEFAULT TRUE,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `;
+  await sql`ALTER TABLE newsletter_subscribers ADD COLUMN IF NOT EXISTS first_name TEXT`;
+  await sql`ALTER TABLE newsletter_subscribers ADD COLUMN IF NOT EXISTS last_name TEXT`;
+  await sql`ALTER TABLE newsletter_subscribers ADD COLUMN IF NOT EXISTS marketing_eligible BOOLEAN NOT NULL DEFAULT TRUE`;
 
   await sql`
     CREATE TABLE IF NOT EXISTS contact_messages (

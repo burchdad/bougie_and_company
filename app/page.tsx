@@ -2,7 +2,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { Facebook, Instagram, Music2 } from "lucide-react";
 import { AnimatedSection } from "@/components/animated-section";
-import { NewsletterForm } from "@/components/newsletter-form";
 import { ProductShowcase } from "@/components/product-showcase";
 import { ReviewCarousel } from "@/components/review-carousel";
 import { lifestyles, socialLinks } from "@/lib/data";
@@ -124,21 +123,6 @@ export default function HomePage() {
                 <p className="mt-3 text-sm leading-6 text-ivory/68">{text}</p>
               </div>
             ))}
-          </div>
-        </div>
-      </AnimatedSection>
-
-      <AnimatedSection className="bg-ember px-4 py-16 text-ivory sm:px-6 lg:px-8">
-        <div className="mx-auto grid max-w-7xl gap-10 md:grid-cols-[1fr_0.8fr]">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.26em] text-champagne">Newsletter</p>
-            <h2 className="mt-3 font-display text-4xl">Join The Bougie List</h2>
-            <p className="mt-4 max-w-2xl leading-7 text-ivory/78">
-              Be the first to know about new products, special promotions, seasonal collections, and exclusive offers.
-            </p>
-          </div>
-          <div className="self-end">
-            <NewsletterForm />
           </div>
         </div>
       </AnimatedSection>
