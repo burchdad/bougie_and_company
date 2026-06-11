@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import { upload } from "@vercel/blob/client";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Camera, EyeOff, FileText, Gift, KeyRound, LayoutDashboard, Loader2, Package, PackageSearch, Save, Search, Settings, ShoppingBag, Star, Tags, Truck, UploadCloud } from "lucide-react";
 
@@ -122,6 +121,47 @@ function adminStockValue(product: AdminProduct | null | undefined) {
 
 function safeBlobFileName(name: string) {
   return name.replace(/[^a-z0-9._-]/gi, "-").toLowerCase() || "product-photo.jpg";
+}
+
+async function compressImageForUpload(file: File) {
+  const maxUploadBytes = 3.8 * 1024 * 1024;
+
+  if (file.size <= maxUploadBytes) {
+    return file;
+  }
+
+  const imageUrl = URL.createObjectURL(file);
+  try {
+    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const nextImage = new window.Image();
+      nextImage.onload = () => resolve(nextImage);
+      nextImage.onerror = () => reject(new Error("Could not read the selected image."));
+      nextImage.src = imageUrl;
+    });
+
+    const scale = Math.min(1, 1800 / Math.max(image.naturalWidth, image.naturalHeight));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+
+    const context = canvas.getContext("2d");
+    if (!context) {
+      return file;
+    }
+
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+    for (const quality of [0.86, 0.78, 0.7, 0.62]) {
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
+      if (blob && (blob.size <= maxUploadBytes || quality === 0.62)) {
+        return new File([blob], safeBlobFileName(file.name).replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" });
+      }
+    }
+  } finally {
+    URL.revokeObjectURL(imageUrl);
+  }
+
+  return file;
 }
 
 function categoryDepth(category: SiteCategory, categories: SiteCategory[]) {
@@ -655,27 +695,14 @@ export function AdminDashboard() {
     }
 
     try {
-      const pathname = `products/${selectedProduct.epos_product_id}/${Date.now()}-${safeBlobFileName(file.name)}`;
-      const blob = await upload(pathname, file, {
-        access: "public",
-        contentType: file.type,
-        handleUploadUrl: `/api/admin/products/${selectedProduct.epos_product_id}/images`,
-        headers: adminKey ? { "x-admin-key": adminKey } : {},
-        clientPayload: JSON.stringify({ productId: selectedProduct.epos_product_id }),
-        multipart: file.size > 4 * 1024 * 1024
-      });
-
+      const uploadFile = await compressImageForUpload(file);
+      const uploadForm = new FormData();
+      uploadForm.set("file", uploadFile);
+      uploadForm.set("altText", altText);
       const response = await fetch(`/api/admin/products/${selectedProduct.epos_product_id}/images`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          ...(adminKey ? { "x-admin-key": adminKey } : {})
-        },
-        body: JSON.stringify({
-          url: blob.url,
-          pathname: blob.pathname,
-          altText
-        })
+        method: "POST",
+        headers: adminKey ? { "x-admin-key": adminKey } : {},
+        body: uploadForm
       });
       const text = await response.text();
       const result = text ? JSON.parse(text) as { ok: boolean; message?: string } : { ok: false, message: "Image uploaded, but the product record response was empty." };
