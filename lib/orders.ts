@@ -277,6 +277,8 @@ async function tryEposOrder(params: {
   shippingProductId?: string | null;
   total: number;
 }) {
+  const statusNumbers = Array.from({ length: 12 }, (_, index) => index + 1);
+  const statusNames = ["Complete", "Completed", "Paid", "Pending", "Closed", "Processed"];
   const itemLines = params.items.map((item) => ({
     ProductId: Number(item.productId),
     ProductID: Number(item.productId),
@@ -309,11 +311,20 @@ async function tryEposOrder(params: {
     params.payload.notes ? `Customer note: ${params.payload.notes}` : ""
   ].filter(Boolean).join("\n");
   const statusVariants = [
-    { Status: 1, TransactionStatus: 1, TransactionStatusId: 1 },
-    { Status: "Complete", TransactionStatus: "Complete" },
-    { Status: "Completed", TransactionStatus: "Completed" },
-    { Status: "Paid", TransactionStatus: "Paid" },
-    { Status: "Pending", TransactionStatus: "Pending" }
+    ...statusNumbers.map((status) => ({
+      Status: status,
+      StatusId: status,
+      StatusID: status,
+      TransactionStatus: status,
+      TransactionStatusId: status,
+      TransactionStatusID: status
+    })),
+    ...statusNames.map((status) => ({
+      Status: status,
+      StatusId: status,
+      TransactionStatus: status,
+      TransactionStatusId: status
+    }))
   ];
   const base = {
     CustomerId: params.customerId ? Number(params.customerId) : undefined,
@@ -433,8 +444,11 @@ async function syncOrderToEpos(params: {
   shippingAmount: number;
   shippingProductId?: string | null;
   total: number;
+  existingCustomerId?: string | null;
 }) {
-  const customer = await tryEposCustomer(params.payload, params.address);
+  const customer = params.existingCustomerId
+    ? { id: params.existingCustomerId, raw: { Id: Number(params.existingCustomerId), reused: true } }
+    : await tryEposCustomer(params.payload, params.address);
 
   try {
     const order = await tryEposOrder({ ...params, customerId: customer.id });
@@ -461,6 +475,99 @@ async function syncOrderToEpos(params: {
       }
     };
   }
+}
+
+async function loadOrderForRetry(orderId: number) {
+  await ensureOrderTables();
+  const sql = getSql();
+  const rows = await sql`
+    SELECT id::int,
+      order_number,
+      customer_first_name,
+      customer_last_name,
+      customer_email,
+      customer_phone,
+      shipping_address1,
+      shipping_address2,
+      shipping_city,
+      shipping_state,
+      shipping_postal_code,
+      shipping_country,
+      shipping_service,
+      shipping_amount::text,
+      total::text,
+      customer_notes,
+      epos_customer_id
+    FROM site_orders
+    WHERE id = ${orderId}
+  `;
+
+  if (!rows.length) {
+    throw new Error("Order was not found.");
+  }
+
+  const itemRows = await getOrderItems(orderId);
+  const order = rows[0] as Record<string, string | number | null>;
+  return {
+    order,
+    items: itemRows.map((item) => ({
+      productId: item.epos_product_id,
+      name: item.name,
+      sku: item.sku,
+      quantity: item.quantity,
+      unitPrice: Number(item.unit_price),
+      lineTotal: Number(item.line_total)
+    }))
+  };
+}
+
+export async function retryOrderEposSync(orderId: number) {
+  const sql = getSql();
+  const { order, items } = await loadOrderForRetry(orderId);
+  const address: CheckoutAddressInput = {
+    address1: String(order.shipping_address1 || ""),
+    address2: String(order.shipping_address2 || ""),
+    city: String(order.shipping_city || ""),
+    state: String(order.shipping_state || ""),
+    postalCode: String(order.shipping_postal_code || ""),
+    country: String(order.shipping_country || "US")
+  };
+  const payload: CheckoutPayload = {
+    customer: {
+      firstName: String(order.customer_first_name || ""),
+      lastName: String(order.customer_last_name || ""),
+      email: String(order.customer_email || ""),
+      phone: String(order.customer_phone || "")
+    },
+    address,
+    notes: String(order.customer_notes || "")
+  };
+  const settings = await getShippingSettings();
+  const epos = await syncOrderToEpos({
+    orderId,
+    orderNumber: String(order.order_number),
+    payload,
+    address,
+    items,
+    shippingService: String(order.shipping_service || "Website Shipping"),
+    shippingAmount: Number(order.shipping_amount || 0),
+    shippingProductId: settings.epos_shipping_product_id,
+    total: Number(order.total || 0),
+    existingCustomerId: order.epos_customer_id ? String(order.epos_customer_id) : null
+  });
+
+  await sql`
+    UPDATE site_orders
+    SET epos_customer_id = ${epos.customerId},
+      epos_order_id = ${epos.orderId},
+      epos_sync_status = ${epos.ok && epos.orderId ? "synced" : epos.ok ? "submitted" : "failed"},
+      epos_sync_message = ${epos.message},
+      epos_raw = ${JSON.stringify(epos.raw)}::jsonb,
+      updated_at = NOW()
+    WHERE id = ${orderId}
+  `;
+
+  return epos;
 }
 
 export async function submitCheckoutOrder(payload: CheckoutPayload) {
