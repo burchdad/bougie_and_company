@@ -315,6 +315,8 @@ async function tryEposOrder(params: {
     Notes: notes,
     Note: notes,
     Status: "Pending",
+    TransactionStatus: 1,
+    TransactionStatusId: 1,
     Total: params.total,
     TotalAmount: params.total,
     DateTime: new Date().toISOString(),
@@ -333,7 +335,7 @@ async function tryEposOrder(params: {
     { ...base, Lines: itemLines },
     base
   ];
-  const endpoints = ["Order", "Transaction"];
+  const endpoints = ["Transaction"];
   const failures: string[] = [];
 
   for (const endpoint of endpoints) {
@@ -353,6 +355,8 @@ async function tryEposOrder(params: {
       DateTime: new Date().toISOString(),
       TotalAmount: params.total,
       Total: params.total,
+      TransactionStatus: 1,
+      TransactionStatusId: 1,
       Reference: params.orderNumber,
       ReferenceCode: params.orderNumber,
       Notes: notes,
@@ -362,6 +366,8 @@ async function tryEposOrder(params: {
       CustomerId: params.customerId ? Number(params.customerId) : undefined,
       Date: new Date().toISOString(),
       Amount: params.total,
+      TransactionStatus: 1,
+      TransactionStatusId: 1,
       Reference: params.orderNumber,
       Notes: notes
     }
