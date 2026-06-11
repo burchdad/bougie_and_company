@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { upload } from "@vercel/blob/client";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Camera, EyeOff, FileText, Gift, KeyRound, LayoutDashboard, Loader2, Package, PackageSearch, Save, Search, Settings, ShoppingBag, Star, Tags, Truck, UploadCloud } from "lucide-react";
 
@@ -117,6 +118,10 @@ function adminStockValue(product: AdminProduct | null | undefined) {
   const eposStock = Number(product.stock || 0);
   const overrideStock = Number(product.storefront_stock_override || 0);
   return eposStock > 0 ? product.stock || "" : overrideStock > 0 ? product.storefront_stock_override || "" : product.stock || "";
+}
+
+function safeBlobFileName(name: string) {
+  return name.replace(/[^a-z0-9._-]/gi, "-").toLowerCase() || "product-photo.jpg";
 }
 
 function categoryDepth(category: SiteCategory, categories: SiteCategory[]) {
@@ -632,16 +637,48 @@ export function AdminDashboard() {
     }
 
     const form = new FormData(event.currentTarget);
+    const file = form.get("file");
+    const altText = String(form.get("altText") || "").trim();
     setUploading(true);
     setMessage("");
 
+    if (!(file instanceof File)) {
+      setMessage("Choose an image to upload.");
+      setUploading(false);
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      setMessage("Product photos must be image files.");
+      setUploading(false);
+      return;
+    }
+
     try {
-      const response = await fetch(`/api/admin/products/${selectedProduct.epos_product_id}/images`, {
-        method: "POST",
+      const pathname = `products/${selectedProduct.epos_product_id}/${Date.now()}-${safeBlobFileName(file.name)}`;
+      const blob = await upload(pathname, file, {
+        access: "public",
+        contentType: file.type,
+        handleUploadUrl: `/api/admin/products/${selectedProduct.epos_product_id}/images`,
         headers: adminKey ? { "x-admin-key": adminKey } : {},
-        body: form
+        clientPayload: JSON.stringify({ productId: selectedProduct.epos_product_id }),
+        multipart: file.size > 4 * 1024 * 1024
       });
-      const result = (await response.json()) as { ok: boolean; message?: string };
+
+      const response = await fetch(`/api/admin/products/${selectedProduct.epos_product_id}/images`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...(adminKey ? { "x-admin-key": adminKey } : {})
+        },
+        body: JSON.stringify({
+          url: blob.url,
+          pathname: blob.pathname,
+          altText
+        })
+      });
+      const text = await response.text();
+      const result = text ? JSON.parse(text) as { ok: boolean; message?: string } : { ok: false, message: "Image uploaded, but the product record response was empty." };
 
       if (!response.ok || !result.ok) {
         setMessage(result.message || "Could not upload the product photo.");
@@ -651,8 +688,9 @@ export function AdminDashboard() {
       setMessage("Product photo uploaded and set as primary.");
       event.currentTarget.reset();
       await loadProducts(query);
-    } catch {
-      setMessage("Could not connect to Blob storage upload.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not connect to Blob storage upload.";
+      setMessage(message.includes("413") ? "That image is too large for the old upload path. Please try again; direct Blob upload is now enabled." : message);
     } finally {
       setUploading(false);
     }
