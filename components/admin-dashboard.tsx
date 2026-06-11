@@ -140,6 +140,7 @@ export function AdminDashboard() {
   const [importingImages, setImportingImages] = useState(false);
   const [repairingStock, setRepairingStock] = useState(false);
   const [savingShipping, setSavingShipping] = useState(false);
+  const [retryingOrderId, setRetryingOrderId] = useState<number | null>(null);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
@@ -236,6 +237,35 @@ export function AdminDashboard() {
       setOrders(result.orders || []);
     } catch {
       setMessage("Could not connect to the orders backend.");
+    }
+  }
+
+  async function retryOrderSync(orderId: number) {
+    setRetryingOrderId(orderId);
+    setMessage("");
+
+    try {
+      const response = await fetch("/api/admin/orders/retry", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(adminKey ? { "x-admin-key": adminKey } : {})
+        },
+        body: JSON.stringify({ orderId })
+      });
+      const result = (await response.json()) as { ok: boolean; message?: string; eposOrderId?: string | null };
+
+      if (!response.ok || !result.ok) {
+        setMessage(result.message || "Could not retry Epos order sync.");
+        return;
+      }
+
+      setMessage(result.eposOrderId ? `Order synced to Epos as ${result.eposOrderId}.` : result.message || "Order sync retry completed.");
+      await loadOrders();
+    } catch {
+      setMessage("Could not connect to the order sync backend.");
+    } finally {
+      setRetryingOrderId(null);
     }
   }
 
@@ -880,6 +910,16 @@ export function AdminDashboard() {
                             <div className="rounded-md border border-champagne/15 bg-ivory/5 p-3">
                               <p className="text-xs font-bold uppercase tracking-[0.16em] text-champagne">Epos</p>
                               <p className="mt-1 font-semibold text-ivory">{order.epos_order_id ? `Order ${order.epos_order_id}` : order.epos_sync_status}</p>
+                              {!order.epos_order_id ? (
+                                <button
+                                  className="focus-ring mt-3 rounded-md bg-champagne px-3 py-2 text-[0.65rem] font-bold uppercase tracking-[0.14em] text-ink hover:bg-ivory disabled:cursor-wait disabled:opacity-60"
+                                  disabled={retryingOrderId === order.id}
+                                  onClick={() => retryOrderSync(order.id)}
+                                  type="button"
+                                >
+                                  {retryingOrderId === order.id ? "Retrying" : "Retry Epos"}
+                                </button>
+                              ) : null}
                             </div>
                             <div className="rounded-md border border-champagne/15 bg-ivory/5 p-3">
                               <p className="text-xs font-bold uppercase tracking-[0.16em] text-champagne">Status</p>
