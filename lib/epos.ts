@@ -100,7 +100,7 @@ export function getEposString(record: Record<string, unknown>, keys: string[]) {
   return null;
 }
 
-async function eposWriteWithPayloadVariants(path: string, method: "POST" | "PUT", payload: Record<string, unknown>) {
+export async function eposWriteWithPayloadVariants(path: string, method: "POST" | "PUT", payload: Record<string, unknown>) {
   let lastError: unknown;
 
   for (const body of [JSON.stringify([payload]), JSON.stringify(payload)]) {

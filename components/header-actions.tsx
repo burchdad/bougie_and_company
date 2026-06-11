@@ -25,6 +25,27 @@ type ShippingQuote = {
   eposShippingProductId?: string | null;
 };
 
+type ShippingAddress = {
+  address1: string;
+  address2: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  country: string;
+};
+
+type CheckoutResponse = {
+  ok: boolean;
+  message: string;
+  order?: {
+    order_number: string;
+    total: string;
+    epos_order_id: string | null;
+    epos_sync_status: string;
+    epos_sync_message: string | null;
+  };
+};
+
 const storageKey = "bougie-cart-preview";
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -49,7 +70,11 @@ export function HeaderActions({ showSearch = true, showAccount = true, showCart 
   const [accountSubmitting, setAccountSubmitting] = useState(false);
   const [shippingQuote, setShippingQuote] = useState<ShippingQuote | null>(null);
   const [shippingMessage, setShippingMessage] = useState("");
+  const [shippingAddress, setShippingAddress] = useState<ShippingAddress | null>(null);
   const [shippingLoading, setShippingLoading] = useState(false);
+  const [checkoutMessage, setCheckoutMessage] = useState("");
+  const [checkoutStatus, setCheckoutStatus] = useState<"idle" | "error" | "success">("idle");
+  const [checkoutSubmitting, setCheckoutSubmitting] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -70,6 +95,9 @@ export function HeaderActions({ showSearch = true, showAccount = true, showCart 
       });
       setShippingQuote(null);
       setShippingMessage("");
+      setShippingAddress(null);
+      setCheckoutMessage("");
+      setCheckoutStatus("idle");
       setPanel("cart");
     }
 
@@ -100,6 +128,9 @@ export function HeaderActions({ showSearch = true, showAccount = true, showCart 
     });
     setShippingQuote(null);
     setShippingMessage("");
+    setShippingAddress(null);
+    setCheckoutMessage("");
+    setCheckoutStatus("idle");
   }
 
   async function handleAccountSubmit(event: FormEvent<HTMLFormElement>) {
@@ -153,9 +184,20 @@ export function HeaderActions({ showSearch = true, showAccount = true, showCart 
   async function handleShippingSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
+    const nextAddress = {
+      address1: String(form.get("address1") || ""),
+      address2: String(form.get("address2") || ""),
+      city: String(form.get("city") || ""),
+      state: String(form.get("state") || ""),
+      postalCode: String(form.get("postalCode") || ""),
+      country: String(form.get("country") || "US")
+    };
     setShippingLoading(true);
     setShippingMessage("");
     setShippingQuote(null);
+    setShippingAddress(null);
+    setCheckoutMessage("");
+    setCheckoutStatus("idle");
 
     try {
       const response = await fetch("/api/shipping/calculate", {
@@ -164,23 +206,79 @@ export function HeaderActions({ showSearch = true, showAccount = true, showCart 
         body: JSON.stringify({
           subtotal,
           itemCount: cartCount,
-          address: {
-            address1: String(form.get("address1") || ""),
-            city: String(form.get("city") || ""),
-            state: String(form.get("state") || ""),
-            postalCode: String(form.get("postalCode") || ""),
-            country: String(form.get("country") || "US")
-          }
+          address: nextAddress
         })
       });
       const result = (await response.json()) as ShippingQuote;
 
       setShippingQuote(result);
       setShippingMessage(result.message || (result.ok ? "Shipping calculated." : "Could not calculate shipping."));
+      if (result.ok) {
+        setShippingAddress(nextAddress);
+      }
     } catch {
       setShippingMessage("Could not connect to the shipping calculator.");
     } finally {
       setShippingLoading(false);
+    }
+  }
+
+  async function handleCheckoutSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!shippingQuote?.ok || !shippingAddress) {
+      setCheckoutStatus("error");
+      setCheckoutMessage("Calculate shipping before submitting the order.");
+      return;
+    }
+
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    setCheckoutSubmitting(true);
+    setCheckoutStatus("idle");
+    setCheckoutMessage("");
+
+    try {
+      const response = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customer: {
+            firstName: String(form.get("firstName") || ""),
+            lastName: String(form.get("lastName") || ""),
+            email: String(form.get("email") || ""),
+            phone: String(form.get("phone") || "")
+          },
+          address: shippingAddress,
+          notes: String(form.get("notes") || ""),
+          items: cartItems.map((item) => ({
+            id: item.id,
+            name: item.name,
+            quantity: item.quantity
+          }))
+        })
+      });
+      const result = (await response.json()) as CheckoutResponse;
+
+      if (!response.ok || !result.ok) {
+        setCheckoutStatus("error");
+        setCheckoutMessage(result.message || "The order could not be submitted.");
+        return;
+      }
+
+      setCheckoutStatus("success");
+      setCheckoutMessage(result.message);
+      setCartItems([]);
+      window.localStorage.removeItem(storageKey);
+      setShippingQuote(null);
+      setShippingAddress(null);
+      setShippingMessage("");
+      formElement.reset();
+    } catch {
+      setCheckoutStatus("error");
+      setCheckoutMessage("Could not connect to checkout.");
+    } finally {
+      setCheckoutSubmitting(false);
     }
   }
 
@@ -308,6 +406,10 @@ export function HeaderActions({ showSearch = true, showAccount = true, showCart 
                         Street address
                         <input className="focus-ring min-h-11 rounded-md border border-saddle/20 bg-ivory px-3 text-sm font-normal normal-case tracking-normal text-ink" name="address1" required />
                       </label>
+                      <label className="grid gap-1 text-xs font-bold uppercase tracking-[0.14em] text-saddle">
+                        Apt / suite
+                        <input className="focus-ring min-h-11 rounded-md border border-saddle/20 bg-ivory px-3 text-sm font-normal normal-case tracking-normal text-ink" name="address2" />
+                      </label>
                       <div className="grid gap-3 sm:grid-cols-[1fr_5rem_7rem]">
                         <label className="grid min-w-0 gap-1 text-xs font-bold uppercase tracking-[0.14em] text-saddle">
                           City
@@ -337,11 +439,43 @@ export function HeaderActions({ showSearch = true, showAccount = true, showCart 
                       </div>
                     ) : null}
                   </form>
+                  <form className="rounded-lg border border-saddle/15 bg-white p-4" onSubmit={handleCheckoutSubmit}>
+                    <p className="font-display text-2xl text-ink">Checkout</p>
+                    <div className="mt-3 grid gap-3">
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <label className="grid gap-1 text-xs font-bold uppercase tracking-[0.14em] text-saddle">
+                          First name
+                          <input className="focus-ring min-h-11 rounded-md border border-saddle/20 bg-ivory px-3 text-sm font-normal normal-case tracking-normal text-ink" name="firstName" required />
+                        </label>
+                        <label className="grid gap-1 text-xs font-bold uppercase tracking-[0.14em] text-saddle">
+                          Last name
+                          <input className="focus-ring min-h-11 rounded-md border border-saddle/20 bg-ivory px-3 text-sm font-normal normal-case tracking-normal text-ink" name="lastName" required />
+                        </label>
+                      </div>
+                      <label className="grid gap-1 text-xs font-bold uppercase tracking-[0.14em] text-saddle">
+                        Email
+                        <input className="focus-ring min-h-11 rounded-md border border-saddle/20 bg-ivory px-3 text-sm font-normal normal-case tracking-normal text-ink" name="email" required type="email" />
+                      </label>
+                      <label className="grid gap-1 text-xs font-bold uppercase tracking-[0.14em] text-saddle">
+                        Phone
+                        <input className="focus-ring min-h-11 rounded-md border border-saddle/20 bg-ivory px-3 text-sm font-normal normal-case tracking-normal text-ink" name="phone" />
+                      </label>
+                      <label className="grid gap-1 text-xs font-bold uppercase tracking-[0.14em] text-saddle">
+                        Notes
+                        <textarea className="focus-ring min-h-20 rounded-md border border-saddle/20 bg-ivory px-3 py-3 text-sm font-normal normal-case tracking-normal text-ink" name="notes" />
+                      </label>
+                      <button className="focus-ring rounded-md bg-ink px-4 py-3 text-xs font-bold uppercase tracking-[0.16em] text-ivory hover:bg-saddle disabled:opacity-60" disabled={checkoutSubmitting || !shippingQuote?.ok} type="submit">
+                        {checkoutSubmitting ? "Submitting" : "Submit Order"}
+                      </button>
+                    </div>
+                    {checkoutMessage ? <p className={`mt-3 text-sm font-semibold ${checkoutStatus === "success" ? "text-saddle" : "text-ember"}`}>{checkoutMessage}</p> : null}
+                  </form>
                 </div>
               ) : (
                 <div className="rounded-lg border border-dashed border-saddle/25 bg-white p-6 text-center">
                   <ShoppingBag className="mx-auto h-8 w-8 text-saddle" />
-                  <p className="mt-4 font-display text-2xl text-ink">Your cart is empty.</p>
+                  <p className="mt-4 font-display text-2xl text-ink">{checkoutStatus === "success" ? "Order submitted." : "Your cart is empty."}</p>
+                  {checkoutMessage ? <p className={`mt-3 text-sm font-semibold ${checkoutStatus === "success" ? "text-saddle" : "text-ember"}`}>{checkoutMessage}</p> : null}
                   <Link className="mt-4 inline-flex text-sm font-bold uppercase tracking-[0.16em] text-saddle hover:text-ink" href="/shop" onClick={() => setPanel(null)}>
                     Browse the shop
                   </Link>
@@ -361,9 +495,6 @@ export function HeaderActions({ showSearch = true, showAccount = true, showCart 
                 <span>Total</span>
                 <span>${cartTotal.toFixed(2)}</span>
               </div>
-              <button className="focus-ring mt-4 w-full rounded-md bg-ink px-5 py-4 text-sm font-bold uppercase tracking-[0.18em] text-ivory hover:bg-saddle" type="button">
-                Checkout Coming Soon
-              </button>
             </div>
           </div>
         ) : null}

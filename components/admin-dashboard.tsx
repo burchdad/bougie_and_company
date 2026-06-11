@@ -53,6 +53,24 @@ type SiteDiscount = {
   epos_discount_reason_id: string | null;
 };
 
+type SiteOrder = {
+  id: number;
+  order_number: string;
+  status: string;
+  customer_name: string;
+  customer_email: string;
+  customer_phone: string | null;
+  shipping_service: string;
+  subtotal: string;
+  shipping_amount: string;
+  total: string;
+  epos_order_id: string | null;
+  epos_customer_id: string | null;
+  epos_sync_status: string;
+  epos_sync_message: string | null;
+  created_at: string;
+};
+
 type ShippingSettings = {
   origin_postal_code: string;
   free_shipping_threshold: string;
@@ -106,6 +124,7 @@ export function AdminDashboard() {
   const [products, setProducts] = useState<AdminProduct[]>([]);
   const [categories, setCategories] = useState<SiteCategory[]>([]);
   const [discounts, setDiscounts] = useState<SiteDiscount[]>([]);
+  const [orders, setOrders] = useState<SiteOrder[]>([]);
   const [shippingSettings, setShippingSettings] = useState<ShippingSettings | null>(null);
   const [editingCategoryId, setEditingCategoryId] = useState<number | null>(null);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
@@ -200,6 +219,26 @@ export function AdminDashboard() {
     }
   }
 
+  async function loadOrders() {
+    setMessage("");
+
+    try {
+      const response = await fetch("/api/admin/orders", {
+        headers: adminKey ? { "x-admin-key": adminKey } : {}
+      });
+      const result = (await response.json()) as { ok: boolean; orders?: SiteOrder[]; message?: string };
+
+      if (!response.ok || !result.ok) {
+        setMessage(result.message || "Could not load orders.");
+        return;
+      }
+
+      setOrders(result.orders || []);
+    } catch {
+      setMessage("Could not connect to the orders backend.");
+    }
+  }
+
   async function loadShippingSettings() {
     setMessage("");
 
@@ -279,6 +318,9 @@ export function AdminDashboard() {
     }
     if (isSignedIn && activeTab === "discounts" && discounts.length === 0) {
       loadDiscounts();
+    }
+    if (isSignedIn && activeTab === "orders") {
+      loadOrders();
     }
     if (isSignedIn && activeTab === "shipping" && !shippingSettings) {
       loadShippingSettings();
@@ -787,7 +829,7 @@ export function AdminDashboard() {
                   <button className="focus-ring rounded-lg border border-champagne/25 bg-ivory/5 p-5 text-left hover:bg-ivory/10" onClick={() => setActiveTab("orders")} type="button">
                     <ShoppingBag className="h-7 w-7 text-champagne" />
                     <p className="mt-4 font-display text-3xl">Orders</p>
-                    <p className="mt-2 text-sm text-ivory/65">Checkout/order tools will connect here next.</p>
+                    <p className="mt-2 text-sm text-ivory/65">Website checkout submissions, shipping, and Epos sync status.</p>
                   </button>
                   <button className="focus-ring rounded-lg border border-champagne/25 bg-ivory/5 p-5 text-left hover:bg-ivory/10" onClick={() => setActiveTab("settings")} type="button">
                     <Settings className="h-7 w-7 text-champagne" />
@@ -802,16 +844,52 @@ export function AdminDashboard() {
               <div className="min-h-[34rem] rounded-lg border border-champagne/25 bg-ivory/5 p-5">
                 <h2 className="font-display text-4xl">{adminTabs.find((tab) => tab.id === activeTab)?.label}</h2>
                 {activeTab === "orders" ? (
-                  <div className="mt-5 grid gap-4 lg:grid-cols-3">
-                    {["Pending", "Reviewing", "Completed"].map((status) => (
-                      <div className="rounded-lg border border-champagne/25 bg-ink/50 p-4" key={status}>
-                        <div className="flex items-center justify-between">
-                          <p className="text-xs font-bold uppercase tracking-[0.2em] text-champagne">{status}</p>
-                          <span className="rounded-full border border-champagne/40 px-2 text-xs">0</span>
-                        </div>
-                        <div className="mt-4 rounded-md border border-dashed border-champagne/25 p-6 text-center text-sm text-ivory/60">No orders yet</div>
-                      </div>
-                    ))}
+                  <div className="mt-5">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <p className="max-w-3xl text-sm leading-6 text-ivory/70">Orders submitted from the storefront are saved in Neon and sent to Epos with product lines and website shipping.</p>
+                      <button className="focus-ring rounded-md border border-champagne/40 px-4 py-3 text-xs font-bold uppercase tracking-[0.16em] text-champagne hover:bg-champagne hover:text-ink" onClick={loadOrders} type="button">
+                        Refresh
+                      </button>
+                    </div>
+                    <div className="mt-5 grid gap-4">
+                      {!orders.length ? (
+                        <div className="rounded-lg border border-dashed border-champagne/25 bg-ink/50 p-6 text-center text-sm text-ivory/60">No website orders yet.</div>
+                      ) : null}
+                      {orders.map((order) => (
+                        <article className="rounded-lg border border-champagne/25 bg-ink/50 p-4" key={order.id}>
+                          <div className="flex flex-wrap items-start justify-between gap-4">
+                            <div>
+                              <p className="text-xs font-bold uppercase tracking-[0.2em] text-champagne">{order.order_number}</p>
+                              <p className="mt-2 font-display text-3xl">{order.customer_name}</p>
+                              <p className="mt-1 text-sm text-ivory/65">{order.customer_email}{order.customer_phone ? ` / ${order.customer_phone}` : ""}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-display text-3xl">${Number(order.total).toFixed(2)}</p>
+                              <p className="mt-1 text-xs uppercase tracking-[0.16em] text-ivory/55">{new Date(order.created_at).toLocaleString()}</p>
+                            </div>
+                          </div>
+                          <div className="mt-4 grid gap-3 text-sm text-ivory/70 md:grid-cols-4">
+                            <div className="rounded-md border border-champagne/15 bg-ivory/5 p-3">
+                              <p className="text-xs font-bold uppercase tracking-[0.16em] text-champagne">Subtotal</p>
+                              <p className="mt-1 font-semibold text-ivory">${Number(order.subtotal).toFixed(2)}</p>
+                            </div>
+                            <div className="rounded-md border border-champagne/15 bg-ivory/5 p-3">
+                              <p className="text-xs font-bold uppercase tracking-[0.16em] text-champagne">Shipping</p>
+                              <p className="mt-1 font-semibold text-ivory">{order.shipping_service} / ${Number(order.shipping_amount).toFixed(2)}</p>
+                            </div>
+                            <div className="rounded-md border border-champagne/15 bg-ivory/5 p-3">
+                              <p className="text-xs font-bold uppercase tracking-[0.16em] text-champagne">Epos</p>
+                              <p className="mt-1 font-semibold text-ivory">{order.epos_order_id ? `Order ${order.epos_order_id}` : order.epos_sync_status}</p>
+                            </div>
+                            <div className="rounded-md border border-champagne/15 bg-ivory/5 p-3">
+                              <p className="text-xs font-bold uppercase tracking-[0.16em] text-champagne">Status</p>
+                              <p className="mt-1 font-semibold text-ivory">{order.status}</p>
+                            </div>
+                          </div>
+                          {order.epos_sync_message ? <p className="mt-3 text-sm text-champagne">{order.epos_sync_message}</p> : null}
+                        </article>
+                      ))}
+                    </div>
                   </div>
                 ) : null}
                 {activeTab === "categories" ? (
