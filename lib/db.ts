@@ -19,5 +19,5 @@ export function badRequest(message: string) {
 export function serverError(error: unknown) {
   const message = error instanceof Error ? error.message : "Unexpected server error.";
   console.error(message);
-  return Response.json({ ok: false, message: "The form backend is not available yet." }, { status: 500 });
+  return Response.json({ ok: false, message: "We could not save that request right now. Please try again shortly." }, { status: 500 });
 }

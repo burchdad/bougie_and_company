@@ -1,4 +1,5 @@
-import { badRequest, emailPattern, getSql, serverError } from "@/lib/db";
+import { badRequest, emailPattern, serverError } from "@/lib/db";
+import { upsertCustomerAccount } from "@/lib/customer-capture";
 
 export const runtime = "nodejs";
 
@@ -22,15 +23,9 @@ export async function POST(request: Request) {
       return badRequest("Enter a valid email address.");
     }
 
-    const sql = getSql();
-    await sql`
-      INSERT INTO customer_accounts (first_name, last_name, email)
-      VALUES (${firstName}, ${lastName}, ${email})
-      ON CONFLICT (email)
-      DO UPDATE SET first_name = EXCLUDED.first_name, last_name = EXCLUDED.last_name, updated_at = NOW()
-    `;
+    await upsertCustomerAccount({ firstName, lastName, email, source: "account" });
 
-    return Response.json({ ok: true, message: "Account request saved." }, { status: 201, headers: { "Cache-Control": "no-store" } });
+    return Response.json({ ok: true, message: "Account request received. Welcome to Bougie & Company." }, { status: 201, headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     return serverError(error);
   }

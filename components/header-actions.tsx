@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Search, ShoppingBag, Trash2, UserRound, X } from "lucide-react";
+import { CheckCircle2, Search, ShoppingBag, Trash2, UserRound, X } from "lucide-react";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { bestSellers, shopDepartments } from "@/lib/data";
@@ -161,7 +161,7 @@ export function HeaderActions({ showSearch = true, showAccount = true, showCart 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(accountMode === "create" ? { firstName, lastName, email } : { email })
       });
-      const result = await readFormResponse(response, accountMode === "create" ? "Account request saved." : "Sign-in request saved.");
+      const result = await readFormResponse(response, accountMode === "create" ? "Account request received. Welcome to Bougie & Company." : "Account lookup received. We will follow up soon.");
 
       if (!result.ok) {
         setAccountStatus("error");
@@ -267,7 +267,7 @@ export function HeaderActions({ showSearch = true, showAccount = true, showCart 
       }
 
       setCheckoutStatus("success");
-      setCheckoutMessage(result.order?.order_number ? `Order ${result.order.order_number} submitted. Thank you for shopping with us.` : "Order submitted. Thank you for shopping with us.");
+      setCheckoutMessage(result.order?.order_number ? `Thank you for your order. Your confirmation number is ${result.order.order_number}.` : "Thank you for your order. We received it successfully.");
       setCartItems([]);
       window.localStorage.removeItem(storageKey);
       setShippingQuote(null);
@@ -284,7 +284,7 @@ export function HeaderActions({ showSearch = true, showAccount = true, showCart 
 
   const panelMarkup = panel ? (
     <div className="fixed inset-0 z-[100] bg-ink/45 backdrop-blur-sm" onClick={() => setPanel(null)}>
-      <aside className="ml-auto flex h-dvh w-full max-w-md flex-col bg-ivory shadow-glow" onClick={(event) => event.stopPropagation()}>
+      <aside className="ml-auto flex h-dvh w-full max-w-lg flex-col overflow-x-hidden bg-ivory shadow-glow" onClick={(event) => event.stopPropagation()}>
         <div className="flex items-center justify-between border-b border-saddle/15 px-5 py-4">
           <h2 className="font-display text-3xl text-ink">{panel === "search" ? "Search" : panel === "account" ? "Account" : "Cart"}</h2>
           <button className="focus-ring rounded-full p-2 text-espresso hover:bg-cream" aria-label="Close panel" onClick={() => setPanel(null)} type="button">
@@ -380,7 +380,7 @@ export function HeaderActions({ showSearch = true, showAccount = true, showCart 
 
         {panel === "cart" ? (
           <div className="flex flex-1 flex-col overflow-hidden">
-            <div className="flex-1 overflow-auto p-5">
+            <div className="flex-1 overflow-x-hidden overflow-y-auto p-5">
               {cartItems.length ? (
                 <div className="grid gap-4">
                   <div className="grid gap-3">
@@ -402,13 +402,13 @@ export function HeaderActions({ showSearch = true, showAccount = true, showCart 
                   <form className="rounded-lg border border-saddle/15 bg-white p-4" onSubmit={handleShippingSubmit}>
                     <p className="font-display text-2xl text-ink">Shipping</p>
                     <div className="mt-3 grid gap-3">
-                      <label className="grid gap-1 text-xs font-bold uppercase tracking-[0.14em] text-saddle">
+                      <label className="grid min-w-0 gap-1 text-xs font-bold uppercase tracking-[0.14em] text-saddle">
                         Street address
-                        <input className="focus-ring min-h-11 rounded-md border border-saddle/20 bg-ivory px-3 text-sm font-normal normal-case tracking-normal text-ink" name="address1" required />
+                        <input className="focus-ring min-h-11 w-full rounded-md border border-saddle/20 bg-ivory px-3 text-sm font-normal normal-case tracking-normal text-ink" name="address1" required />
                       </label>
-                      <label className="grid gap-1 text-xs font-bold uppercase tracking-[0.14em] text-saddle">
+                      <label className="grid min-w-0 gap-1 text-xs font-bold uppercase tracking-[0.14em] text-saddle">
                         Apt / suite
-                        <input className="focus-ring min-h-11 rounded-md border border-saddle/20 bg-ivory px-3 text-sm font-normal normal-case tracking-normal text-ink" name="address2" />
+                        <input className="focus-ring min-h-11 w-full rounded-md border border-saddle/20 bg-ivory px-3 text-sm font-normal normal-case tracking-normal text-ink" name="address2" />
                       </label>
                       <div className="grid gap-3 sm:grid-cols-[1fr_5rem_7rem]">
                         <label className="grid min-w-0 gap-1 text-xs font-bold uppercase tracking-[0.14em] text-saddle">
@@ -442,27 +442,25 @@ export function HeaderActions({ showSearch = true, showAccount = true, showCart 
                   <form className="rounded-lg border border-saddle/15 bg-white p-4" onSubmit={handleCheckoutSubmit}>
                     <p className="font-display text-2xl text-ink">Checkout</p>
                     <div className="mt-3 grid gap-3">
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <label className="grid gap-1 text-xs font-bold uppercase tracking-[0.14em] text-saddle">
-                          First name
-                          <input className="focus-ring min-h-11 rounded-md border border-saddle/20 bg-ivory px-3 text-sm font-normal normal-case tracking-normal text-ink" name="firstName" required />
-                        </label>
-                        <label className="grid gap-1 text-xs font-bold uppercase tracking-[0.14em] text-saddle">
-                          Last name
-                          <input className="focus-ring min-h-11 rounded-md border border-saddle/20 bg-ivory px-3 text-sm font-normal normal-case tracking-normal text-ink" name="lastName" required />
-                        </label>
-                      </div>
-                      <label className="grid gap-1 text-xs font-bold uppercase tracking-[0.14em] text-saddle">
+                      <label className="grid min-w-0 gap-1 text-xs font-bold uppercase tracking-[0.14em] text-saddle">
+                        First name
+                        <input className="focus-ring min-h-11 w-full rounded-md border border-saddle/20 bg-ivory px-3 text-sm font-normal normal-case tracking-normal text-ink" name="firstName" required />
+                      </label>
+                      <label className="grid min-w-0 gap-1 text-xs font-bold uppercase tracking-[0.14em] text-saddle">
+                        Last name
+                        <input className="focus-ring min-h-11 w-full rounded-md border border-saddle/20 bg-ivory px-3 text-sm font-normal normal-case tracking-normal text-ink" name="lastName" required />
+                      </label>
+                      <label className="grid min-w-0 gap-1 text-xs font-bold uppercase tracking-[0.14em] text-saddle">
                         Email
-                        <input className="focus-ring min-h-11 rounded-md border border-saddle/20 bg-ivory px-3 text-sm font-normal normal-case tracking-normal text-ink" name="email" required type="email" />
+                        <input className="focus-ring min-h-11 w-full rounded-md border border-saddle/20 bg-ivory px-3 text-sm font-normal normal-case tracking-normal text-ink" name="email" required type="email" />
                       </label>
-                      <label className="grid gap-1 text-xs font-bold uppercase tracking-[0.14em] text-saddle">
+                      <label className="grid min-w-0 gap-1 text-xs font-bold uppercase tracking-[0.14em] text-saddle">
                         Phone
-                        <input className="focus-ring min-h-11 rounded-md border border-saddle/20 bg-ivory px-3 text-sm font-normal normal-case tracking-normal text-ink" name="phone" />
+                        <input className="focus-ring min-h-11 w-full rounded-md border border-saddle/20 bg-ivory px-3 text-sm font-normal normal-case tracking-normal text-ink" name="phone" />
                       </label>
-                      <label className="grid gap-1 text-xs font-bold uppercase tracking-[0.14em] text-saddle">
+                      <label className="grid min-w-0 gap-1 text-xs font-bold uppercase tracking-[0.14em] text-saddle">
                         Notes
-                        <textarea className="focus-ring min-h-20 rounded-md border border-saddle/20 bg-ivory px-3 py-3 text-sm font-normal normal-case tracking-normal text-ink" name="notes" />
+                        <textarea className="focus-ring min-h-20 w-full rounded-md border border-saddle/20 bg-ivory px-3 py-3 text-sm font-normal normal-case tracking-normal text-ink" name="notes" />
                       </label>
                       <button className="focus-ring rounded-md bg-ink px-4 py-3 text-xs font-bold uppercase tracking-[0.16em] text-ivory hover:bg-saddle disabled:opacity-60" disabled={checkoutSubmitting || !shippingQuote?.ok} type="submit">
                         {checkoutSubmitting ? "Submitting" : "Submit Order"}
@@ -473,9 +471,10 @@ export function HeaderActions({ showSearch = true, showAccount = true, showCart 
                 </div>
               ) : (
                 <div className="rounded-lg border border-dashed border-saddle/25 bg-white p-6 text-center">
-                  <ShoppingBag className="mx-auto h-8 w-8 text-saddle" />
-                  <p className="mt-4 font-display text-2xl text-ink">{checkoutStatus === "success" ? "Order submitted." : "Your cart is empty."}</p>
+                  {checkoutStatus === "success" ? <CheckCircle2 className="mx-auto h-10 w-10 text-saddle" /> : <ShoppingBag className="mx-auto h-8 w-8 text-saddle" />}
+                  <p className="mt-4 font-display text-2xl text-ink">{checkoutStatus === "success" ? "Thank you for shopping with us." : "Your cart is empty."}</p>
                   {checkoutMessage ? <p className={`mt-3 text-sm font-semibold ${checkoutStatus === "success" ? "text-saddle" : "text-ember"}`}>{checkoutMessage}</p> : null}
+                  {checkoutStatus === "success" ? <p className="mt-2 text-sm leading-6 text-espresso/70">The boutique team will review and prepare your order shortly.</p> : null}
                   <Link className="mt-4 inline-flex text-sm font-bold uppercase tracking-[0.16em] text-saddle hover:text-ink" href="/shop" onClick={() => setPanel(null)}>
                     Browse the shop
                   </Link>

@@ -1,4 +1,5 @@
 import { getSql, emailPattern } from "@/lib/db";
+import { upsertCustomerAccount } from "@/lib/customer-capture";
 import { eposWriteWithPayloadVariants, getEposId } from "@/lib/epos";
 import { calculateShipping, getShippingSettings, type ShippingAddress } from "@/lib/shipping";
 
@@ -604,7 +605,7 @@ export async function submitCheckoutOrder(payload: CheckoutPayload) {
     const quantity = Number(input.quantity || 0);
 
     if (!product) {
-      return { ok: false as const, message: `${input.name || "An item"} is not available in the live EPOS catalog.` };
+      return { ok: false as const, message: `${input.name || "An item"} is not available in the shop right now.` };
     }
 
     const availableStock = displayStock(product);
@@ -686,6 +687,19 @@ export async function submitCheckoutOrder(payload: CheckoutPayload) {
       INSERT INTO site_order_items (order_id, epos_product_id, name, sku, quantity, unit_price, line_total)
       VALUES (${id}, ${item.productId}, ${item.name}, ${item.sku}, ${item.quantity}, ${item.unitPrice}, ${item.lineTotal})
     `;
+  }
+
+  try {
+    await upsertCustomerAccount({
+      firstName,
+      lastName,
+      email,
+      phone: String(payload.customer?.phone || "").trim() || null,
+      source: "checkout",
+      orderNumber: nextOrderNumber
+    });
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : "Customer capture failed.");
   }
 
   try {

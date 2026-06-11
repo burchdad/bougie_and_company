@@ -9,7 +9,7 @@ export async function readFormResponse(response: Response, fallbackMessage: stri
   if (!text) {
     return {
       ok: response.ok,
-      message: response.ok ? fallbackMessage : "The form backend returned an empty response."
+      message: response.ok ? fallbackMessage : "We could not save that request right now. Please try again shortly."
     };
   }
 
@@ -22,7 +22,7 @@ export async function readFormResponse(response: Response, fallbackMessage: stri
   } catch {
     return {
       ok: response.ok,
-      message: response.ok ? fallbackMessage : "The form backend returned an unexpected response."
+      message: response.ok ? fallbackMessage : "We could not save that request right now. Please try again shortly."
     };
   }
 }
