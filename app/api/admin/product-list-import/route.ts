@@ -32,7 +32,7 @@ const canonicalCategories: CategoryNode[] = [
   { label: "Accessories", children: [{ label: "Purses" }, { label: "Luggage" }, { label: "Caps" }, { label: "Coozies" }, { label: "Leather Coasters" }, { label: "Cocktail Infusions" }, { label: "Outdoor" }] },
   { label: "Equine Jewelry", children: [{ label: "Necklaces" }, { label: "Bracelets" }, { label: "Equine Earrings" }] },
   { label: "Men's Collection", slug: "mens-collection", children: [{ label: "T-Shirts" }, { label: "Men's Care", slug: "mens-care" }, { label: "Beard Products" }, { label: "Mechanic Soap" }] },
-  { label: "Women's Collection", slug: "womens-collection", children: [{ label: "Dresses" }, { label: "Tops" }, { label: "Bottoms" }, { label: "Cardigans" }, { label: "Rompers & Jumpsuits" }] },
+  { label: "Women's Collection", slug: "womens-collection", children: [{ label: "Dresses" }, { label: "Tops" }, { label: "Pants" }, { label: "Cardigans" }, { label: "Rompers & Jumpsuits" }] },
   { label: "Bath & Body", children: [{ label: "Bath Bombs" }, { label: "Bath Salts & Scrubs" }, { label: "Body Butter & Lotions" }, { label: "Chap Stick" }, { label: "Body Spray" }, { label: "Clay Mask" }, { label: "Handmade Soap" }, { label: "Week From Hell" }] },
   { label: "Candles", children: [{ label: "Soy 9oz" }, { label: "Soy Wax Melts" }, { label: "Candles & Wax Melts" }] },
   { label: "Home Collection", children: [{ label: "Tea Towels & Pillows" }, { label: "Farm Eggs" }] },
@@ -78,16 +78,17 @@ function publicImageUrl(value: unknown) {
 
 function inferApparelSlug(name: string) {
   const lower = name.toLowerCase();
+  if (lower.includes("draws with piping") || lower.includes("vneck short sleeves draws")) return "dresses";
   if (lower.includes("dress")) return "dresses";
   if (lower.includes("cardigan") || lower.includes("duster")) return "cardigans";
   if (lower.includes("romper") || lower.includes("jumpsuit") || lower.includes("jump suit")) return "rompers-jumpsuits";
-  if (lower.includes("pant") || lower.includes("bottom") || lower.includes("short") || lower.includes("skirt")) return "bottoms";
+  if (lower.includes("pant") || lower.includes("wideleg") || lower.includes("wide leg") || lower.includes("bottom") || lower.includes("short") || lower.includes("skirt")) return "pants";
   return "tops";
 }
 
 function inferEquineSlug(name: string) {
   const lower = name.toLowerCase();
-  if (lower.includes("bracelet")) return "bracelets";
+  if (lower.includes("bracelet") || lower.includes("wrist") || lower.includes("wrap") || lower.includes("magnet")) return "bracelets";
   if (lower.includes("earring") || lower.includes("ear ring")) return "equine-earrings";
   return "necklaces";
 }
@@ -121,6 +122,7 @@ function kitchenSoapSlugsFor(name: string) {
 function categorySlugsFor(row: ImportRow) {
   const category = normalize(row.CategoryId);
   const name = cleanString(row.Name);
+  const sku = normalizeSku(row.Sku);
 
   switch (category) {
     case "apparel":
@@ -161,6 +163,7 @@ function categorySlugsFor(row: ImportRow) {
     case "kitchen homemade dish disk soaps and hand soap":
       return kitchenSoapSlugsFor(name);
     case "leather coasters":
+      if (sku === "BCLC591") return [];
       return ["accessories", "leather-coasters"];
     case "luggage":
       return ["accessories", "luggage"];
@@ -301,10 +304,11 @@ export async function POST(request: Request) {
     const description = cleanString(row.Description) || name;
     const salePrice = numberValue(row.SalePriceExTax) ?? numberValue(row.SalePriceIncTax);
     const sellOnWeb = normalize(row.SellOnWeb) === "yes";
-    const isWebsiteHidden = !sellOnWeb || normalize(row.CategoryId) === "tanning 1month membership";
+    const forceHidden = sku === "BCLC591";
+    const isWebsiteHidden = forceHidden || !sellOnWeb || normalize(row.CategoryId) === "tanning 1month membership";
     const imageUrl = publicImageUrl(row.ImageUrl);
     const assignedSlugs = categorySlugsFor(row);
-    const blockGuessedImageImport = !imageUrl && assignedSlugs.includes("handmade-soap");
+    const blockGuessedImageImport = forceHidden || (!imageUrl && assignedSlugs.includes("handmade-soap"));
     const assignedIds = categoryIdsFor(assignedSlugs, slugToId);
 
     await sql`

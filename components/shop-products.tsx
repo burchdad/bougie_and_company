@@ -95,6 +95,7 @@ const apparelCategorySlugs = new Set([
   "dresses",
   "tops",
   "bottoms",
+  "pants",
   "cardigans",
   "rompers-jumpsuits",
   "t-shirts"
@@ -110,7 +111,10 @@ const categoryKeywordMap: Record<string, string[]> = {
   "body-scrubs": ["body scrub", "scrub"],
   "body-spray": ["body spray", "body sprays"],
   "body-sprays": ["body spray", "body sprays"],
+  bottoms: ["pant", "wideleg", "wide leg", "bottom", "short", "skirt"],
+  bracelets: ["bracelet", "wrist", "wrap", "magnet"],
   "chap-stick": ["chap stick", "chapstick"],
+  cardigans: ["cardigan", "duster"],
   candles: ["candle"],
   "clay-masks": ["clay mask"],
   clothing: ["shirt", "tee", "t-shirt", "top", "bottom", "dress", "romper", "jumpsuit", "cardigan", "jean", "short", "pant", "skirt"],
@@ -146,6 +150,7 @@ const categoryKeywordMap: Record<string, string[]> = {
   necklaces: ["necklace"],
   "outdoor-items": ["outdoor"],
   outdoor: ["outdoor"],
+  pants: ["pant", "wideleg", "wide leg", "bottom", "short", "skirt"],
   purses: ["purse", "bag"],
   regular: ["regular coaster"],
   "rompers-jumpsuits": ["romper", "jumpsuit"],
@@ -228,6 +233,10 @@ function productMatchesFilter(product: Product, filterId: string) {
   if (filterId === "foaming-hand-soap" || filterId === "kitchen-selection-foaming-hand-soap") {
     const haystack = productSearchText(product);
     return product.category_slugs?.includes("kitchen-selection") && haystack.includes("foaming hand");
+  }
+
+  if (filterId === "bottoms") {
+    return product.category_slugs?.includes("pants") || product.category_slugs?.includes("bottoms");
   }
 
   if (product.category_slugs?.includes(filterId)) {
