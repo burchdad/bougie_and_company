@@ -253,6 +253,18 @@ function shouldHideImportedProduct(row: ImportRow) {
   return sku === "BCLC591" || shouldSuppressVariantSku(sku) || name.includes("american flag cotton tea towel") || name.includes("premium loofah");
 }
 
+function shouldSuppressImportedImage(row: ImportRow) {
+  const name = normalize(row.Name);
+  const sku = normalizeSku(row.Sku);
+
+  return (
+    sku === "BCS134" ||
+    name.includes("homemade soap rose bud") ||
+    name.includes("lavender handmade soap") ||
+    name.includes("handmade soap lavender")
+  );
+}
+
 function chooseProductMatch(matches: ProductRow[], name: string, sku: string, alreadyMatched: Set<string>) {
   if (!matches.length) {
     return null;
@@ -348,9 +360,10 @@ export async function POST(request: Request) {
     const isWebsiteHidden = forceHidden || !sellOnWeb || normalize(row.CategoryId) === "tanning 1month membership";
     const assignedSlugs = categorySlugsFor(row);
     const prefersEposImageImport = assignedSlugs.includes("handmade-soap");
-    const imageUrl = prefersEposImageImport ? null : publicImageUrl(row.ImageUrl);
-    const disableFuzzyImageFallback = prefersEposImageImport && !imageUrl;
-    const blockEposImageImport = forceHidden;
+    const suppressImportedImage = shouldSuppressImportedImage(row);
+    const imageUrl = prefersEposImageImport || suppressImportedImage ? null : publicImageUrl(row.ImageUrl);
+    const disableFuzzyImageFallback = (prefersEposImageImport || suppressImportedImage) && !imageUrl;
+    const blockEposImageImport = forceHidden || suppressImportedImage;
     const assignedIds = categoryIdsFor(assignedSlugs, slugToId);
 
     await sql`
