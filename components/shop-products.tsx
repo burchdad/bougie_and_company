@@ -45,6 +45,8 @@ type DetailProduct = {
   group?: ProductGroup;
 };
 
+const mensTshirtSizes = ["Medium", "Large", "XL"];
+
 const variantWords = [
   "xxs",
   "xs",
@@ -204,6 +206,17 @@ function stockCount(value: string | null) {
 
 function hasAvailableStock(product: Product) {
   return stockCount(product.stock) > 0;
+}
+
+function isMensTshirtProduct(product: Product) {
+  const slugs = product.category_slugs || [];
+  const text = `${product.name} ${product.marketing_title || ""} ${product.sku || ""}`.toLowerCase();
+  return slugs.includes("t-shirts") || (slugs.includes("mens-collection") && /\b(t-shirt|tee)\b/i.test(text));
+}
+
+function cartProductName(product: Product, option?: string) {
+  const name = product.marketing_title || product.name;
+  return option ? `${name} - ${option}` : name;
 }
 
 function getProductDepartment(product: Product) {
@@ -561,7 +574,7 @@ export function ShopProducts() {
   const filteredGroups = useMemo(() => groupProducts(filteredProducts), [filteredProducts]);
   const isComingSoonCategory = activeDepartment === "tack";
 
-  function addToCart(product: Product) {
+  function addToCart(product: Product, option?: string) {
     if (!hasAvailableStock(product)) {
       return;
     }
@@ -570,7 +583,7 @@ export function ShopProducts() {
       new CustomEvent("bougie:add-to-cart", {
         detail: {
           id: product.epos_product_id,
-          name: product.marketing_title || product.name,
+          name: cartProductName(product, option),
           price: money(product.sale_price),
           category: departmentTitle(getProductDepartment(product))
         }
@@ -589,6 +602,9 @@ export function ShopProducts() {
   const detailPrice = detailProduct ? money(detailProduct.product.sale_price) : "";
   const detailAvailable = detailProduct ? hasAvailableStock(detailProduct.product) : false;
   const detailHasVariants = Boolean(detailProduct?.group && detailProduct.group.products.length > 1);
+  const detailGroupKey = detailProduct?.group?.key || detailProduct?.product.epos_product_id || "";
+  const detailHasTshirtSizes = Boolean(detailProduct && !detailHasVariants && isMensTshirtProduct(detailProduct.product));
+  const selectedDetailTshirtSize = selectedVariants[detailGroupKey] || mensTshirtSizes[0];
 
   return (
     <div className="mt-10">
@@ -621,6 +637,8 @@ export function ShopProducts() {
               const imageProduct = product.primary_image_url ? product : group.products.find((variant) => variant.primary_image_url) || product;
               const price = money(product.sale_price);
               const hasVariants = group.products.length > 1;
+              const hasTshirtSizes = !hasVariants && isMensTshirtProduct(product);
+              const selectedTshirtSize = selectedVariants[group.key] || mensTshirtSizes[0];
               const isOutOfStock = !hasAvailableStock(product);
 
               return (
@@ -669,12 +687,28 @@ export function ShopProducts() {
                         </select>
                       </label>
                     ) : null}
+                    {hasTshirtSizes ? (
+                      <label className="mt-4 grid gap-2 text-sm font-semibold text-espresso">
+                        Select size
+                        <select
+                          className="focus-ring min-h-11 rounded-md border border-saddle/20 bg-ivory px-3 font-normal"
+                          onChange={(event) => setSelectedVariants((current) => ({ ...current, [group.key]: event.target.value }))}
+                          value={selectedTshirtSize}
+                        >
+                          {mensTshirtSizes.map((size) => (
+                            <option key={size} value={size}>
+                              {size} / {price}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : null}
                     <div className="mt-5 flex items-center justify-between gap-3">
                       <span className="font-bold text-espresso">{price}</span>
                       <button
                         className="focus-ring inline-flex items-center gap-2 rounded-md bg-ink px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] text-ivory hover:bg-saddle disabled:cursor-not-allowed disabled:bg-espresso/30"
                         disabled={price === "Price in store" || isOutOfStock}
-                        onClick={() => addToCart(product)}
+                        onClick={() => addToCart(product, hasTshirtSizes ? selectedTshirtSize : undefined)}
                         type="button"
                       >
                         <ShoppingBag className="h-4 w-4" />
@@ -749,10 +783,26 @@ export function ShopProducts() {
                     </select>
                   </label>
                 ) : null}
+                {detailHasTshirtSizes ? (
+                  <label className="mt-6 grid gap-2 text-sm font-semibold text-espresso">
+                    Select size
+                    <select
+                      className="focus-ring min-h-11 rounded-md border border-saddle/20 bg-white px-3 font-normal"
+                      onChange={(event) => setSelectedVariants((current) => ({ ...current, [detailGroupKey]: event.target.value }))}
+                      value={selectedDetailTshirtSize}
+                    >
+                      {mensTshirtSizes.map((size) => (
+                        <option key={size} value={size}>
+                          {size} / {detailPrice}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : null}
                 <button
                   className="focus-ring mt-7 inline-flex w-full items-center justify-center gap-2 rounded-md bg-ink px-5 py-4 text-sm font-bold uppercase tracking-[0.18em] text-ivory hover:bg-saddle disabled:cursor-not-allowed disabled:bg-espresso/30 sm:w-auto"
                   disabled={detailPrice === "Price in store" || !detailAvailable}
-                  onClick={() => addToCart(detailProduct.product)}
+                  onClick={() => addToCart(detailProduct.product, detailHasTshirtSizes ? selectedDetailTshirtSize : undefined)}
                   type="button"
                 >
                   <ShoppingBag className="h-4 w-4" />

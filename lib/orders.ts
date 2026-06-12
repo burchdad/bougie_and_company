@@ -178,25 +178,27 @@ function orderNumber(id: number) {
 }
 
 function normalizeItems(items: CheckoutItemInput[] | undefined) {
-  const byId = new Map<string, CheckoutItemInput>();
+  const byLine = new Map<string, CheckoutItemInput>();
 
   (items || []).forEach((item) => {
     const id = String(item.id || "").trim();
+    const name = String(item.name || "").trim();
     const quantity = Math.max(0, Math.trunc(Number(item.quantity || 0)));
 
     if (!id || quantity < 1) {
       return;
     }
 
-    const existing = byId.get(id);
-    byId.set(id, {
+    const lineKey = `${id}::${name}`;
+    const existing = byLine.get(lineKey);
+    byLine.set(lineKey, {
       id,
-      name: item.name,
+      name,
       quantity: (existing?.quantity || 0) + quantity
     });
   });
 
-  return [...byId.values()];
+  return [...byLine.values()];
 }
 
 async function loadProducts(productIds: string[]) {
@@ -599,6 +601,12 @@ export async function submitCheckoutOrder(payload: CheckoutPayload) {
   const productRows = await loadProducts(normalizedItems.map((item) => String(item.id)));
   const byId = new Map(productRows.map((product) => [product.epos_product_id, product]));
   const orderItems: OrderItem[] = [];
+  const requestedQuantityById = new Map<string, number>();
+
+  normalizedItems.forEach((item) => {
+    const id = String(item.id);
+    requestedQuantityById.set(id, (requestedQuantityById.get(id) || 0) + Number(item.quantity || 0));
+  });
 
   for (const input of normalizedItems) {
     const product = byId.get(String(input.id));
@@ -609,7 +617,8 @@ export async function submitCheckoutOrder(payload: CheckoutPayload) {
     }
 
     const availableStock = displayStock(product);
-    if (availableStock < quantity) {
+    const requestedQuantity = requestedQuantityById.get(product.epos_product_id) || quantity;
+    if (availableStock < requestedQuantity) {
       return { ok: false as const, message: `${product.name} only has ${availableStock} available.` };
     }
 
@@ -620,7 +629,7 @@ export async function submitCheckoutOrder(payload: CheckoutPayload) {
 
     orderItems.push({
       productId: product.epos_product_id,
-      name: product.name,
+      name: input.name || product.name,
       sku: product.sku,
       quantity,
       unitPrice: money(unitPrice),
