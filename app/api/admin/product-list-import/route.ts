@@ -65,6 +65,12 @@ function isVariantFamilySku(value: unknown) {
   return Boolean(sku && variantFamilySku(sku) && variantFamilySku(sku) !== sku);
 }
 
+function variantSizeKey(value: unknown) {
+  const sku = normalizeSku(value);
+  const match = sku.match(/(?:[-_ ]?)(X[-_ ]?SMALL|XSMALL|X[-_ ]?LARGE|XLARGE|SMALL|MEDIUM|LARGE|XXS|XS|XL|XXL|XXXL|2X|3X|4X|5X|OS)$/i);
+  return match?.[1] ? match[1].replace(/[-_ ]+/g, "").toLowerCase() : "";
+}
+
 function titleWithoutLeadingSku(name: string, sku: string) {
   let title = name;
   if (sku) {
@@ -371,6 +377,7 @@ export async function POST(request: Request) {
 
     const variantFamily = variantFamilySku(sku);
     if (variantFamily && isVariantFamilySku(sku) && isApparelAssignment(assignedSlugs) && assignedIds.length) {
+      const currentSizeKey = variantSizeKey(sku);
       const siblingProducts = products.filter((candidate) => {
         if (candidate.epos_product_id === product.epos_product_id) {
           return false;
@@ -378,8 +385,21 @@ export async function POST(request: Request) {
 
         return variantFamilySku(candidate.sku) === variantFamily;
       });
+      const siblingBySize = new Map<string, ProductRow>();
 
-      for (const sibling of siblingProducts) {
+      siblingProducts.forEach((sibling) => {
+        const sizeKey = variantSizeKey(sibling.sku) || sibling.epos_product_id;
+        if (currentSizeKey && sizeKey === currentSizeKey) {
+          return;
+        }
+
+        const existing = siblingBySize.get(sizeKey);
+        if (!existing || Number(sibling.epos_product_id) > Number(existing.epos_product_id)) {
+          siblingBySize.set(sizeKey, sibling);
+        }
+      });
+
+      for (const sibling of siblingBySize.values()) {
         matchedProductIds.add(sibling.epos_product_id);
 
         await sql`
