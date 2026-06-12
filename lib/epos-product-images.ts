@@ -528,6 +528,7 @@ export async function importEposProductImages({ skipExisting = true, limit = 25 
         FROM epos_products p
         LEFT JOIN product_images i ON i.epos_product_id = p.epos_product_id
         WHERE p.is_deleted = FALSE
+          AND COALESCE(p.raw->>'SkipEposImageImport', 'false') <> 'true'
           AND NOT EXISTS (
             SELECT 1
             FROM product_images existing
@@ -542,6 +543,7 @@ export async function importEposProductImages({ skipExisting = true, limit = 25 
     FROM epos_products p
     LEFT JOIN product_images i ON i.epos_product_id = p.epos_product_id
     WHERE p.is_deleted = FALSE
+      AND COALESCE(p.raw->>'SkipEposImageImport', 'false') <> 'true'
     GROUP BY p.epos_product_id, p.name, p.sku, p.raw
     ORDER BY p.name ASC
         LIMIT ${limit}

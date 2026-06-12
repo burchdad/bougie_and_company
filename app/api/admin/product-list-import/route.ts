@@ -277,7 +277,9 @@ export async function POST(request: Request) {
     const sellOnWeb = normalize(row.SellOnWeb) === "yes";
     const isWebsiteHidden = !sellOnWeb || normalize(row.CategoryId) === "tanning 1month membership";
     const imageUrl = publicImageUrl(row.ImageUrl);
-    const assignedIds = categoryIdsFor(categorySlugsFor(row), slugToId);
+    const assignedSlugs = categorySlugsFor(row);
+    const blockGuessedImageImport = !imageUrl && assignedSlugs.includes("handmade-soap");
+    const assignedIds = categoryIdsFor(assignedSlugs, slugToId);
 
     await sql`
       UPDATE epos_products
@@ -291,7 +293,8 @@ export async function POST(request: Request) {
           Sku: sku || null,
           SalePrice: salePrice,
           SellOnWeb: sellOnWeb ? "yes" : "no",
-          ImageUrl: imageUrl
+          ImageUrl: imageUrl,
+          SkipEposImageImport: blockGuessedImageImport
         })}::jsonb,
         synced_at = NOW()
       WHERE epos_product_id = ${product.epos_product_id}
@@ -328,6 +331,8 @@ export async function POST(request: Request) {
         VALUES (${product.epos_product_id}, ${imageUrl}, NULL, ${name}, 0, TRUE)
       `;
       summary.updatedImages += 1;
+    } else if (blockGuessedImageImport) {
+      await sql`DELETE FROM product_images WHERE epos_product_id = ${product.epos_product_id}`;
     }
 
     if (isWebsiteHidden) {
