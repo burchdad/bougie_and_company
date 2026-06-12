@@ -20,18 +20,16 @@ function hashFromHref(href: string) {
   return hash ? slugify(hash) : "";
 }
 
-function normalizeMenuLinks(items: MenuItem[], parentId: string | null = null, seen = new Set<string>()): MenuItem[] {
+function normalizeMenuLinks(items: MenuItem[]): MenuItem[] {
   return items.map((item) => {
     const hrefHash = hashFromHref(item.href);
     const labelSlug = slugify(item.label);
-    const baseId = parentId && hrefHash === parentId ? labelSlug : hrefHash || labelSlug;
-    const id = seen.has(baseId) && parentId ? `${parentId}-${labelSlug}` : baseId;
-    seen.add(id);
+    const id = hrefHash || labelSlug;
 
     return {
       ...item,
       href: `/shop#${id}`,
-      children: item.children?.length ? normalizeMenuLinks(item.children, id, seen) : undefined
+      children: item.children?.length ? normalizeMenuLinks(item.children) : undefined
     };
   });
 }

@@ -88,7 +88,7 @@ function inferApparelSlug(name: string) {
 function inferEquineSlug(name: string) {
   const lower = name.toLowerCase();
   if (lower.includes("bracelet")) return "bracelets";
-  if (lower.includes("earring")) return "equine-earrings";
+  if (lower.includes("earring") || lower.includes("ear ring")) return "equine-earrings";
   return "necklaces";
 }
 
