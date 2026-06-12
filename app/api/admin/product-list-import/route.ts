@@ -237,6 +237,10 @@ function isApparelAssignment(slugs: string[]) {
   return slugs.some((slug) => ["womens-collection", "mens-collection", "tops", "pants", "cardigans", "dresses", "rompers-jumpsuits", "t-shirts"].includes(slug));
 }
 
+function shouldSuppressVariantSku(value: unknown) {
+  return normalizeSku(value) === "BGA80892X-SMALL";
+}
+
 function chooseProductMatch(matches: ProductRow[], name: string, sku: string, alreadyMatched: Set<string>) {
   if (!matches.length) {
     return null;
@@ -325,7 +329,7 @@ export async function POST(request: Request) {
     const description = cleanString(row.Description) || name;
     const salePrice = numberValue(row.SalePriceExTax) ?? numberValue(row.SalePriceIncTax);
     const sellOnWeb = normalize(row.SellOnWeb) === "yes";
-    const forceHidden = sku === "BCLC591";
+    const forceHidden = sku === "BCLC591" || shouldSuppressVariantSku(sku);
     const isWebsiteHidden = forceHidden || !sellOnWeb || normalize(row.CategoryId) === "tanning 1month membership";
     const imageUrl = publicImageUrl(row.ImageUrl);
     const assignedSlugs = categorySlugsFor(row);
@@ -380,6 +384,10 @@ export async function POST(request: Request) {
       const currentSizeKey = variantSizeKey(sku);
       const siblingProducts = products.filter((candidate) => {
         if (candidate.epos_product_id === product.epos_product_id) {
+          return false;
+        }
+
+        if (shouldSuppressVariantSku(candidate.sku)) {
           return false;
         }
 
