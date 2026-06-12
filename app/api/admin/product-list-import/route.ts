@@ -34,7 +34,7 @@ const canonicalCategories: CategoryNode[] = [
   { label: "Men's Collection", slug: "mens-collection", children: [{ label: "T-Shirts" }, { label: "Men's Care", slug: "mens-care" }, { label: "Beard Products" }, { label: "Mechanic Soap" }] },
   { label: "Women's Collection", slug: "womens-collection", children: [{ label: "Dresses" }, { label: "Tops" }, { label: "Bottoms" }, { label: "Cardigans" }, { label: "Rompers & Jumpsuits" }] },
   { label: "Bath & Body", children: [{ label: "Bath Bombs" }, { label: "Bath Salts & Scrubs" }, { label: "Body Butter & Lotions" }, { label: "Chap Stick" }, { label: "Body Spray" }, { label: "Clay Mask" }, { label: "Handmade Soap" }, { label: "Week From Hell" }] },
-  { label: "Candles", children: [{ label: "Candles & Wax Melts" }] },
+  { label: "Candles", children: [{ label: "Soy 9oz" }, { label: "Soy Wax Melts" }, { label: "Candles & Wax Melts" }] },
   { label: "Home Collection", children: [{ label: "Tea Towels & Pillows" }, { label: "Farm Eggs" }] },
   { label: "Kitchen Selection", children: [{ label: "Dish Soap & Hand Soap" }, { label: "Foaming Hand Soap" }] },
   { label: "Gift Collection", children: [{ label: "Gift Cards" }] },
@@ -92,6 +92,19 @@ function inferEquineSlug(name: string) {
   return "necklaces";
 }
 
+function candleSlugsFor(name: string) {
+  const lower = name.toLowerCase();
+  if (lower.includes("wax melt")) {
+    return ["candles", "soy-wax-melts"];
+  }
+
+  if (lower.includes("9oz") || lower.includes("9 oz")) {
+    return ["candles", "soy-9oz"];
+  }
+
+  return ["candles", "candles-wax-melts"];
+}
+
 function categorySlugsFor(row: ImportRow) {
   const category = normalize(row.CategoryId);
   const name = cleanString(row.Name);
@@ -110,7 +123,7 @@ function categorySlugsFor(row: ImportRow) {
     case "body spray":
       return ["bath-body", "body-spray"];
     case "candles and wax melts":
-      return ["candles", "candles-wax-melts"];
+      return candleSlugsFor(name);
     case "caps":
       return ["accessories", "mens-collection", "caps"];
     case "chap stick":

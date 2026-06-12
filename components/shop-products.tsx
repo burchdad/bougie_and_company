@@ -143,7 +143,9 @@ const categoryKeywordMap: Record<string, string[]> = {
   purses: ["purse", "bag"],
   regular: ["regular coaster"],
   "rompers-jumpsuits": ["romper", "jumpsuit"],
-  "soy-9oz": ["9oz", "9 oz", "soy"],
+  "candles-soy-9oz": ["9oz", "9 oz"],
+  "candles-soy-wax-melts": ["wax melt", "wax melts"],
+  "soy-9oz": ["9oz", "9 oz"],
   "soy-wax-melts": ["wax melt", "wax melts"],
   soaps: ["soap"],
   tack: ["tack", "halter", "lead rope", "bridle", "bit", "reins", "saddle", "spur"],
@@ -200,6 +202,16 @@ function productMatchesFilter(product: Product, filterId: string) {
 
   if (filterId === "tack") {
     return false;
+  }
+
+  if (filterId === "soy-9oz" || filterId === "candles-soy-9oz") {
+    const haystack = productSearchText(product);
+    return product.category_slugs?.includes("candles") && (haystack.includes("9oz") || haystack.includes("9 oz")) && !haystack.includes("wax melt");
+  }
+
+  if (filterId === "soy-wax-melts" || filterId === "candles-soy-wax-melts") {
+    const haystack = productSearchText(product);
+    return product.category_slugs?.includes("candles") && (haystack.includes("wax melt") || haystack.includes("wax melts"));
   }
 
   if (product.category_slugs?.includes(filterId)) {
