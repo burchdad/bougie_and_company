@@ -2,7 +2,8 @@
 
 import Image from "next/image";
 import { ShoppingBag, Sparkles, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { readFormResponse } from "@/lib/form-response";
 import { departmentTitle, inferDepartment } from "@/lib/product-categorization";
 
 type Product = {
@@ -46,6 +47,130 @@ type DetailProduct = {
 };
 
 const mensTshirtSizes = ["Medium", "Large", "XL"];
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function GiftBasketRequestForm() {
+  const [message, setMessage] = useState("");
+  const [status, setStatus] = useState<"idle" | "error" | "success">("idle");
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    const firstName = String(form.get("firstName") || "").trim();
+    const lastName = String(form.get("lastName") || "").trim();
+    const email = String(form.get("email") || "").trim();
+    const phone = String(form.get("phone") || "").trim();
+    const occasion = String(form.get("occasion") || "").trim();
+    const budget = String(form.get("budget") || "").trim();
+    const recipient = String(form.get("recipient") || "").trim();
+    const details = String(form.get("details") || "").trim();
+
+    if (!firstName || !lastName || !email || !occasion || !budget || !details) {
+      setStatus("error");
+      setMessage("Please fill out the required fields.");
+      return;
+    }
+
+    if (!emailPattern.test(email)) {
+      setStatus("error");
+      setMessage("Enter a valid email address.");
+      return;
+    }
+
+    setSubmitting(true);
+    setStatus("idle");
+    setMessage("");
+
+    try {
+      const response = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          firstName,
+          lastName,
+          email,
+          phone,
+          subject: "Custom gift basket request",
+          source: "gift-collection",
+          message: [
+            "Custom gift basket request",
+            "",
+            `Occasion: ${occasion}`,
+            `Budget: ${budget}`,
+            recipient ? `Recipient: ${recipient}` : "",
+            "",
+            details
+          ].filter(Boolean).join("\n")
+        })
+      });
+      const result = await readFormResponse(response, "Thank you. Your gift basket request has been sent.");
+
+      if (!result.ok) {
+        setStatus("error");
+        setMessage(result.message || "We could not send your request yet.");
+        return;
+      }
+
+      formElement.reset();
+      setStatus("success");
+      setMessage(result.message || "Thank you. Your gift basket request has been sent.");
+    } catch {
+      setStatus("error");
+      setMessage("We could not send your request right now. Please try again shortly.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <form className="mt-6 grid gap-4 text-left" onSubmit={handleSubmit}>
+      <div className="grid gap-4 md:grid-cols-2">
+        <label className="grid gap-2 text-sm font-semibold text-espresso">
+          First name
+          <input className="focus-ring min-h-12 rounded-md border border-saddle/20 bg-ivory px-3 font-normal" name="firstName" required />
+        </label>
+        <label className="grid gap-2 text-sm font-semibold text-espresso">
+          Last name
+          <input className="focus-ring min-h-12 rounded-md border border-saddle/20 bg-ivory px-3 font-normal" name="lastName" required />
+        </label>
+      </div>
+      <div className="grid gap-4 md:grid-cols-2">
+        <label className="grid gap-2 text-sm font-semibold text-espresso">
+          Email
+          <input className="focus-ring min-h-12 rounded-md border border-saddle/20 bg-ivory px-3 font-normal" name="email" required type="email" />
+        </label>
+        <label className="grid gap-2 text-sm font-semibold text-espresso">
+          Phone
+          <input className="focus-ring min-h-12 rounded-md border border-saddle/20 bg-ivory px-3 font-normal" name="phone" />
+        </label>
+      </div>
+      <div className="grid gap-4 md:grid-cols-3">
+        <label className="grid gap-2 text-sm font-semibold text-espresso">
+          Occasion
+          <input className="focus-ring min-h-12 rounded-md border border-saddle/20 bg-ivory px-3 font-normal" name="occasion" placeholder="Birthday, thank you..." required />
+        </label>
+        <label className="grid gap-2 text-sm font-semibold text-espresso">
+          Budget
+          <input className="focus-ring min-h-12 rounded-md border border-saddle/20 bg-ivory px-3 font-normal" name="budget" placeholder="$50, $100..." required />
+        </label>
+        <label className="grid gap-2 text-sm font-semibold text-espresso">
+          Recipient
+          <input className="focus-ring min-h-12 rounded-md border border-saddle/20 bg-ivory px-3 font-normal" name="recipient" placeholder="For her, teacher..." />
+        </label>
+      </div>
+      <label className="grid gap-2 text-sm font-semibold text-espresso">
+        What should we include?
+        <textarea className="focus-ring min-h-32 rounded-md border border-saddle/20 bg-ivory px-3 py-3 font-normal" name="details" placeholder="Tell us preferred scents, colors, items, allergies, pickup/shipping timing, or anything special." required />
+      </label>
+      <button className="focus-ring justify-self-start rounded-md bg-ink px-6 py-4 text-sm font-bold uppercase tracking-[0.18em] text-ivory hover:bg-saddle disabled:opacity-60" disabled={submitting} type="submit">
+        {submitting ? "Sending..." : "Request Gift Basket"}
+      </button>
+      {message ? <p className={`text-sm font-semibold ${status === "success" ? "text-saddle" : "text-ember"}`}>{message}</p> : null}
+    </form>
+  );
+}
 
 const variantWords = [
   "xxs",
@@ -638,6 +763,7 @@ export function ShopProducts() {
                 ? "Please contact us and we will help create a custom gift basket for your occasion."
                 : "Try another category from the shop menu."}
             </p>
+            {isGiftCollectionCategory ? <GiftBasketRequestForm /> : null}
           </div>
         ) : null}
 
