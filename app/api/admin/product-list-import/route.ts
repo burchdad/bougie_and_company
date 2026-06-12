@@ -54,6 +54,17 @@ function normalizeSku(value: unknown) {
   return cleanString(value).toUpperCase().replace(/\s+/g, "");
 }
 
+function variantFamilySku(value: unknown) {
+  return normalizeSku(value)
+    .replace(/(?:[-_ ]?X[-_ ]?SMALL|[-_ ]?XSMALL|[-_ ]?X[-_ ]?LARGE|[-_ ]?XLARGE|[-_ ]?SMALL|[-_ ]?MEDIUM|[-_ ]?LARGE|[-_ ]?XXS|[-_ ]?XS|[-_ ]?XL|[-_ ]?XXL|[-_ ]?XXXL|[-_ ]?2X|[-_ ]?3X|[-_ ]?4X|[-_ ]?5X|[-_ ]?OS)$/i, "")
+    .trim();
+}
+
+function isVariantFamilySku(value: unknown) {
+  const sku = normalizeSku(value);
+  return Boolean(sku && variantFamilySku(sku) && variantFamilySku(sku) !== sku);
+}
+
 function titleWithoutLeadingSku(name: string, sku: string) {
   let title = name;
   if (sku) {
@@ -216,6 +227,10 @@ function categoryIdsFor(slugs: string[], slugToId: Map<string, number>) {
   return [...new Set(slugs.map((slug) => slugToId.get(slug)).filter((id): id is number => Number.isFinite(id)))];
 }
 
+function isApparelAssignment(slugs: string[]) {
+  return slugs.some((slug) => ["womens-collection", "mens-collection", "tops", "pants", "cardigans", "dresses", "rompers-jumpsuits", "t-shirts"].includes(slug));
+}
+
 function chooseProductMatch(matches: ProductRow[], name: string, sku: string, alreadyMatched: Set<string>) {
   if (!matches.length) {
     return null;
@@ -352,6 +367,42 @@ export async function POST(request: Request) {
         ON CONFLICT DO NOTHING
       `;
       summary.categoryAssignments += assignedIds.length;
+    }
+
+    const variantFamily = variantFamilySku(sku);
+    if (variantFamily && isVariantFamilySku(sku) && isApparelAssignment(assignedSlugs) && assignedIds.length) {
+      const siblingProducts = products.filter((candidate) => {
+        if (candidate.epos_product_id === product.epos_product_id) {
+          return false;
+        }
+
+        return variantFamilySku(candidate.sku) === variantFamily;
+      });
+
+      for (const sibling of siblingProducts) {
+        matchedProductIds.add(sibling.epos_product_id);
+
+        await sql`
+          INSERT INTO product_site_meta (epos_product_id, marketing_title, marketing_description, department, is_hidden, updated_at)
+          VALUES (${sibling.epos_product_id}, NULL, NULL, ${assignedSlugs[0] || null}, FALSE, NOW())
+          ON CONFLICT (epos_product_id)
+          DO UPDATE SET
+            marketing_title = NULL,
+            marketing_description = NULL,
+            department = EXCLUDED.department,
+            is_hidden = FALSE,
+            updated_at = NOW()
+        `;
+
+        await sql`DELETE FROM product_site_categories WHERE epos_product_id = ${sibling.epos_product_id}`;
+        await sql`
+          INSERT INTO product_site_categories (epos_product_id, site_category_id)
+          SELECT ${sibling.epos_product_id}, value::bigint
+          FROM jsonb_array_elements_text(${JSON.stringify(assignedIds)}::jsonb)
+          ON CONFLICT DO NOTHING
+        `;
+        summary.categoryAssignments += assignedIds.length;
+      }
     }
 
     if (imageUrl) {

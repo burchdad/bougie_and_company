@@ -51,6 +51,9 @@ const variantWords = [
   "small",
   "medium",
   "large",
+  "x-small",
+  "x-large",
+  "xlarge",
   "xl",
   "xxl",
   "xxxl",
@@ -285,21 +288,44 @@ function titleWordsWithoutSku(title: string) {
   return title.replace(/^[A-Z]{2,}\d+[A-Z0-9-]*\s+/i, "").trim().split(/\s+/).filter(Boolean);
 }
 
+function displaySize(value: string) {
+  const normalized = value.toLowerCase().replace(/[\s_-]+/g, "");
+  const labels: Record<string, string> = {
+    xxs: "XXS",
+    xs: "XS",
+    xsmall: "XS",
+    small: "Small",
+    s: "Small",
+    medium: "Medium",
+    m: "Medium",
+    large: "Large",
+    l: "Large",
+    xlarge: "XL",
+    xl: "XL",
+    xxl: "XXL",
+    xxxl: "XXXL",
+    os: "One Size",
+    onesize: "One Size"
+  };
+
+  return labels[normalized] || value.toUpperCase();
+}
+
 function variantSizeLabel(title: string, sku: string) {
   const lowerTitle = title.toLowerCase();
-  const explicitSize = lowerTitle.match(/\b(xxs|xs|small|medium|large|xl|xxl|xxxl|s|m|l|2x|3x|4x|5x|one size|os)\b/);
+  const explicitSize = lowerTitle.match(/\b(xxs|xs|x-small|small|medium|large|x-large|xlarge|xl|xxl|xxxl|s|m|l|2x|3x|4x|5x|one size|os)\b/);
   if (explicitSize?.[1]) {
-    return explicitSize[1].toUpperCase();
+    return displaySize(explicitSize[1]);
   }
 
-  const compactSkuSize = sku.match(/(xxs|xs|small|medium|large|xl|xxl|xxxl|2x|3x|4x|5x|os)$/i);
+  const compactSkuSize = sku.match(/(xxs|xs|x-small|small|medium|x-large|xlarge|large|xl|xxl|xxxl|2x|3x|4x|5x|os)$/i);
   if (compactSkuSize?.[1]) {
-    return compactSkuSize[1].toUpperCase();
+    return displaySize(compactSkuSize[1]);
   }
 
-  const skuSize = sku.match(/(?:^|[-_\s])(xxs|xs|s|m|l|xl|xxl|xxxl|2x|3x|4x|5x|os)(?:$|[-_\s])/i);
+  const skuSize = sku.match(/(?:^|[-_\s])(xxs|xs|x-small|small|medium|large|x-large|xlarge|s|m|l|xl|xxl|xxxl|2x|3x|4x|5x|os)(?:$|[-_\s])/i);
   if (skuSize?.[1]) {
-    return skuSize[1].toUpperCase();
+    return displaySize(skuSize[1]);
   }
 
   return "";
@@ -426,13 +452,31 @@ function groupProducts(products: Product[]) {
     });
   });
 
-  return [...groups.values()].map((group) => ({
-    ...group,
-    products: group.products.sort((a, b) => {
-      const stockSort = Number(hasAvailableStock(b)) - Number(hasAvailableStock(a));
-      return stockSort || variantLabel(a).localeCompare(variantLabel(b), undefined, { numeric: true });
-    })
-  }));
+  return [...groups.values()].map((group) => {
+    const variantsByLabel = new Map<string, Product>();
+    group.products.forEach((product) => {
+      const label = variantLabel(product);
+      const existing = variantsByLabel.get(label);
+      if (!existing) {
+        variantsByLabel.set(label, product);
+        return;
+      }
+
+      const existingScore = Number(hasAvailableStock(existing)) + Number(Boolean(existing.primary_image_url));
+      const nextScore = Number(hasAvailableStock(product)) + Number(Boolean(product.primary_image_url));
+      if (nextScore > existingScore) {
+        variantsByLabel.set(label, product);
+      }
+    });
+
+    return {
+      ...group,
+      products: [...variantsByLabel.values()].sort((a, b) => {
+        const stockSort = Number(hasAvailableStock(b)) - Number(hasAvailableStock(a));
+        return stockSort || variantLabel(a).localeCompare(variantLabel(b), undefined, { numeric: true });
+      })
+    };
+  });
 }
 
 export function ShopProducts() {
