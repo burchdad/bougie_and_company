@@ -253,6 +253,14 @@ function productMatchesFilter(product: Product, filterId: string) {
     return false;
   }
 
+  if (filterId === "gift-collection" || filterId === "gift-cards" || filterId === "gift-certificates" || filterId === "gift-sets") {
+    return false;
+  }
+
+  if (filterId === "handmade-soaps" || filterId === "soaps") {
+    return productSearchText(product).includes("soap");
+  }
+
   if (filterId === "soy-9oz" || filterId === "candles-soy-9oz") {
     const haystack = productSearchText(product);
     return product.category_slugs?.includes("candles") && (haystack.includes("9oz") || haystack.includes("9 oz")) && !haystack.includes("wax melt");
@@ -572,7 +580,7 @@ export function ShopProducts() {
   }, [activeDepartment, products]);
 
   const filteredGroups = useMemo(() => groupProducts(filteredProducts), [filteredProducts]);
-  const isComingSoonCategory = activeDepartment === "tack";
+  const isGiftCollectionCategory = activeDepartment === "gift-collection" || activeDepartment === "gift-cards" || activeDepartment === "gift-certificates" || activeDepartment === "gift-sets";
 
   function addToCart(product: Product, option?: string) {
     if (!hasAvailableStock(product)) {
@@ -624,8 +632,12 @@ export function ShopProducts() {
         {!loading && !filteredGroups.length && !message ? (
           <div className="mt-5 rounded-lg border border-dashed border-saddle/25 bg-white p-8 text-center">
             <Sparkles className="mx-auto h-8 w-8 text-saddle" />
-            <p className="mt-3 font-display text-3xl text-ink">{isComingSoonCategory ? "Coming soon." : "No products found here yet."}</p>
-            <p className="mt-2 text-espresso/70">{isComingSoonCategory ? "Tack products will be added when they are ready." : "Try another category from the shop menu."}</p>
+            <p className="mt-3 font-display text-3xl text-ink">{isGiftCollectionCategory ? "Build your own gift basket." : "No products found here yet."}</p>
+            <p className="mt-2 text-espresso/70">
+              {isGiftCollectionCategory
+                ? "Please contact us and we will help create a custom gift basket for your occasion."
+                : "Try another category from the shop menu."}
+            </p>
           </div>
         ) : null}
 

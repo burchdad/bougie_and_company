@@ -39,7 +39,7 @@ const canonicalCategories: CategoryNode[] = [
   { label: "Kitchen Selection", children: [{ label: "Dish Soap", slug: "homemade-dish-soap" }, { label: "Foaming Hand Soap" }, { label: "Dish Soap & Hand Soap" }] },
   { label: "Gift Collection", children: [{ label: "Gift Cards" }] },
   { label: "Jewelry", children: [{ label: "Fashion Earrings" }, { label: "Headbands" }] },
-  { label: "Tack" }
+  { label: "Handmade Soaps" }
 ];
 
 function cleanString(value: unknown) {
@@ -176,16 +176,16 @@ function categorySlugsFor(row: ImportRow) {
     case "gift card":
       return ["gift-collection", "gift-cards"];
     case "handmade soap":
-      return ["bath-body", "handmade-soap"];
+      return ["handmade-soaps", "bath-body", "handmade-soap"];
     case "kitchen homemade dish disk soaps and hand soap":
-      return kitchenSoapSlugsFor(name);
+      return ["handmade-soaps", ...kitchenSoapSlugsFor(name)];
     case "leather coasters":
       if (sku === "BCLC591") return [];
       return ["accessories", "leather-coasters"];
     case "luggage":
       return ["accessories", "luggage"];
     case "mechanic soap":
-      return ["mens-collection", "mens-care", "mechanic-soap"];
+      return ["handmade-soaps", "mens-collection", "mens-care", "mechanic-soap"];
     case "outdoor":
       return ["accessories", "outdoor"];
     case "purses":

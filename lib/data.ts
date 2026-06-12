@@ -82,9 +82,9 @@ export const shopDepartments = [
     items: ["Necklaces", "Bracelets", "Earrings"]
   },
   {
-    id: "tack",
-    title: "Tack",
-    items: ["Tack"]
+    id: "handmade-soaps",
+    title: "Handmade Soaps",
+    items: ["Handmade Soaps", "Homemade Mechanic Soaps", "Foaming Hand Soap", "Dish Soap"]
   },
   {
     id: "accessories",

@@ -44,6 +44,7 @@ function categoryHref(category: SiteCategory) {
 
 function cleanCategoryTree(items: CategoryMenuItem[], parentLabel = ""): CategoryMenuItem[] {
   return items
+    .filter((item) => !(parentLabel === "" && item.label === "Tack"))
     .filter((item) => !(parentLabel === "Men's Collection" && item.label === "Bath Bombs"))
     .map((item) => ({
       ...item,

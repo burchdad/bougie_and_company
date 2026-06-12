@@ -3,7 +3,7 @@ import { shopDepartments } from "@/lib/data";
 export const departmentKeywords: Record<string, string[]> = {
   clothing: ["shirt", "tee", "t-shirt", "top", "bottom", "dress", "romper", "jumpsuit", "cardigan", "jean", "short", "pant", "skirt"],
   "equine-jewelry": ["equine", "horse", "rein", "snaffle", "necklace", "bracelet", "earring"],
-  tack: ["tack", "halter", "lead rope", "bridle", "bit", "reins", "saddle", "spur"],
+  "handmade-soaps": ["handmade soap", "homemade soap", "mechanic soap", "foaming hand", "dish soap", "shave soap"],
   accessories: ["purse", "bag", "luggage", "weekender", "coozie", "koozie", "coaster", "infusion", "cocktail", "cap", "hat"],
   "bath-body": ["bath", "body", "scrub", "salt", "bomb", "chap", "mask", "lotion", "soap", "beard", "spray", "week from hell", "shampoo"],
   "home-collection": ["candle", "wax", "melt", "tea towel", "pillow", "coaster", "mixer", "outdoor"],
