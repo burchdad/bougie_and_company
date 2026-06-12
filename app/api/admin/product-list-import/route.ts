@@ -87,6 +87,12 @@ function numberValue(value: unknown) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function giftCardAmount(name: unknown) {
+  const match = cleanString(name).match(/(?:^|[^0-9])(\d+(?:\.\d{1,2})?)(?:[^0-9]|$)/);
+  const amount = match?.[1] ? Number(match[1]) : null;
+  return amount && Number.isFinite(amount) && amount > 0 ? amount : null;
+}
+
 function publicImageUrl(value: unknown) {
   const url = cleanString(value);
   return /^https:\/\/api\.eposnowhq\.com\/v1\/image\//i.test(url) ? url : null;
@@ -247,6 +253,11 @@ function shouldHideImportedProduct(row: ImportRow) {
   return sku === "BCLC591" || shouldSuppressVariantSku(sku) || name.includes("american flag cotton tea towel");
 }
 
+function shouldRemoveImportedImage(row: ImportRow) {
+  const name = normalize(row.Name);
+  return name.includes("lavender handmade soap");
+}
+
 function chooseProductMatch(matches: ProductRow[], name: string, sku: string, alreadyMatched: Set<string>) {
   if (!matches.length) {
     return null;
@@ -333,14 +344,17 @@ export async function POST(request: Request) {
     matchedProductIds.add(product.epos_product_id);
 
     const description = cleanString(row.Description) || name;
-    const isFarmEggProduct = normalize(row.CategoryId) === "farm eggs";
-    const salePrice = isFarmEggProduct ? 4 : numberValue(row.SalePriceExTax) ?? numberValue(row.SalePriceIncTax);
+    const normalizedCategory = normalize(row.CategoryId);
+    const isFarmEggProduct = normalizedCategory === "farm eggs";
+    const importedPrice = numberValue(row.SalePriceExTax) ?? numberValue(row.SalePriceIncTax);
+    const salePrice = isFarmEggProduct ? 4 : normalizedCategory === "gift card" ? giftCardAmount(name) ?? importedPrice : importedPrice;
     const sellOnWeb = normalize(row.SellOnWeb) === "yes";
     const forceHidden = shouldHideImportedProduct(row);
     const isWebsiteHidden = forceHidden || !sellOnWeb || normalize(row.CategoryId) === "tanning 1month membership";
-    const imageUrl = publicImageUrl(row.ImageUrl);
+    const forceRemoveImage = shouldRemoveImportedImage(row);
+    const imageUrl = forceRemoveImage ? null : publicImageUrl(row.ImageUrl);
     const assignedSlugs = categorySlugsFor(row);
-    const blockGuessedImageImport = forceHidden || (!imageUrl && assignedSlugs.includes("handmade-soap"));
+    const blockGuessedImageImport = forceHidden || forceRemoveImage || (!imageUrl && assignedSlugs.includes("handmade-soap"));
     const assignedIds = categoryIdsFor(assignedSlugs, slugToId);
 
     await sql`
