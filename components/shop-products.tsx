@@ -48,6 +48,7 @@ type DetailProduct = {
 
 const mensTshirtSizes = ["Medium", "Large", "XL"];
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const homemadeSoapDisclaimer = "Handmade soap colors may vary slightly from batch to batch depending on when each bar is made.";
 
 function GiftBasketRequestForm() {
   const [message, setMessage] = useState("");
@@ -331,6 +332,11 @@ function money(value: string | null) {
 function isFarmEggProduct(product: Product) {
   const haystack = productSearchText(product);
   return product.category_slugs?.includes("farm-eggs") || haystack.includes("farm fresh egg");
+}
+
+function isHomemadeSoapProduct(product: Product) {
+  const haystack = productSearchText(product);
+  return product.category_slugs?.includes("handmade-soap") || haystack.includes("handmade soap") || haystack.includes("homemade soap");
 }
 
 function displayPrice(product: Product) {
@@ -758,6 +764,7 @@ export function ShopProducts() {
   const detailPrice = detailProduct ? displayPrice(detailProduct.product) : "";
   const detailAvailable = detailProduct ? hasAvailableStock(detailProduct.product) : false;
   const detailIsFarmEgg = Boolean(detailProduct && isFarmEggProduct(detailProduct.product));
+  const detailIsHomemadeSoap = Boolean(detailProduct && isHomemadeSoapProduct(detailProduct.product));
   const detailHasVariants = Boolean(detailProduct?.group && detailProduct.group.products.length > 1);
   const detailGroupKey = detailProduct?.group?.key || detailProduct?.product.epos_product_id || "";
   const detailHasTshirtSizes = Boolean(detailProduct && !detailHasVariants && isMensTshirtProduct(detailProduct.product));
@@ -803,6 +810,7 @@ export function ShopProducts() {
               const selectedTshirtSize = selectedVariants[group.key] || mensTshirtSizes[0];
               const isOutOfStock = !hasAvailableStock(product);
               const isFarmEgg = isFarmEggProduct(product);
+              const isHomemadeSoap = isHomemadeSoapProduct(product);
 
               return (
                 <article className={`group overflow-hidden rounded-lg border border-saddle/15 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-luxe ${isOutOfStock ? "opacity-90" : ""}`} key={group.key}>
@@ -886,6 +894,7 @@ export function ShopProducts() {
                       </button>
                     </div>
                     {isFarmEgg ? <p className="mt-3 text-sm font-semibold text-saddle">Local delivery only. Please contact to place order.</p> : null}
+                    {isHomemadeSoap ? <p className="mt-3 text-sm leading-6 text-espresso/65">{homemadeSoapDisclaimer}</p> : null}
                   </div>
                 </article>
               );
@@ -928,6 +937,7 @@ export function ShopProducts() {
                   <p className="mt-5 text-base leading-7 text-espresso/75">{detailProduct.product.marketing_description || detailProduct.product.description}</p>
                 ) : null}
                 {detailIsFarmEgg ? <p className="mt-5 rounded-md bg-cream px-4 py-3 text-sm font-semibold text-saddle">Local delivery only. Please contact to place order.</p> : null}
+                {detailIsHomemadeSoap ? <p className="mt-5 rounded-md bg-cream px-4 py-3 text-sm font-semibold leading-6 text-saddle">{homemadeSoapDisclaimer}</p> : null}
                 {detailProduct.product.sku ? <p className="mt-4 text-xs font-bold uppercase tracking-[0.18em] text-saddle/75">Style {detailProduct.product.sku}</p> : null}
                 {detailHasVariants && detailProduct.group ? (
                   <label className="mt-6 grid gap-2 text-sm font-semibold text-espresso">

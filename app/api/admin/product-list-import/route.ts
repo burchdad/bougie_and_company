@@ -253,11 +253,6 @@ function shouldHideImportedProduct(row: ImportRow) {
   return sku === "BCLC591" || shouldSuppressVariantSku(sku) || name.includes("american flag cotton tea towel") || name.includes("premium loofah");
 }
 
-function shouldRemoveImportedImage(row: ImportRow) {
-  const name = normalize(row.Name);
-  return name.includes("lavender handmade soap");
-}
-
 function chooseProductMatch(matches: ProductRow[], name: string, sku: string, alreadyMatched: Set<string>) {
   if (!matches.length) {
     return null;
@@ -351,10 +346,11 @@ export async function POST(request: Request) {
     const sellOnWeb = normalize(row.SellOnWeb) === "yes";
     const forceHidden = shouldHideImportedProduct(row);
     const isWebsiteHidden = forceHidden || !sellOnWeb || normalize(row.CategoryId) === "tanning 1month membership";
-    const forceRemoveImage = shouldRemoveImportedImage(row);
-    const imageUrl = forceRemoveImage ? null : publicImageUrl(row.ImageUrl);
     const assignedSlugs = categorySlugsFor(row);
-    const blockGuessedImageImport = forceHidden || forceRemoveImage || (!imageUrl && assignedSlugs.includes("handmade-soap"));
+    const prefersEposImageImport = assignedSlugs.includes("handmade-soap");
+    const imageUrl = prefersEposImageImport ? null : publicImageUrl(row.ImageUrl);
+    const disableFuzzyImageFallback = prefersEposImageImport && !imageUrl;
+    const blockEposImageImport = forceHidden;
     const assignedIds = categoryIdsFor(assignedSlugs, slugToId);
 
     await sql`
@@ -370,7 +366,8 @@ export async function POST(request: Request) {
           SalePrice: salePrice,
           SellOnWeb: sellOnWeb ? "yes" : "no",
           ImageUrl: imageUrl,
-          SkipEposImageImport: blockGuessedImageImport
+          SkipEposImageImport: blockEposImageImport,
+          DisableFuzzyImageFallback: disableFuzzyImageFallback
         })}::jsonb,
         synced_at = NOW()
       WHERE epos_product_id = ${product.epos_product_id}
@@ -461,7 +458,7 @@ export async function POST(request: Request) {
         VALUES (${product.epos_product_id}, ${imageUrl}, NULL, ${name}, 0, TRUE)
       `;
       summary.updatedImages += 1;
-    } else if (blockGuessedImageImport) {
+    } else if (forceHidden || disableFuzzyImageFallback) {
       await sql`DELETE FROM product_images WHERE epos_product_id = ${product.epos_product_id}`;
     }
 
