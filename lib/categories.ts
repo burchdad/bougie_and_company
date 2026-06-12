@@ -38,6 +38,11 @@ export function slugify(value: string) {
   return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "category";
 }
 
+function menuItemSlug(item: CategoryMenuItem) {
+  const hrefSlug = item.href.split("#")[1];
+  return hrefSlug ? slugify(hrefSlug) : slugify(item.label);
+}
+
 function categoryHref(category: SiteCategory) {
   return category.parent_id ? `/shop#${category.slug}` : category.href;
 }
@@ -104,7 +109,7 @@ export async function seedDefaultCategoriesIfEmpty() {
     let sortOrder = Number(rows[0]?.sort_order ?? -1) + 1;
 
     for (const item of defaultMenuItems) {
-      const slug = slugify(item.label);
+      const slug = menuItemSlug(item);
       if (existingHeaderSlugs.has(slug)) {
         continue;
       }
@@ -121,9 +126,10 @@ export async function seedDefaultCategoriesIfEmpty() {
 
   async function insert(items: CategoryMenuItem[], parentId: number | null) {
     for (const [index, item] of items.entries()) {
+      const slug = menuItemSlug(item);
       const rows = await sql`
         INSERT INTO site_categories (label, slug, href, parent_id, sort_order, is_header)
-        VALUES (${item.label}, ${slugify(item.label)}, ${item.href}, ${parentId}, ${index}, ${parentId === null})
+        VALUES (${item.label}, ${slug}, ${item.href}, ${parentId}, ${index}, ${parentId === null})
         RETURNING id
       `;
       await insert(item.children || [], Number(rows[0].id));

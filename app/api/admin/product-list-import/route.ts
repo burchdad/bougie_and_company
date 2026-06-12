@@ -329,7 +329,7 @@ export async function POST(request: Request) {
     const description = cleanString(row.Description) || name;
     const salePrice = numberValue(row.SalePriceExTax) ?? numberValue(row.SalePriceIncTax);
     const sellOnWeb = normalize(row.SellOnWeb) === "yes";
-    const forceHidden = sku === "BCLC591" || shouldSuppressVariantSku(sku);
+    const forceHidden = sku === "BCLC591" || shouldSuppressVariantSku(sku) || normalize(row.CategoryId) === "gift card";
     const isWebsiteHidden = forceHidden || !sellOnWeb || normalize(row.CategoryId) === "tanning 1month membership";
     const imageUrl = publicImageUrl(row.ImageUrl);
     const assignedSlugs = categorySlugsFor(row);
