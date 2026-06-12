@@ -1,6 +1,6 @@
 import { getSql } from "@/lib/db";
 import { EposProduct, EposProductStock, fetchEposCollection, getEposId, getEposNumber, getEposString } from "@/lib/epos";
-import { importEposProductImages } from "@/lib/epos-product-images";
+import { hydrateExternalProductImages, importEposProductImages } from "@/lib/epos-product-images";
 
 type SyncResult = {
   products: number;
@@ -182,10 +182,13 @@ export async function syncEposCatalog(options: { importImages?: boolean; imageLi
   const products = await syncEposProducts();
   const stock = await syncEposStock();
   const images = options.importImages
-    ? await importEposProductImages({
-        limit: options.imageLimit,
-        skipExisting: options.skipExistingImages !== false
-      })
+    ? {
+        ...(await importEposProductImages({
+          limit: options.imageLimit,
+          skipExisting: options.skipExistingImages !== false
+        })),
+        hydration: await hydrateExternalProductImages({ limit: options.imageLimit || 50 })
+      }
     : undefined;
 
   return { products, stock, ...(images ? { images } : {}) };

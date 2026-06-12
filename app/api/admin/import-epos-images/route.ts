@@ -1,5 +1,5 @@
 import { isAdminRequest } from "@/lib/admin-products";
-import { importEposProductImages } from "@/lib/epos-product-images";
+import { hydrateExternalProductImages, importEposProductImages } from "@/lib/epos-product-images";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,16 +11,19 @@ export async function POST(request: Request) {
   }
 
   try {
-    const body = (await request.json().catch(() => ({}))) as { skipExisting?: boolean; limit?: number };
+    const body = (await request.json().catch(() => ({}))) as { hydrateExternalImages?: boolean; skipExisting?: boolean; limit?: number };
+    const limit = Number.isFinite(Number(body.limit)) ? Math.min(Math.max(Number(body.limit), 1), 50) : 25;
+    const hydration = body.hydrateExternalImages === false ? null : await hydrateExternalProductImages({ limit });
     const result = await importEposProductImages({
       skipExisting: body.skipExisting !== false,
-      limit: Number.isFinite(Number(body.limit)) ? Math.min(Math.max(Number(body.limit), 1), 20) : 8
+      limit
     });
     return Response.json(
       {
         ok: true,
-        message: `Epos image import checked ${result.productsScanned} product${result.productsScanned === 1 ? "" : "s"} and uploaded ${result.uploaded} image${result.uploaded === 1 ? "" : "s"}.`,
-        result
+        message: `Epos image import checked ${result.productsScanned} product${result.productsScanned === 1 ? "" : "s"}, uploaded ${result.uploaded} image${result.uploaded === 1 ? "" : "s"}, and hydrated ${hydration?.hydrated ?? 0} existing image link${hydration?.hydrated === 1 ? "" : "s"} into Blob.`,
+        result,
+        hydration
       },
       { headers: { "Cache-Control": "no-store" } }
     );

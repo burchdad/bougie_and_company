@@ -44,6 +44,14 @@ type BlobImageRepairResult = {
   error: string | null;
 };
 
+type BlobHydrationResult = {
+  scanned: number;
+  hydrated: number;
+  failed: number;
+  remainingExternal: number;
+  failureSamples: ImageImportResult["failureSamples"];
+};
+
 function collectImageUrls(value: unknown, parentKey = "", urls = new Set<string>()) {
   if (!value) {
     return urls;
@@ -119,7 +127,7 @@ function imageContentTypeFrom(extension: string, contentType: string | null) {
   return "image/jpeg";
 }
 
-function addFailureSample(result: ImageImportResult, imageUrl: string, reason: string, details: { status?: number; contentType?: string | null } = {}) {
+function addFailureSample(result: { failureSamples: ImageImportResult["failureSamples"] }, imageUrl: string, reason: string, details: { status?: number; contentType?: string | null } = {}) {
   if (result.failureSamples.length >= 5) {
     return;
   }
@@ -740,6 +748,102 @@ export async function importEposProductImages({ skipExisting = true, limit = 25 
       )
   `;
   result.remainingWithoutPhotos = Number(remainingRows[0]?.count || 0);
+
+  return result;
+}
+
+export async function hydrateExternalProductImages({ limit = 50 } = {}) {
+  const startedAt = Date.now();
+  await ensureProductAdminTables();
+
+  const sql = getSql();
+  const rows = await sql`
+    SELECT
+      i.id::text,
+      i.epos_product_id,
+      i.url,
+      i.alt_text,
+      i.sort_order,
+      p.name,
+      p.sku
+    FROM product_images i
+    JOIN epos_products p ON p.epos_product_id = i.epos_product_id
+    WHERE p.is_deleted = FALSE
+      AND i.pathname IS NULL
+      AND i.url LIKE 'http%'
+      AND i.url NOT LIKE '%.public.blob.vercel-storage.com%'
+    ORDER BY i.is_primary DESC, i.created_at ASC
+    LIMIT ${Math.min(Math.max(Math.trunc(limit), 1), 250)}
+  `;
+
+  const result: BlobHydrationResult = {
+    scanned: rows.length,
+    hydrated: 0,
+    failed: 0,
+    remainingExternal: 0,
+    failureSamples: []
+  };
+
+  for (const row of rows) {
+    if (Date.now() - startedAt > imageImportBudgetMs) {
+      break;
+    }
+
+    const imageUrl = String(row.url);
+
+    try {
+      const response = await fetch(imageUrl, { cache: "no-store" });
+
+      if (!response.ok) {
+        result.failed += 1;
+        addFailureSample(result, imageUrl, "hydrate-fetch-not-ok", { status: response.status, contentType: response.headers.get("content-type") });
+        continue;
+      }
+
+      const contentType = response.headers.get("content-type");
+      if (!isUsableImageResponse(imageUrl, contentType)) {
+        result.failed += 1;
+        addFailureSample(result, imageUrl, "hydrate-not-image-content-type", { status: response.status, contentType });
+        continue;
+      }
+
+      const productId = String(row.epos_product_id);
+      const productSku = typeof row.sku === "string" ? row.sku : null;
+      const productName = typeof row.name === "string" ? row.name : null;
+      const extension = extensionFrom(imageUrl, contentType);
+      const uploadContentType = imageContentTypeFrom(extension, contentType);
+      const folderName = safeName(productSku || productName || productId) || safeName(productId);
+      const pathname = `products/${folderName}/epos-${safeName(productSku || productId)}-${row.id}.${extension}`;
+      const blob = await put(pathname, await response.blob(), {
+        access: "public",
+        contentType: uploadContentType,
+        addRandomSuffix: true
+      });
+
+      await sql`
+        UPDATE product_images
+        SET url = ${blob.url},
+          pathname = ${blob.pathname},
+          alt_text = COALESCE(alt_text, ${productName})
+        WHERE id = ${String(row.id)}
+      `;
+      result.hydrated += 1;
+    } catch (error) {
+      result.failed += 1;
+      addFailureSample(result, imageUrl, error instanceof Error ? error.message : "hydrate-fetch-error");
+    }
+  }
+
+  const remainingRows = await sql`
+    SELECT COUNT(*)::int AS count
+    FROM product_images i
+    JOIN epos_products p ON p.epos_product_id = i.epos_product_id
+    WHERE p.is_deleted = FALSE
+      AND i.pathname IS NULL
+      AND i.url LIKE 'http%'
+      AND i.url NOT LIKE '%.public.blob.vercel-storage.com%'
+  `;
+  result.remainingExternal = Number(remainingRows[0]?.count || 0);
 
   return result;
 }

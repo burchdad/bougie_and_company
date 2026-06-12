@@ -773,7 +773,7 @@ export function AdminDashboard() {
           "Content-Type": "application/json",
           ...(adminKey ? { "x-admin-key": adminKey } : {})
         },
-        body: JSON.stringify({ skipExisting: true, limit: 8 })
+        body: JSON.stringify({ hydrateExternalImages: true, skipExisting: true, limit: 25 })
       });
       const text = await response.text();
       let result: {
@@ -796,6 +796,12 @@ export function AdminDashboard() {
           failed: number;
           remainingWithoutPhotos: number;
         };
+        hydration?: {
+          scanned: number;
+          hydrated: number;
+          failed: number;
+          remainingExternal: number;
+        } | null;
       };
 
       try {
@@ -811,9 +817,10 @@ export function AdminDashboard() {
       }
 
       const counts = result.result;
+      const hydration = result.hydration;
       setMessage(
         counts
-          ? `${result.message} Blob scan found ${counts.blobImagesFound ?? 0} existing image file${counts.blobImagesFound === 1 ? "" : "s"}: ${counts.blobImagesMatched ?? 0} matched products, ${counts.blobImagesAlreadyLinked ?? 0} already linked, ${counts.blobImagesLinked ?? 0} newly linked, ${counts.blobImagesUnmatched ?? 0} unmatched. Epos image records: ${counts.eposImageRecordsFound ?? 0} found, ${counts.eposImageRecordsMatched ?? 0} matched. Found ${counts.imageUrlsFound} image URL${counts.imageUrlsFound === 1 ? "" : "s"}, skipped ${counts.skippedExisting} existing, failed ${counts.failed}. ${counts.remainingWithoutPhotos} product${counts.remainingWithoutPhotos === 1 ? "" : "s"} still have no photo.${counts.blobImageRepairError ? ` Blob scan error: ${counts.blobImageRepairError}` : ""}`
+          ? `${result.message} Blob hydrated ${hydration?.hydrated ?? 0} existing external image link${hydration?.hydrated === 1 ? "" : "s"}; ${hydration?.remainingExternal ?? 0} external image row${hydration?.remainingExternal === 1 ? "" : "s"} remain. Uploaded ${counts.uploaded}, failed ${counts.failed}, and ${counts.remainingWithoutPhotos} product${counts.remainingWithoutPhotos === 1 ? "" : "s"} still have no photo.`
           : result.message || "Epos image import complete."
       );
       await loadProducts(query);
@@ -835,7 +842,7 @@ export function AdminDashboard() {
           "Content-Type": "application/json",
           ...(adminKey ? { "x-admin-key": adminKey } : {})
         },
-        body: JSON.stringify({ importImages: false })
+        body: JSON.stringify({ importImages: true, imageLimit: 25, skipExistingImages: true })
       });
       const text = await response.text();
       let result: {
@@ -859,6 +866,12 @@ export function AdminDashboard() {
           skippedDuplicate: number;
           failed: number;
           remainingWithoutPhotos: number;
+          hydration?: {
+            scanned: number;
+            hydrated: number;
+            failed: number;
+            remainingExternal: number;
+          } | null;
         };
       };
 
@@ -875,9 +888,9 @@ export function AdminDashboard() {
       }
 
       const imageText = result.images
-        ? ` Blob scan found ${result.images.blobImagesFound ?? 0} existing image file${result.images.blobImagesFound === 1 ? "" : "s"}: ${result.images.blobImagesMatched ?? 0} matched products, ${result.images.blobImagesAlreadyLinked ?? 0} already linked, ${result.images.blobImagesLinked ?? 0} newly linked, ${result.images.blobImagesUnmatched ?? 0} unmatched. Epos image records: ${result.images.eposImageRecordsFound ?? 0} found, ${result.images.eposImageRecordsMatched ?? 0} matched. Uploaded ${result.images.uploaded} image${result.images.uploaded === 1 ? "" : "s"} from ${result.images.imageUrlsFound} URL${result.images.imageUrlsFound === 1 ? "" : "s"}; ${result.images.remainingWithoutPhotos} product${result.images.remainingWithoutPhotos === 1 ? "" : "s"} still have no photo.${result.images.blobImageRepairError ? ` Blob scan error: ${result.images.blobImageRepairError}` : ""}`
+        ? ` Hydrated ${result.images.hydration?.hydrated ?? 0} external image link${result.images.hydration?.hydrated === 1 ? "" : "s"} into Blob; ${result.images.hydration?.remainingExternal ?? 0} external image row${result.images.hydration?.remainingExternal === 1 ? "" : "s"} remain. Uploaded ${result.images.uploaded} image${result.images.uploaded === 1 ? "" : "s"} from ${result.images.imageUrlsFound} URL${result.images.imageUrlsFound === 1 ? "" : "s"}; ${result.images.remainingWithoutPhotos} product${result.images.remainingWithoutPhotos === 1 ? "" : "s"} still have no photo.${result.images.blobImageRepairError ? ` Blob scan error: ${result.images.blobImageRepairError}` : ""}`
         : "";
-      setMessage(`Epos sync complete. Pulled ${result.products || 0} products and ${result.stock || 0} stock record${result.stock === 1 ? "" : "s"}.${imageText} Use Import Epos Images separately for photo repair/import.`);
+      setMessage(`Epos sync complete. Pulled ${result.products || 0} products and ${result.stock || 0} stock record${result.stock === 1 ? "" : "s"}.${imageText}`);
       await loadProducts(query);
     } catch {
       setMessage("Could not connect to the Epos catalog sync backend.");
