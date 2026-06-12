@@ -42,6 +42,7 @@ type DetailProduct = {
   product: Product;
   imageProduct: Product;
   title: string;
+  group?: ProductGroup;
 };
 
 const variantWords = [
@@ -65,26 +66,47 @@ const variantWords = [
 ];
 
 const apparelColorWords = [
+  "aqua",
+  "beige",
   "black",
   "blue",
   "brown",
+  "camel",
   "charcoal",
   "coral",
   "cream",
+  "dusty",
+  "espresso",
+  "fuchsia",
+  "gold",
   "graphite",
   "gray",
   "green",
   "grey",
   "ivory",
+  "khaki",
+  "lavender",
+  "lime",
+  "magenta",
+  "maroon",
+  "mint",
+  "moss",
+  "mustard",
   "navy",
+  "olive",
+  "orange",
   "pink",
   "purple",
   "red",
+  "rose",
+  "rust",
   "skye",
   "tan",
+  "taupe",
   "teal",
   "turquoise",
   "white",
+  "wine",
   "yellow"
 ];
 
@@ -259,14 +281,20 @@ function cleanProductTitle(product: Product) {
   return (product.marketing_title || product.name).replace(/\s+/g, " ").trim();
 }
 
-function variantLabel(product: Product) {
-  const title = cleanProductTitle(product);
-  const sku = product.sku || "";
-  const lowerTitle = title.toLowerCase();
+function titleWordsWithoutSku(title: string) {
+  return title.replace(/^[A-Z]{2,}\d+[A-Z0-9-]*\s+/i, "").trim().split(/\s+/).filter(Boolean);
+}
 
+function variantSizeLabel(title: string, sku: string) {
+  const lowerTitle = title.toLowerCase();
   const explicitSize = lowerTitle.match(/\b(xxs|xs|small|medium|large|xl|xxl|xxxl|s|m|l|2x|3x|4x|5x|one size|os)\b/);
   if (explicitSize?.[1]) {
     return explicitSize[1].toUpperCase();
+  }
+
+  const compactSkuSize = sku.match(/(xxs|xs|small|medium|large|xl|xxl|xxxl|2x|3x|4x|5x|os)$/i);
+  if (compactSkuSize?.[1]) {
+    return compactSkuSize[1].toUpperCase();
   }
 
   const skuSize = sku.match(/(?:^|[-_\s])(xxs|xs|s|m|l|xl|xxl|xxxl|2x|3x|4x|5x|os)(?:$|[-_\s])/i);
@@ -274,11 +302,48 @@ function variantLabel(product: Product) {
     return skuSize[1].toUpperCase();
   }
 
-  const withoutSku = title.replace(/^[A-Z]{2,}\d+[A-Z0-9-]*\s+/i, "").trim();
-  const titleWords = withoutSku.split(/\s+/);
-  const colorWords = titleWords.filter((word) => apparelColorWords.includes(word.toLowerCase()));
-  if (colorWords.length) {
-    return colorWords.map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
+  return "";
+}
+
+function variantColorLabel(title: string) {
+  const titleWords = titleWordsWithoutSku(title);
+  const leadingColors: string[] = [];
+  for (const word of titleWords) {
+    if (!apparelColorWords.includes(word.toLowerCase())) {
+      break;
+    }
+    leadingColors.push(word);
+  }
+
+  const trailingColors: string[] = [];
+  for (let index = titleWords.length - 1; index >= 0; index -= 1) {
+    const word = titleWords[index];
+    if (!apparelColorWords.includes(word.toLowerCase())) {
+      break;
+    }
+    trailingColors.unshift(word);
+  }
+
+  const colorWords = leadingColors.length ? leadingColors : trailingColors;
+  return colorWords.map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
+}
+
+function variantLabel(product: Product) {
+  const title = cleanProductTitle(product);
+  const sku = product.sku || "";
+  const size = variantSizeLabel(title, sku);
+  const color = variantColorLabel(title);
+
+  if (color && size) {
+    return `${color} / ${size}`;
+  }
+
+  if (size) {
+    return size;
+  }
+
+  if (color) {
+    return color;
   }
 
   return sku || product.epos_product_id;
@@ -298,6 +363,9 @@ function normalizedVariantBaseTitle(product: Product) {
   const words = title.split(/\s+/).filter(Boolean);
   while (words.length > 1 && apparelColorWords.includes(words[0])) {
     words.shift();
+  }
+  while (words.length > 1 && apparelColorWords.includes(words[words.length - 1])) {
+    words.pop();
   }
 
   title = words.join(" ");
@@ -466,8 +534,8 @@ export function ShopProducts() {
     );
   }
 
-  function openProduct(product: Product, title: string, imageProduct = product) {
-    setDetailProduct({ product, imageProduct, title });
+  function openProduct(product: Product, title: string, imageProduct = product, group?: ProductGroup) {
+    setDetailProduct({ product, imageProduct, title, group });
   }
 
   function closeProduct() {
@@ -476,6 +544,7 @@ export function ShopProducts() {
 
   const detailPrice = detailProduct ? money(detailProduct.product.sale_price) : "";
   const detailAvailable = detailProduct ? hasAvailableStock(detailProduct.product) : false;
+  const detailHasVariants = Boolean(detailProduct?.group && detailProduct.group.products.length > 1);
 
   return (
     <div className="mt-10">
@@ -512,7 +581,7 @@ export function ShopProducts() {
 
               return (
                 <article className={`group overflow-hidden rounded-lg border border-saddle/15 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-luxe ${isOutOfStock ? "opacity-90" : ""}`} key={group.key}>
-                  <button className="relative block aspect-[4/3] w-full overflow-hidden bg-gradient-to-br from-espresso via-saddle to-ember text-left" onClick={() => openProduct(product, group.title, imageProduct)} type="button">
+                  <button className="relative block aspect-[4/3] w-full overflow-hidden bg-gradient-to-br from-espresso via-saddle to-ember text-left" onClick={() => openProduct(product, group.title, imageProduct, group)} type="button">
                     <div className="absolute inset-0 opacity-30 mix-blend-soft-light luxury-pattern" />
                     {imageProduct.primary_image_url ? (
                       <Image
@@ -536,7 +605,7 @@ export function ShopProducts() {
                   </button>
                   <div className="p-5">
                     <p className="text-xs font-bold uppercase tracking-[0.18em] text-saddle">{departmentTitle(getProductDepartment(product))}</p>
-                    <button className="mt-2 block text-left" onClick={() => openProduct(product, group.title, imageProduct)} type="button">
+                    <button className="mt-2 block text-left" onClick={() => openProduct(product, group.title, imageProduct, group)} type="button">
                       <h3 className="line-clamp-2 min-h-14 font-display text-2xl leading-tight text-ink hover:text-saddle">{group.title}</h3>
                     </button>
                     {hasVariants ? (
@@ -610,6 +679,32 @@ export function ShopProducts() {
                   <p className="mt-5 text-base leading-7 text-espresso/75">{detailProduct.product.marketing_description || detailProduct.product.description}</p>
                 ) : null}
                 {detailProduct.product.sku ? <p className="mt-4 text-xs font-bold uppercase tracking-[0.18em] text-saddle/75">Style {detailProduct.product.sku}</p> : null}
+                {detailHasVariants && detailProduct.group ? (
+                  <label className="mt-6 grid gap-2 text-sm font-semibold text-espresso">
+                    Select option
+                    <select
+                      className="focus-ring min-h-11 rounded-md border border-saddle/20 bg-white px-3 font-normal"
+                      onChange={(event) => {
+                        const nextProduct = detailProduct.group?.products.find((variant) => variant.epos_product_id === event.target.value);
+                        if (!nextProduct || !detailProduct.group) {
+                          return;
+                        }
+
+                        const nextImageProduct = nextProduct.primary_image_url ? nextProduct : detailProduct.group.products.find((variant) => variant.primary_image_url) || nextProduct;
+                        setSelectedVariants((current) => ({ ...current, [detailProduct.group!.key]: nextProduct.epos_product_id }));
+                        setDetailProduct({ ...detailProduct, product: nextProduct, imageProduct: nextImageProduct });
+                      }}
+                      value={detailProduct.product.epos_product_id}
+                    >
+                      {detailProduct.group.products.map((variant) => (
+                        <option key={variant.epos_product_id} value={variant.epos_product_id}>
+                          {variantLabel(variant)} / {money(variant.sale_price)}
+                          {!hasAvailableStock(variant) ? " / Out of stock" : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : null}
                 <button
                   className="focus-ring mt-7 inline-flex w-full items-center justify-center gap-2 rounded-md bg-ink px-5 py-4 text-sm font-bold uppercase tracking-[0.18em] text-ivory hover:bg-saddle disabled:cursor-not-allowed disabled:bg-espresso/30 sm:w-auto"
                   disabled={detailPrice === "Price in store" || !detailAvailable}
