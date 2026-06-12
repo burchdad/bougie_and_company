@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { ChevronDown } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { defaultMenuItems } from "@/lib/category-defaults";
 
 type MenuItem = {
@@ -75,29 +75,8 @@ function MenuLink({ item, nested = false }: { item: MenuItem; nested?: boolean }
 
 export function CategoryMenu() {
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
-  const [menuItems, setMenuItems] = useState<MenuItem[]>(() => normalizeMenuLinks(defaultMenuItems));
+  const menuItems = useMemo(() => normalizeMenuLinks(defaultMenuItems), []);
   const closeTimer = useRef<number | null>(null);
-
-  useEffect(() => {
-    let ignore = false;
-
-    async function loadMenu() {
-      try {
-        const response = await fetch("/api/categories", { cache: "no-store" });
-        const result = (await response.json()) as { ok: boolean; menu?: MenuItem[] };
-        if (!ignore && result.ok && result.menu?.length) {
-          setMenuItems(normalizeMenuLinks(result.menu));
-        }
-      } catch {
-        setMenuItems(normalizeMenuLinks(defaultMenuItems));
-      }
-    }
-
-    loadMenu();
-    return () => {
-      ignore = true;
-    };
-  }, []);
 
   function openMenu(label: string) {
     if (closeTimer.current) {

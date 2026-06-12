@@ -54,6 +54,18 @@ function normalizeSku(value: unknown) {
   return cleanString(value).toUpperCase().replace(/\s+/g, "");
 }
 
+function titleWithoutLeadingSku(name: string, sku: string) {
+  let title = name;
+  if (sku) {
+    title = title.replace(new RegExp(`^${sku.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s+`, "i"), "");
+  }
+  return title.replace(/^[A-Z]{2,}\d+[A-Z0-9-]*\s+/i, "").replace(/\s+/g, " ").trim();
+}
+
+function comparableName(name: unknown, sku = "") {
+  return normalize(titleWithoutLeadingSku(cleanString(name), sku));
+}
+
 function numberValue(value: unknown) {
   const parsed = Number(cleanString(value));
   return Number.isFinite(parsed) ? parsed : null;
@@ -175,6 +187,27 @@ function categoryIdsFor(slugs: string[], slugToId: Map<string, number>) {
   return [...new Set(slugs.map((slug) => slugToId.get(slug)).filter((id): id is number => Number.isFinite(id)))];
 }
 
+function chooseProductMatch(matches: ProductRow[], name: string, sku: string, alreadyMatched: Set<string>) {
+  if (!matches.length) {
+    return null;
+  }
+
+  const available = matches.filter((product) => !alreadyMatched.has(product.epos_product_id));
+  const candidates = available.length ? available : matches;
+  const rowName = normalize(name);
+  const rowComparable = comparableName(name, sku);
+
+  return (
+    candidates.find((product) => normalize(product.name) === rowName) ||
+    candidates.find((product) => comparableName(product.name, normalizeSku(product.sku)) === rowComparable) ||
+    candidates.find((product) => {
+      const productName = comparableName(product.name, normalizeSku(product.sku));
+      return Boolean(productName && rowComparable && (productName.includes(rowComparable) || rowComparable.includes(productName)));
+    }) ||
+    candidates[0]
+  );
+}
+
 export async function POST(request: Request) {
   if (!isAdminRequest(request)) {
     return Response.json({ ok: false, message: "Admin access required." }, { status: 401 });
@@ -227,8 +260,10 @@ export async function POST(request: Request) {
       continue;
     }
 
-    const matches = (sku ? bySku.get(sku) : null) || byName.get(normalize(name)) || [];
-    const product = matches[0];
+    const skuMatches = sku ? bySku.get(sku) || [] : [];
+    const nameMatches = byName.get(normalize(name)) || [];
+    const matches = [...skuMatches, ...nameMatches].filter((product, index, all) => all.findIndex((candidate) => candidate.epos_product_id === product.epos_product_id) === index);
+    const product = chooseProductMatch(matches, name, sku, matchedProductIds);
 
     if (!product) {
       summary.unmatched.push({ name, sku });

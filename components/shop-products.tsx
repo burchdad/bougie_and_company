@@ -88,6 +88,18 @@ const apparelColorWords = [
   "yellow"
 ];
 
+const apparelCategorySlugs = new Set([
+  "womens-collection",
+  "mens-collection",
+  "clothing",
+  "dresses",
+  "tops",
+  "bottoms",
+  "cardigans",
+  "rompers-jumpsuits",
+  "t-shirts"
+]);
+
 const categoryKeywordMap: Record<string, string[]> = {
   accessories: ["purse", "bag", "luggage", "weekender", "coozie", "koozie", "coaster", "infusion", "cocktail", "cap", "hat"],
   "bath-body": ["bath", "body", "scrub", "salt", "bomb", "chap", "mask", "lotion", "soap", "beard", "spray", "week from hell", "shampoo"],
@@ -257,11 +269,31 @@ function normalizedVariantBaseTitle(product: Product) {
   return title.replace(/[^a-z0-9]+/g, " ").trim();
 }
 
+function hasVariantSignal(product: Product) {
+  const slugs = product.category_slugs || [];
+  if (!slugs.some((slug) => apparelCategorySlugs.has(slug))) {
+    return false;
+  }
+
+  const text = `${cleanProductTitle(product)} ${product.sku || ""}`.toLowerCase();
+  const sizePattern = /\b(size|sz|xxs|xs|small|medium|large|xl|xxl|xxxl|2x|3x|4x|5x|one size|os)\b/i;
+  const hasColor = apparelColorWords.some((word) => new RegExp(`\\b${word}\\b`, "i").test(text));
+  return sizePattern.test(text) || hasColor;
+}
+
 function groupKey(product: Product) {
+  if (!hasVariantSignal(product)) {
+    return product.epos_product_id;
+  }
+
   return normalizedVariantBaseTitle(product) || product.epos_product_id;
 }
 
 function groupTitle(product: Product) {
+  if (!hasVariantSignal(product)) {
+    return titleWithoutLeadingSku(cleanProductTitle(product)).trim();
+  }
+
   const baseTitle = normalizedVariantBaseTitle(product);
   if (!baseTitle || baseTitle === product.epos_product_id) {
     return titleWithoutLeadingSku(cleanProductTitle(product)).replace(/\b(Size|SZ)\b\s*[:#-]?\s*/gi, "").trim();
