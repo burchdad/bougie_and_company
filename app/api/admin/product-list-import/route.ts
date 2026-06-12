@@ -24,14 +24,15 @@ type ProductRow = {
 
 type CategoryNode = {
   label: string;
+  slug?: string;
   children?: CategoryNode[];
 };
 
 const canonicalCategories: CategoryNode[] = [
   { label: "Accessories", children: [{ label: "Purses" }, { label: "Luggage" }, { label: "Caps" }, { label: "Coozies" }, { label: "Leather Coasters" }, { label: "Cocktail Infusions" }, { label: "Outdoor" }] },
   { label: "Equine Jewelry", children: [{ label: "Necklaces" }, { label: "Bracelets" }, { label: "Equine Earrings" }] },
-  { label: "Men's Collection", children: [{ label: "T-Shirts" }, { label: "Men's Care" }, { label: "Beard Products" }, { label: "Mechanic Soap" }] },
-  { label: "Women's Collection", children: [{ label: "Dresses" }, { label: "Tops" }, { label: "Bottoms" }, { label: "Cardigans" }, { label: "Rompers & Jumpsuits" }] },
+  { label: "Men's Collection", slug: "mens-collection", children: [{ label: "T-Shirts" }, { label: "Men's Care", slug: "mens-care" }, { label: "Beard Products" }, { label: "Mechanic Soap" }] },
+  { label: "Women's Collection", slug: "womens-collection", children: [{ label: "Dresses" }, { label: "Tops" }, { label: "Bottoms" }, { label: "Cardigans" }, { label: "Rompers & Jumpsuits" }] },
   { label: "Bath & Body", children: [{ label: "Bath Bombs" }, { label: "Bath Salts & Scrubs" }, { label: "Body Butter & Lotions" }, { label: "Chap Stick" }, { label: "Body Spray" }, { label: "Clay Mask" }, { label: "Handmade Soap" }, { label: "Week From Hell" }] },
   { label: "Candles", children: [{ label: "Candles & Wax Melts" }] },
   { label: "Home Collection", children: [{ label: "Tea Towels & Pillows" }, { label: "Farm Eggs" }] },
@@ -152,7 +153,7 @@ async function resetCategories() {
 
   async function insert(nodes: CategoryNode[], parentId: number | null) {
     for (const [index, node] of nodes.entries()) {
-      const slug = slugify(node.label);
+      const slug = node.slug || slugify(node.label);
       const rows = await sql`
         INSERT INTO site_categories (label, slug, href, parent_id, sort_order, is_header)
         VALUES (${node.label}, ${slug}, ${`/shop#${slug}`}, ${parentId}, ${index}, ${parentId === null})
