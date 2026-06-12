@@ -180,7 +180,7 @@ export async function POST(request: Request) {
     return Response.json({ ok: false, message: "Admin access required." }, { status: 401 });
   }
 
-  const body = (await request.json()) as { rows?: ImportRow[]; resetCategories?: boolean };
+  const body = (await request.json()) as { rows?: ImportRow[]; resetCategories?: boolean; hideMissingProducts?: boolean };
   const importRows = Array.isArray(body.rows) ? body.rows : [];
 
   if (!importRows.length) {
@@ -214,8 +214,10 @@ export async function POST(request: Request) {
     unmatched: [] as Array<{ name: string; sku: string }>,
     updatedImages: 0,
     hidden: 0,
+    hiddenMissing: 0,
     categoryAssignments: 0
   };
+  const matchedProductIds = new Set<string>();
 
   for (const row of importRows) {
     const name = cleanString(row.Name);
@@ -232,6 +234,8 @@ export async function POST(request: Request) {
       summary.unmatched.push({ name, sku });
       continue;
     }
+
+    matchedProductIds.add(product.epos_product_id);
 
     const description = cleanString(row.Description) || name;
     const salePrice = numberValue(row.SalePriceExTax) ?? numberValue(row.SalePriceIncTax);
@@ -295,6 +299,42 @@ export async function POST(request: Request) {
       summary.hidden += 1;
     }
     summary.matched += 1;
+  }
+
+  if (body.hideMissingProducts) {
+    const matchedJson = JSON.stringify([...matchedProductIds]);
+    const hiddenRows = await sql`
+      WITH matched AS (
+        SELECT value::text AS epos_product_id
+        FROM jsonb_array_elements_text(${matchedJson}::jsonb)
+      ),
+      missing AS (
+        SELECT p.epos_product_id
+        FROM epos_products p
+        WHERE p.is_deleted = FALSE
+          AND NOT EXISTS (SELECT 1 FROM matched m WHERE m.epos_product_id = p.epos_product_id)
+      ),
+      upserted AS (
+        INSERT INTO product_site_meta (epos_product_id, is_hidden, updated_at)
+        SELECT epos_product_id, TRUE, NOW()
+        FROM missing
+        ON CONFLICT (epos_product_id)
+        DO UPDATE SET is_hidden = TRUE, updated_at = NOW()
+        RETURNING epos_product_id
+      )
+      SELECT COUNT(*)::int AS count FROM upserted
+    `;
+
+    await sql`
+      WITH matched AS (
+        SELECT value::text AS epos_product_id
+        FROM jsonb_array_elements_text(${matchedJson}::jsonb)
+      )
+      DELETE FROM product_site_categories pc
+      WHERE NOT EXISTS (SELECT 1 FROM matched m WHERE m.epos_product_id = pc.epos_product_id)
+    `;
+
+    summary.hiddenMissing = Number(hiddenRows[0]?.count || 0);
   }
 
   return Response.json({ ok: true, message: "Product list import completed.", summary }, { headers: { "Cache-Control": "no-store" } });
