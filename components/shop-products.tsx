@@ -280,8 +280,11 @@ const categoryKeywordMap: Record<string, string[]> = {
   "equine-jewelry": ["equine", "horse", "rein", "snaffle", "necklace", "bracelet", "earring", "ear ring"],
   "fashion-earrings": ["earring", "ear ring"],
   "foaming-hand-soap": ["foaming hand"],
+  "hand-soaps": ["hand soap", "handmade soap", "homemade soap", "dish soap"],
   "gift-certificates": ["gift certificate"],
-  "gift-collection": ["gift", "certificate", "set"],
+  "gift-basket": ["gift basket"],
+  "gift-cards": ["gift card", "gift certificate"],
+  "gift-collection": ["gift card", "gift certificate"],
   "gift-sets": ["gift set"],
   "handmade-soaps": ["handmade soap", "homemade soap"],
   headbands: ["headband"],
@@ -293,8 +296,8 @@ const categoryKeywordMap: Record<string, string[]> = {
   "kitchen-selection-homemade-dish-soap": ["dish soap"],
   "homemade-mechanic-soaps": ["mechanic soap", "mechanic soaps"],
   "jewelry-headbands": ["jewelry", "headband", "earring", "bracelet", "necklace"],
-  "kitchen-collection": ["dish soap", "foaming hand", "kitchen"],
-  "kitchen-selection": ["dish soap", "foaming hand", "kitchen"],
+  "kitchen-collection": ["dish soap", "foaming hand", "hand soap", "handmade soap", "homemade soap", "kitchen"],
+  "kitchen-selection": ["dish soap", "foaming hand", "hand soap", "handmade soap", "homemade soap", "kitchen"],
   "leather-coasters": ["leather coaster"],
   luggage: ["luggage", "weekender", "duffle", "travel"],
   "mens-care": ["men", "beard", "mechanic", "body spray", "shampoo", "chap"],
@@ -304,6 +307,7 @@ const categoryKeywordMap: Record<string, string[]> = {
   outdoor: ["outdoor"],
   pants: ["pant", "wideleg", "wide leg", "bottom", "short", "skirt"],
   purses: ["purse", "bag"],
+  "farm-eggs": ["farm fresh egg", "farm eggs"],
   regular: ["regular coaster"],
   "rompers-jumpsuits": ["romper", "jumpsuit"],
   "candles-soy-9oz": ["9oz", "9 oz"],
@@ -322,6 +326,15 @@ const categoryKeywordMap: Record<string, string[]> = {
 function money(value: string | null) {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? `$${parsed.toFixed(2)}` : "Price in store";
+}
+
+function isFarmEggProduct(product: Product) {
+  const haystack = productSearchText(product);
+  return product.category_slugs?.includes("farm-eggs") || haystack.includes("farm fresh egg");
+}
+
+function displayPrice(product: Product) {
+  return isFarmEggProduct(product) ? "$4.00 / dozen" : money(product.sale_price);
 }
 
 function stockCount(value: string | null) {
@@ -378,8 +391,13 @@ function productMatchesFilter(product: Product, filterId: string) {
     return false;
   }
 
-  if (filterId === "gift-collection" || filterId === "gift-cards" || filterId === "gift-certificates" || filterId === "gift-sets") {
+  if (filterId === "gift-basket" || filterId === "gift-baskets" || filterId === "gift-sets") {
     return false;
+  }
+
+  if (filterId === "gift-collection" || filterId === "gift-cards" || filterId === "gift-certificates") {
+    const haystack = productSearchText(product);
+    return product.category_slugs?.includes("gift-cards") || haystack.includes("gift card") || haystack.includes("gift certificate");
   }
 
   if (filterId === "handmade-soaps" || filterId === "soaps") {
@@ -399,6 +417,11 @@ function productMatchesFilter(product: Product, filterId: string) {
   if (filterId === "homemade-dish-soap" || filterId === "kitchen-selection-dish-soap" || filterId === "kitchen-selection-homemade-dish-soap") {
     const haystack = productSearchText(product);
     return product.category_slugs?.includes("kitchen-selection") && haystack.includes("dish soap") && !haystack.includes("foaming hand");
+  }
+
+  if (filterId === "hand-soaps") {
+    const haystack = productSearchText(product);
+    return product.category_slugs?.includes("soaps") && haystack.includes("soap") && !haystack.includes("foaming hand");
   }
 
   if (filterId === "foaming-hand-soap" || filterId === "kitchen-selection-foaming-hand-soap") {
@@ -705,10 +728,10 @@ export function ShopProducts() {
   }, [activeDepartment, products]);
 
   const filteredGroups = useMemo(() => groupProducts(filteredProducts), [filteredProducts]);
-  const isGiftCollectionCategory = activeDepartment === "gift-collection" || activeDepartment === "gift-cards" || activeDepartment === "gift-certificates" || activeDepartment === "gift-sets";
+  const isGiftBasketCategory = activeDepartment === "gift-basket" || activeDepartment === "gift-baskets";
 
   function addToCart(product: Product, option?: string) {
-    if (!hasAvailableStock(product)) {
+    if (!hasAvailableStock(product) || isFarmEggProduct(product)) {
       return;
     }
 
@@ -717,7 +740,7 @@ export function ShopProducts() {
         detail: {
           id: product.epos_product_id,
           name: cartProductName(product, option),
-          price: money(product.sale_price),
+          price: displayPrice(product),
           category: departmentTitle(getProductDepartment(product))
         }
       })
@@ -732,8 +755,9 @@ export function ShopProducts() {
     setDetailProduct(null);
   }
 
-  const detailPrice = detailProduct ? money(detailProduct.product.sale_price) : "";
+  const detailPrice = detailProduct ? displayPrice(detailProduct.product) : "";
   const detailAvailable = detailProduct ? hasAvailableStock(detailProduct.product) : false;
+  const detailIsFarmEgg = Boolean(detailProduct && isFarmEggProduct(detailProduct.product));
   const detailHasVariants = Boolean(detailProduct?.group && detailProduct.group.products.length > 1);
   const detailGroupKey = detailProduct?.group?.key || detailProduct?.product.epos_product_id || "";
   const detailHasTshirtSizes = Boolean(detailProduct && !detailHasVariants && isMensTshirtProduct(detailProduct.product));
@@ -757,13 +781,13 @@ export function ShopProducts() {
         {!loading && !filteredGroups.length && !message ? (
           <div className="mt-5 rounded-lg border border-dashed border-saddle/25 bg-white p-8 text-center">
             <Sparkles className="mx-auto h-8 w-8 text-saddle" />
-            <p className="mt-3 font-display text-3xl text-ink">{isGiftCollectionCategory ? "Build your own gift basket." : "No products found here yet."}</p>
+            <p className="mt-3 font-display text-3xl text-ink">{isGiftBasketCategory ? "Build your own gift basket." : "No products found here yet."}</p>
             <p className="mt-2 text-espresso/70">
-              {isGiftCollectionCategory
+              {isGiftBasketCategory
                 ? "Please contact us and we will help create a custom gift basket for your occasion."
                 : "Try another category from the shop menu."}
             </p>
-            {isGiftCollectionCategory ? <GiftBasketRequestForm /> : null}
+            {isGiftBasketCategory ? <GiftBasketRequestForm /> : null}
           </div>
         ) : null}
 
@@ -773,11 +797,12 @@ export function ShopProducts() {
               const selectedProductId = selectedVariants[group.key];
               const product = group.products.find((variant) => variant.epos_product_id === selectedProductId) || group.products.find(hasAvailableStock) || group.products[0];
               const imageProduct = product.primary_image_url ? product : group.products.find((variant) => variant.primary_image_url) || product;
-              const price = money(product.sale_price);
+              const price = displayPrice(product);
               const hasVariants = group.products.length > 1;
               const hasTshirtSizes = !hasVariants && isMensTshirtProduct(product);
               const selectedTshirtSize = selectedVariants[group.key] || mensTshirtSizes[0];
               const isOutOfStock = !hasAvailableStock(product);
+              const isFarmEgg = isFarmEggProduct(product);
 
               return (
                 <article className={`group overflow-hidden rounded-lg border border-saddle/15 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-luxe ${isOutOfStock ? "opacity-90" : ""}`} key={group.key}>
@@ -845,14 +870,22 @@ export function ShopProducts() {
                       <span className="font-bold text-espresso">{price}</span>
                       <button
                         className="focus-ring inline-flex items-center gap-2 rounded-md bg-ink px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] text-ivory hover:bg-saddle disabled:cursor-not-allowed disabled:bg-espresso/30"
-                        disabled={price === "Price in store" || isOutOfStock}
-                        onClick={() => addToCart(product, hasTshirtSizes ? selectedTshirtSize : undefined)}
+                        disabled={!isFarmEgg && (price === "Price in store" || isOutOfStock)}
+                        onClick={() => {
+                          if (isFarmEgg) {
+                            window.location.href = "/contact";
+                            return;
+                          }
+
+                          addToCart(product, hasTshirtSizes ? selectedTshirtSize : undefined);
+                        }}
                         type="button"
                       >
                         <ShoppingBag className="h-4 w-4" />
-                        {isOutOfStock ? "Sold Out" : "Add"}
+                        {isFarmEgg ? "Contact" : isOutOfStock ? "Sold Out" : "Add"}
                       </button>
                     </div>
+                    {isFarmEgg ? <p className="mt-3 text-sm font-semibold text-saddle">Local delivery only. Please contact to place order.</p> : null}
                   </div>
                 </article>
               );
@@ -894,6 +927,7 @@ export function ShopProducts() {
                 {detailProduct.product.marketing_description || detailProduct.product.description ? (
                   <p className="mt-5 text-base leading-7 text-espresso/75">{detailProduct.product.marketing_description || detailProduct.product.description}</p>
                 ) : null}
+                {detailIsFarmEgg ? <p className="mt-5 rounded-md bg-cream px-4 py-3 text-sm font-semibold text-saddle">Local delivery only. Please contact to place order.</p> : null}
                 {detailProduct.product.sku ? <p className="mt-4 text-xs font-bold uppercase tracking-[0.18em] text-saddle/75">Style {detailProduct.product.sku}</p> : null}
                 {detailHasVariants && detailProduct.group ? (
                   <label className="mt-6 grid gap-2 text-sm font-semibold text-espresso">
@@ -939,12 +973,19 @@ export function ShopProducts() {
                 ) : null}
                 <button
                   className="focus-ring mt-7 inline-flex w-full items-center justify-center gap-2 rounded-md bg-ink px-5 py-4 text-sm font-bold uppercase tracking-[0.18em] text-ivory hover:bg-saddle disabled:cursor-not-allowed disabled:bg-espresso/30 sm:w-auto"
-                  disabled={detailPrice === "Price in store" || !detailAvailable}
-                  onClick={() => addToCart(detailProduct.product, detailHasTshirtSizes ? selectedDetailTshirtSize : undefined)}
+                  disabled={!detailIsFarmEgg && (detailPrice === "Price in store" || !detailAvailable)}
+                  onClick={() => {
+                    if (detailIsFarmEgg) {
+                      window.location.href = "/contact";
+                      return;
+                    }
+
+                    addToCart(detailProduct.product, detailHasTshirtSizes ? selectedDetailTshirtSize : undefined);
+                  }}
                   type="button"
                 >
                   <ShoppingBag className="h-4 w-4" />
-                  {detailAvailable ? "Add To Cart" : "Sold Out"}
+                  {detailIsFarmEgg ? "Contact To Order" : detailAvailable ? "Add To Cart" : "Sold Out"}
                 </button>
               </div>
             </div>

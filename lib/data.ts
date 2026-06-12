@@ -82,19 +82,14 @@ export const shopDepartments = [
     items: ["Necklaces", "Bracelets", "Earrings"]
   },
   {
-    id: "handmade-soaps",
-    title: "Handmade Soaps",
-    items: ["Handmade Soaps", "Homemade Mechanic Soaps", "Foaming Hand Soap", "Dish Soap"]
-  },
-  {
     id: "accessories",
     title: "Accessories",
-    items: ["Purses", "Luggage", "Home Collection", "Kitchen Collection", "Bath & Body", "Gift Collection", "Men's Care", "Women's Care", "Coozies", "Leather Coasters", "Cocktail Infusions", "Soaps", "Homemade", "Foaming Hand Soap"]
+    items: ["Purses", "Luggage", "Home Collection", "Kitchen Collection", "Bath & Body", "Gift Collection", "Men's Care", "Women's Care", "Coozies", "Leather Coasters", "Cocktail Infusions", "Farm Fresh Eggs"]
   },
   {
     id: "bath-body",
     title: "Bath & Body",
-    items: ["Bath Bombs", "Body Butter/Lotion", "Chap Stick", "Body Spray", "Bath Salts", "Body Scrubs", "Clay Masks", "Handmade Soaps", "Week From Hell"]
+    items: ["Bath Bombs", "Body Butter/Lotion", "Chap Stick", "Body Spray", "Bath Salts", "Body Scrubs", "Clay Masks", "Week From Hell"]
   },
   {
     id: "home-collection",
@@ -114,12 +109,12 @@ export const shopDepartments = [
   {
     id: "kitchen-selection",
     title: "Kitchen Selection",
-    items: ["Homemade Dish Soap", "Foaming Hand Soap"]
+    items: ["Soaps", "Hand Soaps", "Foaming Hand Soaps"]
   },
   {
     id: "gift-collection",
     title: "Gift Collection",
-    items: ["Gift Sets", "Gift Certificates"]
+    items: ["Gift Cards", "Gift Baskets"]
   },
   {
     id: "jewelry-headbands",

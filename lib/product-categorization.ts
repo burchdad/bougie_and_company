@@ -3,13 +3,12 @@ import { shopDepartments } from "@/lib/data";
 export const departmentKeywords: Record<string, string[]> = {
   clothing: ["shirt", "tee", "t-shirt", "top", "bottom", "dress", "romper", "jumpsuit", "cardigan", "jean", "short", "pant", "skirt"],
   "equine-jewelry": ["equine", "horse", "rein", "snaffle", "necklace", "bracelet", "earring"],
-  "handmade-soaps": ["handmade soap", "homemade soap", "mechanic soap", "foaming hand", "dish soap", "shave soap"],
-  accessories: ["purse", "bag", "luggage", "weekender", "coozie", "koozie", "coaster", "infusion", "cocktail", "cap", "hat"],
+  accessories: ["purse", "bag", "luggage", "weekender", "coozie", "koozie", "coaster", "infusion", "cocktail", "cap", "hat", "farm fresh egg"],
   "bath-body": ["bath", "body", "scrub", "salt", "bomb", "chap", "mask", "lotion", "soap", "beard", "spray", "week from hell", "shampoo"],
   "home-collection": ["candle", "wax", "melt", "tea towel", "pillow", "coaster", "mixer", "outdoor"],
   "mens-collection": ["men", "beard", "mechanic", "cap", "t-shirt", "body spray", "shampoo"],
   "womens-collection": ["women", "dress", "romper", "jumpsuit", "purse", "bath bomb", "body spray", "week from hell"],
-  "kitchen-selection": ["dish soap", "foaming hand", "kitchen"],
+  "kitchen-selection": ["dish soap", "foaming hand", "hand soap", "handmade soap", "homemade soap", "kitchen"],
   "gift-collection": ["gift", "certificate", "set"],
   "jewelry-headbands": ["jewelry", "headband", "earring", "bracelet", "necklace"]
 };

@@ -29,17 +29,16 @@ type CategoryNode = {
 };
 
 const canonicalCategories: CategoryNode[] = [
-  { label: "Accessories", children: [{ label: "Purses" }, { label: "Luggage" }, { label: "Caps" }, { label: "Coozies" }, { label: "Leather Coasters" }, { label: "Cocktail Infusions" }, { label: "Outdoor" }] },
+  { label: "Accessories", children: [{ label: "Purses" }, { label: "Luggage" }, { label: "Caps" }, { label: "Coozies" }, { label: "Leather Coasters" }, { label: "Cocktail Infusions" }, { label: "Outdoor" }, { label: "Farm Fresh Eggs", slug: "farm-eggs" }] },
   { label: "Equine Jewelry", children: [{ label: "Necklaces" }, { label: "Bracelets" }, { label: "Equine Earrings" }] },
   { label: "Men's Collection", slug: "mens-collection", children: [{ label: "T-Shirts" }, { label: "Men's Care", slug: "mens-care" }, { label: "Beard Products" }, { label: "Mechanic Soap" }] },
   { label: "Women's Collection", slug: "womens-collection", children: [{ label: "Dresses" }, { label: "Tops" }, { label: "Pants" }, { label: "Cardigans" }, { label: "Rompers & Jumpsuits" }] },
   { label: "Bath & Body", children: [{ label: "Bath Bombs" }, { label: "Bath Salts & Scrubs" }, { label: "Body Butter & Lotions" }, { label: "Chap Stick" }, { label: "Body Spray" }, { label: "Clay Mask" }, { label: "Handmade Soap" }, { label: "Week From Hell" }] },
   { label: "Candles", children: [{ label: "Soy 9oz" }, { label: "Soy Wax Melts" }, { label: "Candles & Wax Melts" }] },
-  { label: "Home Collection", children: [{ label: "Tea Towels & Pillows" }, { label: "Farm Eggs" }] },
-  { label: "Kitchen Selection", children: [{ label: "Dish Soap", slug: "homemade-dish-soap" }, { label: "Foaming Hand Soap" }, { label: "Dish Soap & Hand Soap" }] },
-  { label: "Gift Collection", children: [{ label: "Gift Cards" }] },
-  { label: "Jewelry", children: [{ label: "Fashion Earrings" }, { label: "Headbands" }] },
-  { label: "Handmade Soaps" }
+  { label: "Home Collection", children: [{ label: "Tea Towels & Pillows" }] },
+  { label: "Kitchen Selection", children: [{ label: "Soaps", children: [{ label: "Foaming Hand Soaps", slug: "foaming-hand-soap" }, { label: "Hand Soaps", slug: "hand-soaps" }] }] },
+  { label: "Gift Collection", children: [{ label: "Gift Cards" }, { label: "Gift Baskets", slug: "gift-basket" }] },
+  { label: "Jewelry", children: [{ label: "Fashion Earrings" }, { label: "Headbands" }] }
 ];
 
 function cleanString(value: unknown) {
@@ -126,14 +125,14 @@ function candleSlugsFor(name: string) {
 function kitchenSoapSlugsFor(name: string) {
   const lower = name.toLowerCase();
   if (lower.includes("foaming hand")) {
-    return ["kitchen-selection", "foaming-hand-soap"];
+    return ["kitchen-selection", "soaps", "foaming-hand-soap"];
   }
 
-  if (lower.includes("dish soap")) {
-    return ["kitchen-selection", "homemade-dish-soap"];
+  if (lower.includes("dish soap") || lower.includes("hand soap") || lower.includes("soap")) {
+    return ["kitchen-selection", "soaps", "hand-soaps"];
   }
 
-  return ["kitchen-selection", "dish-soap-hand-soap"];
+  return ["kitchen-selection", "soaps"];
 }
 
 function categorySlugsFor(row: ImportRow) {
@@ -172,20 +171,20 @@ function categorySlugsFor(row: ImportRow) {
     case "equine jewelry":
       return ["equine-jewelry", inferEquineSlug(name)];
     case "farm eggs":
-      return ["home-collection", "farm-eggs"];
+      return ["accessories", "farm-eggs"];
     case "gift card":
       return ["gift-collection", "gift-cards"];
     case "handmade soap":
-      return ["handmade-soaps", "bath-body", "handmade-soap"];
+      return ["kitchen-selection", "soaps", "hand-soaps", "bath-body", "handmade-soap"];
     case "kitchen homemade dish disk soaps and hand soap":
-      return ["handmade-soaps", ...kitchenSoapSlugsFor(name)];
+      return kitchenSoapSlugsFor(name);
     case "leather coasters":
       if (sku === "BCLC591") return [];
       return ["accessories", "leather-coasters"];
     case "luggage":
       return ["accessories", "luggage"];
     case "mechanic soap":
-      return ["handmade-soaps", "mens-collection", "mens-care", "mechanic-soap"];
+      return ["kitchen-selection", "soaps", "hand-soaps", "mens-collection", "mens-care", "mechanic-soap"];
     case "outdoor":
       return ["accessories", "outdoor"];
     case "purses":
@@ -193,6 +192,7 @@ function categorySlugsFor(row: ImportRow) {
     case "tanning 1month membership":
       return [];
     case "tea towels and pillows":
+      if (normalize(name).includes("american flag cotton tea towel")) return [];
       return ["home-collection", "tea-towels-pillows"];
     case "t shirts":
       return ["mens-collection", "t-shirts"];
@@ -239,6 +239,12 @@ function isApparelAssignment(slugs: string[]) {
 
 function shouldSuppressVariantSku(value: unknown) {
   return normalizeSku(value) === "BGA80892X-SMALL";
+}
+
+function shouldHideImportedProduct(row: ImportRow) {
+  const name = normalize(row.Name);
+  const sku = normalizeSku(row.Sku);
+  return sku === "BCLC591" || shouldSuppressVariantSku(sku) || name.includes("american flag cotton tea towel");
 }
 
 function chooseProductMatch(matches: ProductRow[], name: string, sku: string, alreadyMatched: Set<string>) {
@@ -327,9 +333,10 @@ export async function POST(request: Request) {
     matchedProductIds.add(product.epos_product_id);
 
     const description = cleanString(row.Description) || name;
-    const salePrice = numberValue(row.SalePriceExTax) ?? numberValue(row.SalePriceIncTax);
+    const isFarmEggProduct = normalize(row.CategoryId) === "farm eggs";
+    const salePrice = isFarmEggProduct ? 4 : numberValue(row.SalePriceExTax) ?? numberValue(row.SalePriceIncTax);
     const sellOnWeb = normalize(row.SellOnWeb) === "yes";
-    const forceHidden = sku === "BCLC591" || shouldSuppressVariantSku(sku) || normalize(row.CategoryId) === "gift card";
+    const forceHidden = shouldHideImportedProduct(row);
     const isWebsiteHidden = forceHidden || !sellOnWeb || normalize(row.CategoryId) === "tanning 1month membership";
     const imageUrl = publicImageUrl(row.ImageUrl);
     const assignedSlugs = categorySlugsFor(row);
