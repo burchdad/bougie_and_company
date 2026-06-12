@@ -178,6 +178,8 @@ export async function getAdminProducts(query = "", limit = 1000) {
               AND image_product.barcode = p.barcode
             )
             OR (
+              COALESCE(p.raw->>'SkipEposImageImport', 'false') <> 'true'
+              AND
               NULLIF(regexp_replace(regexp_replace(lower(p.name), '^[a-z]+[0-9]+[a-z0-9-]*[[:space:]]+', '', 'i'), '[[:space:]]+(bath bomb|bath bombs|soap|soaps|homemade soap|handmade soap)$', '', 'i'), '') IS NOT NULL
               AND NULLIF(regexp_replace(regexp_replace(lower(image_product.name), '^[a-z]+[0-9]+[a-z0-9-]*[[:space:]]+', '', 'i'), '[[:space:]]+(bath bomb|bath bombs|soap|soaps|homemade soap|handmade soap)$', '', 'i'), '') IS NOT NULL
               AND regexp_replace(regexp_replace(lower(p.name), '^[a-z]+[0-9]+[a-z0-9-]*[[:space:]]+', '', 'i'), '[[:space:]]+(bath bomb|bath bombs|soap|soaps|homemade soap|handmade soap)$', '', 'i')
@@ -282,6 +284,8 @@ export async function getAdminProducts(query = "", limit = 1000) {
               AND image_product.barcode = p.barcode
             )
             OR (
+              COALESCE(p.raw->>'SkipEposImageImport', 'false') <> 'true'
+              AND
               NULLIF(regexp_replace(regexp_replace(lower(p.name), '^[a-z]+[0-9]+[a-z0-9-]*[[:space:]]+', '', 'i'), '[[:space:]]+(bath bomb|bath bombs|soap|soaps|homemade soap|handmade soap)$', '', 'i'), '') IS NOT NULL
               AND NULLIF(regexp_replace(regexp_replace(lower(image_product.name), '^[a-z]+[0-9]+[a-z0-9-]*[[:space:]]+', '', 'i'), '[[:space:]]+(bath bomb|bath bombs|soap|soaps|homemade soap|handmade soap)$', '', 'i'), '') IS NOT NULL
               AND regexp_replace(regexp_replace(lower(p.name), '^[a-z]+[0-9]+[a-z0-9-]*[[:space:]]+', '', 'i'), '[[:space:]]+(bath bomb|bath bombs|soap|soaps|homemade soap|handmade soap)$', '', 'i')
