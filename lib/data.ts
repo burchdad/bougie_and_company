@@ -84,7 +84,7 @@ export const shopDepartments = [
   {
     id: "accessories",
     title: "Accessories",
-    items: ["Purses", "Luggage", "Home Collection", "Kitchen Collection", "Bath & Body", "Gift Collection", "Men's Care", "Women's Care", "Coozies", "Leather Coasters", "Cocktail Infusions", "Farm Fresh Eggs"]
+    items: ["Purses", "Luggage", "Home Collection", "Kitchen Collection", "Bath & Body", "Gift Collection", "Men's Care", "Women's Care", "Coozies", "Coasters", "Leather Coasters", "Cocktail Infusions", "Farm Fresh Eggs"]
   },
   {
     id: "bath-body",
@@ -94,7 +94,7 @@ export const shopDepartments = [
   {
     id: "home-collection",
     title: "Home Collection",
-    items: ["Candles", "Soy 9oz", "Soy Wax melts", "Tea Towels / Pillows", "Cocktail Mixers", "Coasters", "Regular Coasters", "Leather Coasters", "Outdoor Items"]
+    items: ["Candles", "Soy 9oz", "Soy Wax melts", "Tea Towels / Pillows", "Cocktail Mixers", "Outdoor Items"]
   },
   {
     id: "mens-collection",

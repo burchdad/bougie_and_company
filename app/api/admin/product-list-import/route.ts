@@ -29,7 +29,7 @@ type CategoryNode = {
 };
 
 const canonicalCategories: CategoryNode[] = [
-  { label: "Accessories", children: [{ label: "Purses" }, { label: "Luggage" }, { label: "Caps" }, { label: "Coozies" }, { label: "Leather Coasters" }, { label: "Cocktail Infusions" }, { label: "Outdoor" }, { label: "Farm Fresh Eggs", slug: "farm-eggs" }] },
+  { label: "Accessories", children: [{ label: "Purses" }, { label: "Luggage" }, { label: "Caps" }, { label: "Coozies" }, { label: "Coasters", children: [{ label: "Coasters", slug: "regular-coasters" }, { label: "Leather Coasters" }] }, { label: "Cocktail Infusions" }, { label: "Outdoor" }, { label: "Farm Fresh Eggs", slug: "farm-eggs" }] },
   { label: "Equine Jewelry", children: [{ label: "Necklaces" }, { label: "Bracelets" }, { label: "Equine Earrings" }] },
   { label: "Men's Collection", slug: "mens-collection", children: [{ label: "T-Shirts" }, { label: "Men's Care", slug: "mens-care" }, { label: "Beard Products" }, { label: "Mechanic Soap" }] },
   { label: "Women's Collection", slug: "womens-collection", children: [{ label: "Dresses" }, { label: "Tops" }, { label: "Pants" }, { label: "Cardigans" }, { label: "Rompers & Jumpsuits" }] },
@@ -186,7 +186,7 @@ function categorySlugsFor(row: ImportRow) {
       return kitchenSoapSlugsFor(name);
     case "leather coasters":
       if (sku === "BCLC591") return [];
-      return ["accessories", "leather-coasters"];
+      return ["accessories", "coasters", "leather-coasters"];
     case "luggage":
       return ["accessories", "luggage"];
     case "mechanic soap":
@@ -250,7 +250,7 @@ function shouldSuppressVariantSku(value: unknown) {
 function shouldHideImportedProduct(row: ImportRow) {
   const name = normalize(row.Name);
   const sku = normalizeSku(row.Sku);
-  return sku === "BCLC591" || shouldSuppressVariantSku(sku) || name.includes("american flag cotton tea towel");
+  return sku === "BCLC591" || shouldSuppressVariantSku(sku) || name.includes("american flag cotton tea towel") || name.includes("premium loofah");
 }
 
 function shouldRemoveImportedImage(row: ImportRow) {
