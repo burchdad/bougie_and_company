@@ -36,7 +36,7 @@ const canonicalCategories: CategoryNode[] = [
   { label: "Bath & Body", children: [{ label: "Bath Bombs" }, { label: "Bath Salts & Scrubs" }, { label: "Body Butter & Lotions" }, { label: "Chap Stick" }, { label: "Body Spray" }, { label: "Clay Mask" }, { label: "Handmade Soap" }, { label: "Week From Hell" }] },
   { label: "Candles", children: [{ label: "Soy 9oz" }, { label: "Soy Wax Melts" }, { label: "Candles & Wax Melts" }] },
   { label: "Home Collection", children: [{ label: "Tea Towels & Pillows" }, { label: "Farm Eggs" }] },
-  { label: "Kitchen Selection", children: [{ label: "Dish Soap & Hand Soap" }, { label: "Foaming Hand Soap" }] },
+  { label: "Kitchen Selection", children: [{ label: "Dish Soap", slug: "homemade-dish-soap" }, { label: "Foaming Hand Soap" }, { label: "Dish Soap & Hand Soap" }] },
   { label: "Gift Collection", children: [{ label: "Gift Cards" }] },
   { label: "Jewelry", children: [{ label: "Fashion Earrings" }, { label: "Headbands" }] },
   { label: "Tack" }
@@ -105,6 +105,19 @@ function candleSlugsFor(name: string) {
   return ["candles", "candles-wax-melts"];
 }
 
+function kitchenSoapSlugsFor(name: string) {
+  const lower = name.toLowerCase();
+  if (lower.includes("foaming hand")) {
+    return ["kitchen-selection", "foaming-hand-soap"];
+  }
+
+  if (lower.includes("dish soap")) {
+    return ["kitchen-selection", "homemade-dish-soap"];
+  }
+
+  return ["kitchen-selection", "dish-soap-hand-soap"];
+}
+
 function categorySlugsFor(row: ImportRow) {
   const category = normalize(row.CategoryId);
   const name = cleanString(row.Name);
@@ -146,7 +159,7 @@ function categorySlugsFor(row: ImportRow) {
     case "handmade soap":
       return ["bath-body", "handmade-soap"];
     case "kitchen homemade dish disk soaps and hand soap":
-      return ["kitchen-selection", "dish-soap-hand-soap"];
+      return kitchenSoapSlugsFor(name);
     case "leather coasters":
       return ["accessories", "leather-coasters"];
     case "luggage":

@@ -130,6 +130,9 @@ const categoryKeywordMap: Record<string, string[]> = {
   "home-collection": ["candle", "wax", "melt", "tea towel", "pillow", "coaster", "mixer", "outdoor"],
   homemade: ["homemade"],
   "homemade-dish-soap": ["dish soap"],
+  "kitchen-selection-dish-soap": ["dish soap"],
+  "kitchen-selection-foaming-hand-soap": ["foaming hand"],
+  "kitchen-selection-homemade-dish-soap": ["dish soap"],
   "homemade-mechanic-soaps": ["mechanic soap", "mechanic soaps"],
   "jewelry-headbands": ["jewelry", "headband", "earring", "bracelet", "necklace"],
   "kitchen-collection": ["dish soap", "foaming hand", "kitchen"],
@@ -212,6 +215,16 @@ function productMatchesFilter(product: Product, filterId: string) {
   if (filterId === "soy-wax-melts" || filterId === "candles-soy-wax-melts") {
     const haystack = productSearchText(product);
     return product.category_slugs?.includes("candles") && (haystack.includes("wax melt") || haystack.includes("wax melts"));
+  }
+
+  if (filterId === "homemade-dish-soap" || filterId === "kitchen-selection-dish-soap" || filterId === "kitchen-selection-homemade-dish-soap") {
+    const haystack = productSearchText(product);
+    return product.category_slugs?.includes("kitchen-selection") && haystack.includes("dish soap") && !haystack.includes("foaming hand");
+  }
+
+  if (filterId === "foaming-hand-soap" || filterId === "kitchen-selection-foaming-hand-soap") {
+    const haystack = productSearchText(product);
+    return product.category_slugs?.includes("kitchen-selection") && haystack.includes("foaming hand");
   }
 
   if (product.category_slugs?.includes(filterId)) {
