@@ -285,10 +285,10 @@ const categoryKeywordMap: Record<string, string[]> = {
   accessories: ["purse", "bag", "luggage", "weekender", "coozie", "koozie", "coaster", "infusion", "cocktail", "cap", "hat"],
   "bath-body": ["bath", "body", "scrub", "salt", "bomb", "chap", "mask", "lotion", "soap", "beard", "spray", "week from hell", "shampoo"],
   "bath-bombs": ["bath bomb"],
-  "bath-salts": ["bath salt"],
+  "bath-salts": ["bath salt", "bath salts"],
   "beard-products": ["beard"],
   "body-butter-lotion": ["body butter", "lotion"],
-  "body-scrubs": ["body scrub", "scrub"],
+  "body-scrubs": ["body scrub", "bath scrub", "scrub"],
   "body-spray": ["body spray", "body sprays"],
   "body-sprays": ["body spray", "body sprays"],
   bottoms: ["pant", "wideleg", "wide leg", "bottom", "short", "skirt"],
@@ -411,6 +411,14 @@ function productSearchText(product: Product) {
   return `${product.name} ${product.marketing_title || ""} ${product.description || ""} ${product.marketing_description || ""} ${product.sku || ""}`.toLowerCase();
 }
 
+function isBathSaltProductMatch(product: Product) {
+  return /\bsalts?\b/.test(productSearchText(product));
+}
+
+function isBodyScrubProductMatch(product: Product) {
+  return /\bscrubs?\b/.test(productSearchText(product));
+}
+
 function categoryKeywords(filterId: string) {
   const direct = categoryKeywordMap[filterId];
   if (direct) {
@@ -439,6 +447,17 @@ function productMatchesFilter(product: Product, filterId: string) {
 
   if (filterId === "gift-basket" || filterId === "gift-baskets" || filterId === "gift-sets") {
     return false;
+  }
+
+  if (filterId === "bath-salts" || filterId === "body-scrubs") {
+    const slugs = product.category_slugs || [];
+    if (slugs.includes(filterId)) {
+      return true;
+    }
+
+    if (slugs.includes("bath-salts-scrubs")) {
+      return filterId === "bath-salts" ? isBathSaltProductMatch(product) : isBodyScrubProductMatch(product);
+    }
   }
 
   if (filterId === "gift-collection" || filterId === "gift-cards" || filterId === "gift-certificates") {

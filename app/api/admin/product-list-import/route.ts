@@ -33,7 +33,7 @@ const canonicalCategories: CategoryNode[] = [
   { label: "Equine Jewelry", children: [{ label: "Necklaces" }, { label: "Bracelets" }, { label: "Equine Earrings" }] },
   { label: "Men's Collection", slug: "mens-collection", children: [{ label: "T-Shirts" }, { label: "Men's Care", slug: "mens-care" }, { label: "Beard Products" }, { label: "Mechanic Soap" }] },
   { label: "Women's Collection", slug: "womens-collection", children: [{ label: "Dresses" }, { label: "Tops" }, { label: "Pants" }, { label: "Cardigans" }, { label: "Rompers & Jumpsuits" }] },
-  { label: "Bath & Body", children: [{ label: "Bath Bombs" }, { label: "Bath Salts & Scrubs" }, { label: "Body Butter & Lotions" }, { label: "Chap Stick" }, { label: "Body Spray" }, { label: "Clay Mask" }, { label: "Handmade Soap" }, { label: "Week From Hell" }] },
+  { label: "Bath & Body", children: [{ label: "Bath Bombs" }, { label: "Bath Salts" }, { label: "Body Scrubs" }, { label: "Body Butter & Lotions" }, { label: "Chap Stick" }, { label: "Body Spray" }, { label: "Clay Mask" }, { label: "Handmade Soap" }, { label: "Week From Hell" }] },
   { label: "Candles", children: [{ label: "Soy 9oz" }, { label: "Soy Wax Melts" }, { label: "Candles & Wax Melts" }] },
   { label: "Home Collection", children: [{ label: "Tea Towels & Pillows" }] },
   { label: "Kitchen Selection", children: [{ label: "Soaps", children: [{ label: "Foaming Hand Soaps", slug: "foaming-hand-soap" }, { label: "Hand Soaps", slug: "hand-soaps" }] }] },
@@ -141,6 +141,19 @@ function kitchenSoapSlugsFor(name: string) {
   return ["kitchen-selection", "soaps"];
 }
 
+function bathSaltOrScrubSlugsFor(name: string) {
+  const lower = name.toLowerCase();
+  if (lower.includes("salt")) {
+    return ["bath-body", "bath-salts"];
+  }
+
+  if (lower.includes("scrub")) {
+    return ["bath-body", "body-scrubs"];
+  }
+
+  return ["bath-body"];
+}
+
 function categorySlugsFor(row: ImportRow) {
   const category = normalize(row.CategoryId);
   const name = cleanString(row.Name);
@@ -151,8 +164,14 @@ function categorySlugsFor(row: ImportRow) {
       return ["womens-collection", inferApparelSlug(name)];
     case "bath bombs":
       return ["bath-body", "bath-bombs"];
+    case "bath salts":
+      return ["bath-body", "bath-salts"];
+    case "bath scrub":
+    case "body scrub":
+    case "body scrubs":
+      return ["bath-body", "body-scrubs"];
     case "bath salts and scrubs":
-      return ["bath-body", "bath-salts-scrubs"];
+      return bathSaltOrScrubSlugsFor(name);
     case "beard products":
       return ["mens-collection", "mens-care", "beard-products"];
     case "body butter and lotions":
