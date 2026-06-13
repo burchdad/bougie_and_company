@@ -179,6 +179,25 @@ function GiftBasketRequestForm() {
   );
 }
 
+function ProductPhotoFallback({ large = false }: { large?: boolean }) {
+  const logoClassName = large ? "h-36 w-36 p-4" : "h-24 w-24 p-3";
+  const textClassName = large ? "text-2xl sm:text-3xl" : "text-lg sm:text-xl";
+
+  return (
+    <div className="absolute inset-0 overflow-hidden bg-gradient-to-br from-espresso via-saddle to-ember">
+      <div className="absolute inset-0 opacity-30 mix-blend-soft-light luxury-pattern" />
+      <div className="absolute inset-0 grid place-items-center px-8">
+        <div className={`${logoClassName} rounded-full bg-ivory/95 shadow-luxe ring-1 ring-champagne/45`}>
+          <Image alt="Bougie & Company logo" className="h-full w-full object-contain" height={144} src="/images/logo.png" width={144} />
+        </div>
+      </div>
+      <div className="absolute left-1/2 top-1/2 w-[135%] -translate-x-1/2 -translate-y-1/2 -rotate-12 border-y border-champagne/80 bg-ink/90 py-3 text-center shadow-luxe">
+        <span className={`${textClassName} font-black uppercase tracking-[0.22em] text-champagne`}>Photo Coming Soon</span>
+      </div>
+    </div>
+  );
+}
+
 const variantWords = [
   "xxs",
   "xs",
@@ -968,7 +987,9 @@ export function ShopProducts() {
                         src={imageProduct.primary_image_url}
                         width={800}
                       />
-                    ) : null}
+                    ) : (
+                      <ProductPhotoFallback />
+                    )}
                     {imageProduct.primary_image_url ? <div className="absolute inset-0 bg-gradient-to-t from-ink/80 via-ink/10 to-transparent" /> : null}
                     {isOutOfStock ? (
                       <div className="absolute inset-0 z-10 grid place-items-center bg-ink/55 px-6 text-center backdrop-blur-[1px]">
@@ -1090,9 +1111,7 @@ export function ShopProducts() {
                     src={detailProduct.imageProduct.primary_image_url}
                   />
                 ) : (
-                  <div className="grid h-full min-h-[22rem] place-items-center bg-gradient-to-br from-espresso via-saddle to-ember text-ivory">
-                    <Sparkles className="h-10 w-10 text-champagne" />
-                  </div>
+                  <ProductPhotoFallback large />
                 )}
               </div>
               <div className="self-center">
