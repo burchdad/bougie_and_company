@@ -359,10 +359,9 @@ export async function POST(request: Request) {
     const forceHidden = shouldHideImportedProduct(row);
     const isWebsiteHidden = forceHidden || !sellOnWeb || normalize(row.CategoryId) === "tanning 1month membership";
     const assignedSlugs = categorySlugsFor(row);
-    const prefersEposImageImport = assignedSlugs.includes("handmade-soap");
     const suppressImportedImage = shouldSuppressImportedImage(row);
-    const imageUrl = prefersEposImageImport || suppressImportedImage ? null : publicImageUrl(row.ImageUrl);
-    const disableFuzzyImageFallback = (prefersEposImageImport || suppressImportedImage) && !imageUrl;
+    const imageUrl = suppressImportedImage ? null : publicImageUrl(row.ImageUrl);
+    const disableFuzzyImageFallback = suppressImportedImage || (!imageUrl && assignedSlugs.includes("handmade-soap"));
     const blockEposImageImport = forceHidden || suppressImportedImage;
     const assignedIds = categoryIdsFor(assignedSlugs, slugToId);
 
