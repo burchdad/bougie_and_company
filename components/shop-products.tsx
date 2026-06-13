@@ -367,7 +367,23 @@ function isHomemadeSoapProduct(product: Product) {
   return product.category_slugs?.includes("handmade-soap") || haystack.includes("handmade soap") || haystack.includes("homemade soap");
 }
 
+function isGiftCardProduct(product: Product) {
+  const haystack = productSearchText(product);
+  return product.category_slugs?.includes("gift-cards") || haystack.includes("gift card") || haystack.includes("gift certificate");
+}
+
+function giftCardDisplayPrice(product: Product) {
+  const text = `${product.marketing_title || product.name} ${product.marketing_description || ""} ${product.description || ""}`;
+  const match = text.match(/\b(\d+(?:\.\d{1,2})?)\b/);
+  const amount = match?.[1] ? Number(match[1]) : null;
+  return amount && Number.isFinite(amount) && amount > 0 ? `$${amount.toFixed(2)}` : null;
+}
+
 function displayPrice(product: Product) {
+  if (isGiftCardProduct(product)) {
+    return giftCardDisplayPrice(product) || money(product.sale_price);
+  }
+
   return isFarmEggProduct(product) ? "$4.00 / dozen" : money(product.sale_price);
 }
 
@@ -378,6 +394,10 @@ function stockCount(value: string | null) {
 
 function hasAvailableStock(product: Product) {
   return stockCount(product.stock) > 0;
+}
+
+function isPurchasableProduct(product: Product) {
+  return isGiftCardProduct(product) || hasAvailableStock(product);
 }
 
 function isMensTshirtProduct(product: Product) {
@@ -902,7 +922,7 @@ export function ShopProducts() {
   const isGiftBasketCategory = activeDepartment === "gift-basket" || activeDepartment === "gift-baskets";
 
   function addToCart(product: Product, option?: string) {
-    if (!hasAvailableStock(product) || isFarmEggProduct(product)) {
+    if (!isPurchasableProduct(product) || isFarmEggProduct(product)) {
       return;
     }
 
@@ -927,7 +947,7 @@ export function ShopProducts() {
   }
 
   const detailPrice = detailProduct ? displayPrice(detailProduct.product) : "";
-  const detailAvailable = detailProduct ? hasAvailableStock(detailProduct.product) : false;
+  const detailAvailable = detailProduct ? isPurchasableProduct(detailProduct.product) : false;
   const detailIsFarmEgg = Boolean(detailProduct && isFarmEggProduct(detailProduct.product));
   const detailIsHomemadeSoap = Boolean(detailProduct && isHomemadeSoapProduct(detailProduct.product));
   const detailWomensSizeOptions = detailProduct?.group ? womensApparelSizeOptions(detailProduct.group) : [];
@@ -1003,7 +1023,7 @@ export function ShopProducts() {
               const hasVariants = hasWomensVariantOptions || (!isWomensApparelGroup(group) && group.products.length > 1 && !hasOnlyWomensSizeVariants(group));
               const hasTshirtSizes = group.products.some(isMensTshirtProduct);
               const selectedTshirtSize = selectedSizes[group.key] || mensTshirtSizes[0];
-              const isOutOfStock = !hasAvailableStock(product);
+              const isOutOfStock = !isPurchasableProduct(product);
               const isFarmEgg = isFarmEggProduct(product);
               const isHomemadeSoap = isHomemadeSoapProduct(product);
 
