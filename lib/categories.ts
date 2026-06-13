@@ -1,6 +1,6 @@
 import { getSql } from "@/lib/db";
 import { eposFetch } from "@/lib/epos";
-import { defaultMenuItems } from "@/lib/category-defaults";
+import { canonicalCategoryItems, categoryItemSlug } from "@/lib/category-defaults";
 import type { CategoryMenuItem } from "@/lib/category-defaults";
 
 export type SiteCategory = {
@@ -36,11 +36,6 @@ export async function ensureCategoryTables() {
 
 export function slugify(value: string) {
   return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "category";
-}
-
-function menuItemSlug(item: CategoryMenuItem) {
-  const hrefSlug = item.href.split("#")[1];
-  return hrefSlug ? slugify(hrefSlug) : slugify(item.label);
 }
 
 function categoryHref(category: SiteCategory) {
@@ -108,8 +103,8 @@ export async function seedDefaultCategoriesIfEmpty() {
     const rows = await sql`SELECT COALESCE(MAX(sort_order), -1)::int AS sort_order FROM site_categories WHERE parent_id IS NULL`;
     let sortOrder = Number(rows[0]?.sort_order ?? -1) + 1;
 
-    for (const item of defaultMenuItems) {
-      const slug = menuItemSlug(item);
+    for (const item of canonicalCategoryItems) {
+      const slug = categoryItemSlug(item);
       if (existingHeaderSlugs.has(slug)) {
         continue;
       }
@@ -126,7 +121,7 @@ export async function seedDefaultCategoriesIfEmpty() {
 
   async function insert(items: CategoryMenuItem[], parentId: number | null) {
     for (const [index, item] of items.entries()) {
-      const slug = menuItemSlug(item);
+      const slug = categoryItemSlug(item);
       const rows = await sql`
         INSERT INTO site_categories (label, slug, href, parent_id, sort_order, is_header)
         VALUES (${item.label}, ${slug}, ${item.href}, ${parentId}, ${index}, ${parentId === null})
@@ -136,7 +131,7 @@ export async function seedDefaultCategoriesIfEmpty() {
     }
   }
 
-  await insert(defaultMenuItems, null);
+  await insert(canonicalCategoryItems, null);
 }
 
 export async function syncCategoryToEpos(category: SiteCategory, action: "create" | "update" | "delete") {

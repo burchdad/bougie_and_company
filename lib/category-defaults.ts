@@ -2,8 +2,154 @@ export type CategoryMenuItem = {
   id?: number;
   label: string;
   href: string;
+  slug?: string;
   children?: CategoryMenuItem[];
 };
+
+export type FlattenedCategoryItem = {
+  item: CategoryMenuItem;
+  slug: string;
+  parentSlug: string | null;
+  rootSlug: string;
+};
+
+export const legacyCategorySlugAliases: Record<string, string> = {
+  "hand-soaps": "handmade-soaps",
+  "handmade-soap": "handmade-soaps"
+};
+
+export function normalizeCategorySlugAlias(slug: string) {
+  return legacyCategorySlugAliases[slug] || slug;
+}
+
+export function categoryItemSlug(item: Pick<CategoryMenuItem, "href" | "label" | "slug">) {
+  if (item.slug) {
+    return item.slug;
+  }
+
+  const hrefSlug = item.href.split("#")[1];
+  return (hrefSlug || item.label).toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "category";
+}
+
+export function flattenCategoryItems(items: CategoryMenuItem[], parentSlug: string | null = null, rootSlug: string | null = null): FlattenedCategoryItem[] {
+  return items.flatMap((item) => {
+    const slug = categoryItemSlug(item);
+    const currentRootSlug = rootSlug || slug;
+    return [
+      { item, slug, parentSlug, rootSlug: currentRootSlug },
+      ...flattenCategoryItems(item.children || [], slug, currentRootSlug)
+    ];
+  });
+}
+
+export const canonicalCategoryItems: CategoryMenuItem[] = [
+  {
+    label: "Accessories",
+    href: "/shop#accessories",
+    children: [
+      { label: "Purses", href: "/shop#purses" },
+      { label: "Luggage", href: "/shop#luggage" },
+      { label: "Caps", href: "/shop#caps" },
+      { label: "Coozies", href: "/shop#coozies" },
+      {
+        label: "Coasters",
+        href: "/shop#coasters",
+        children: [
+          { label: "Regular Coasters", href: "/shop#regular-coasters", slug: "regular-coasters" },
+          { label: "Leather Coasters", href: "/shop#leather-coasters" }
+        ]
+      },
+      { label: "Cocktail Infusions", href: "/shop#cocktail-infusions" },
+      { label: "Outdoor", href: "/shop#outdoor" },
+      { label: "Farm Fresh Eggs", href: "/shop#farm-eggs", slug: "farm-eggs" }
+    ]
+  },
+  {
+    label: "Equine Jewelry",
+    href: "/shop#equine-jewelry",
+    children: [
+      { label: "Necklaces", href: "/shop#necklaces" },
+      { label: "Bracelets", href: "/shop#bracelets" },
+      { label: "Equine Earrings", href: "/shop#equine-earrings" }
+    ]
+  },
+  {
+    label: "Men's Collection",
+    href: "/shop#mens-collection",
+    slug: "mens-collection",
+    children: [
+      { label: "T-Shirts", href: "/shop#t-shirts" },
+      { label: "Men's Care", href: "/shop#mens-care", slug: "mens-care" },
+      { label: "Beard Products", href: "/shop#beard-products" },
+      { label: "Mechanic Soap", href: "/shop#mechanic-soap" }
+    ]
+  },
+  {
+    label: "Women's Collection",
+    href: "/shop#womens-collection",
+    slug: "womens-collection",
+    children: [
+      { label: "Dresses", href: "/shop#dresses" },
+      { label: "Tops", href: "/shop#tops" },
+      { label: "Pants", href: "/shop#pants" },
+      { label: "Cardigans", href: "/shop#cardigans" },
+      { label: "Rompers & Jumpsuits", href: "/shop#rompers-jumpsuits" }
+    ]
+  },
+  {
+    label: "Soaps",
+    href: "/shop#soaps",
+    children: [
+      { label: "Foaming Hand Soap", href: "/shop#foaming-hand-soap" },
+      { label: "Handmade Soaps", href: "/shop#handmade-soaps" }
+    ]
+  },
+  {
+    label: "Bath & Body",
+    href: "/shop#bath-body",
+    children: [
+      { label: "Bath Bombs", href: "/shop#bath-bombs" },
+      { label: "Bath Salts", href: "/shop#bath-salts" },
+      { label: "Body Scrubs", href: "/shop#body-scrubs" },
+      { label: "Body Butter & Lotions", href: "/shop#body-butter-lotions" },
+      { label: "Chap Stick", href: "/shop#chap-stick" },
+      { label: "Body Spray", href: "/shop#body-spray" },
+      { label: "Clay Mask", href: "/shop#clay-mask" },
+      { label: "Week From Hell", href: "/shop#week-from-hell" }
+    ]
+  },
+  {
+    label: "Candles",
+    href: "/shop#candles",
+    children: [
+      { label: "Soy 9oz", href: "/shop#soy-9oz" },
+      { label: "Soy Wax Melts", href: "/shop#soy-wax-melts" },
+      { label: "Candles & Wax Melts", href: "/shop#candles-wax-melts" }
+    ]
+  },
+  {
+    label: "Home Collection",
+    href: "/shop#home-collection",
+    children: [{ label: "Tea Towels & Pillows", href: "/shop#tea-towels-pillows" }]
+  },
+  { label: "Kitchen Selection", href: "/shop#kitchen-selection" },
+  {
+    label: "Gift Collection",
+    href: "/shop#gift-collection",
+    children: [
+      { label: "Gift Cards", href: "/shop#gift-cards" },
+      { label: "Gift Baskets", href: "/shop#gift-basket", slug: "gift-basket" }
+    ]
+  },
+  {
+    label: "Jewelry",
+    href: "/shop#jewelry",
+    children: [
+      { label: "Fashion Earrings", href: "/shop#fashion-earrings" },
+      { label: "Headbands", href: "/shop#headbands" }
+    ]
+  }
+];
 
 export const defaultMenuItems: CategoryMenuItem[] = [
   {
@@ -12,22 +158,164 @@ export const defaultMenuItems: CategoryMenuItem[] = [
     children: [
       { label: "Purses", href: "/shop#purses" },
       { label: "Luggage", href: "/shop#luggage" },
-      { label: "Home Collection", href: "/shop#home-collection", children: [{ label: "Candles", href: "/shop#candles", children: [{ label: "Soy 9oz", href: "/shop#soy-9oz" }, { label: "Soy Wax melts", href: "/shop#soy-wax-melts" }] }, { label: "Tea Towels / Pillows", href: "/shop#tea-towels-pillows" }, { label: "Cocktail Infusions", href: "/shop#cocktail-infusions" }, { label: "Outdoor Items", href: "/shop#outdoor" }] },
-      { label: "Kitchen Collection", href: "/shop#kitchen-selection", children: [{ label: "Soaps", href: "/shop#soaps", children: [{ label: "Foaming Hand Soaps", href: "/shop#foaming-hand-soap" }, { label: "Hand Soaps", href: "/shop#hand-soaps" }] }] },
-      { label: "Bath & Body", href: "/shop#bath-body", children: [{ label: "Bath Bombs", href: "/shop#bath-bombs" }, { label: "Body Butter/Lotion", href: "/shop#body-butter-lotions" }, { label: "Chap Stick", href: "/shop#chap-stick" }, { label: "Handmade Soap", href: "/shop#handmade-soap" }] },
-      { label: "Gift Collection", href: "/shop#gift-collection", children: [{ label: "Gift Cards", href: "/shop#gift-cards" }, { label: "Gift Baskets", href: "/shop#gift-basket" }] },
-      { label: "Men's Care", href: "/shop#mens-care", children: [{ label: "Body Spray", href: "/shop#body-spray" }, { label: "Beard Products", href: "/shop#beard-products" }, { label: "Homemade Mechanic Soaps", href: "/shop#mechanic-soap" }] },
-      { label: "Women's Care", href: "/shop#bath-body", children: [{ label: "Week From Hell", href: "/shop#week-from-hell" }, { label: "Bath Salts", href: "/shop#bath-salts" }, { label: "Body Scrubs", href: "/shop#body-scrubs" }, { label: "Bath Bombs", href: "/shop#bath-bombs" }, { label: "Body Butter/Lotion", href: "/shop#body-butter-lotions" }, { label: "Chap Stick", href: "/shop#chap-stick" }, { label: "Body Sprays", href: "/shop#body-spray" }, { label: "Purses", href: "/shop#purses" }] },
+      {
+        label: "Home Collection",
+        href: "/shop#home-collection",
+        children: [
+          {
+            label: "Candles",
+            href: "/shop#candles",
+            children: [
+              { label: "Soy 9oz", href: "/shop#soy-9oz" },
+              { label: "Soy Wax Melts", href: "/shop#soy-wax-melts" }
+            ]
+          },
+          { label: "Tea Towels / Pillows", href: "/shop#tea-towels-pillows" },
+          { label: "Cocktail Infusions", href: "/shop#cocktail-infusions" },
+          { label: "Outdoor Items", href: "/shop#outdoor" }
+        ]
+      },
+      {
+        label: "Kitchen Collection",
+        href: "/shop#kitchen-selection",
+        children: [
+          {
+            label: "Soaps",
+            href: "/shop#soaps",
+            children: [
+              { label: "Foaming Hand Soap", href: "/shop#foaming-hand-soap" },
+              { label: "Handmade Soaps", href: "/shop#handmade-soaps" }
+            ]
+          }
+        ]
+      },
+      {
+        label: "Bath & Body",
+        href: "/shop#bath-body",
+        children: [
+          { label: "Bath Bombs", href: "/shop#bath-bombs" },
+          { label: "Body Butter/Lotion", href: "/shop#body-butter-lotions" },
+          { label: "Chap Stick", href: "/shop#chap-stick" },
+          { label: "Handmade Soaps", href: "/shop#handmade-soaps" }
+        ]
+      },
+      {
+        label: "Gift Collection",
+        href: "/shop#gift-collection",
+        children: [
+          { label: "Gift Cards", href: "/shop#gift-cards" },
+          { label: "Gift Baskets", href: "/shop#gift-basket" }
+        ]
+      },
+      {
+        label: "Men's Care",
+        href: "/shop#mens-care",
+        children: [
+          { label: "Body Spray", href: "/shop#body-spray" },
+          { label: "Beard Products", href: "/shop#beard-products" },
+          { label: "Homemade Mechanic Soaps", href: "/shop#mechanic-soap" }
+        ]
+      },
+      {
+        label: "Women's Care",
+        href: "/shop#bath-body",
+        children: [
+          { label: "Week From Hell", href: "/shop#week-from-hell" },
+          { label: "Bath Salts", href: "/shop#bath-salts" },
+          { label: "Body Scrubs", href: "/shop#body-scrubs" },
+          { label: "Bath Bombs", href: "/shop#bath-bombs" },
+          { label: "Body Butter/Lotion", href: "/shop#body-butter-lotions" },
+          { label: "Chap Stick", href: "/shop#chap-stick" },
+          { label: "Body Sprays", href: "/shop#body-spray" },
+          { label: "Purses", href: "/shop#purses" }
+        ]
+      },
       { label: "Coozies", href: "/shop#coozies" },
-      { label: "Coasters", href: "/shop#coasters", children: [{ label: "Coasters", href: "/shop#regular-coasters" }, { label: "Leather Coasters", href: "/shop#leather-coasters" }] },
+      {
+        label: "Coasters",
+        href: "/shop#coasters",
+        children: [
+          { label: "Coasters", href: "/shop#regular-coasters" },
+          { label: "Leather Coasters", href: "/shop#leather-coasters" }
+        ]
+      },
       { label: "Cocktail Infusions", href: "/shop#cocktail-infusions" },
       { label: "Farm Fresh Eggs", href: "/shop#farm-eggs" }
     ]
   },
-  { label: "Equine Jewelry", href: "/shop#equine-jewelry", children: [{ label: "Necklaces", href: "/shop#necklaces" }, { label: "Bracelets", href: "/shop#bracelets" }, { label: "Earrings", href: "/shop#equine-earrings" }] },
-  { label: "Men's Collection", href: "/shop#mens-collection", children: [{ label: "T-Shirts", href: "/shop#t-shirts" }, { label: "Caps", href: "/shop#caps" }, { label: "Men's Care", href: "/shop#mens-care", children: [{ label: "Chap Stick", href: "/shop#chap-stick" }, { label: "Body Spray", href: "/shop#body-spray" }, { label: "Beard Products", href: "/shop#beard-products" }, { label: "Homemade Mechanic Soaps", href: "/shop#mechanic-soap" }] }, { label: "Luggage", href: "/shop#luggage" }, { label: "Coozies", href: "/shop#coozies" }] },
-  { label: "Women's Collection", href: "/shop#womens-collection", children: [{ label: "Tops", href: "/shop#tops" }, { label: "Cardigans", href: "/shop#cardigans" }, { label: "Pants", href: "/shop#pants" }, { label: "Dresses", href: "/shop#dresses" }, { label: "Rompers & Jumpsuits", href: "/shop#rompers-jumpsuits" }, { label: "Women's Care", href: "/shop#bath-body", children: [{ label: "Week From Hell", href: "/shop#week-from-hell" }, { label: "Bath Salts", href: "/shop#bath-salts" }, { label: "Body Scrubs", href: "/shop#body-scrubs" }, { label: "Bath Bombs", href: "/shop#bath-bombs" }, { label: "Body Butter/Lotion", href: "/shop#body-butter-lotions" }, { label: "Chap Stick", href: "/shop#chap-stick" }, { label: "Body Sprays", href: "/shop#body-spray" }] }, { label: "Purses", href: "/shop#purses" }, { label: "Luggage", href: "/shop#luggage" }] },
-  { label: "Soaps", href: "/shop#soaps", children: [{ label: "Foaming Hand Soap", href: "/shop#foaming-hand-soap" }, { label: "Handmade Soaps", href: "/shop#handmade-soaps" }] },
-  { label: "Candles", href: "/shop#candles", children: [{ label: "Soy 9oz", href: "/shop#soy-9oz" }, { label: "Soy Wax melts", href: "/shop#soy-wax-melts" }] },
-  { label: "Jewelry", href: "/shop#jewelry", children: [{ label: "Earrings", href: "/shop#fashion-earrings" }] }
+  {
+    label: "Equine Jewelry",
+    href: "/shop#equine-jewelry",
+    children: [
+      { label: "Necklaces", href: "/shop#necklaces" },
+      { label: "Bracelets", href: "/shop#bracelets" },
+      { label: "Earrings", href: "/shop#equine-earrings" }
+    ]
+  },
+  {
+    label: "Men's Collection",
+    href: "/shop#mens-collection",
+    children: [
+      { label: "T-Shirts", href: "/shop#t-shirts" },
+      {
+        label: "Men's Care",
+        href: "/shop#mens-care",
+        children: [
+          { label: "Chap Stick", href: "/shop#chap-stick" },
+          { label: "Body Spray", href: "/shop#body-spray" },
+          { label: "Beard Products", href: "/shop#beard-products" },
+          { label: "Homemade Mechanic Soaps", href: "/shop#mechanic-soap" }
+        ]
+      },
+      { label: "Luggage", href: "/shop#luggage" },
+      { label: "Coozies", href: "/shop#coozies" }
+    ]
+  },
+  {
+    label: "Women's Collection",
+    href: "/shop#womens-collection",
+    children: [
+      { label: "Tops", href: "/shop#tops" },
+      { label: "Cardigans", href: "/shop#cardigans" },
+      { label: "Pants", href: "/shop#pants" },
+      { label: "Dresses", href: "/shop#dresses" },
+      { label: "Rompers & Jumpsuits", href: "/shop#rompers-jumpsuits" },
+      {
+        label: "Women's Care",
+        href: "/shop#bath-body",
+        children: [
+          { label: "Week From Hell", href: "/shop#week-from-hell" },
+          { label: "Bath Salts", href: "/shop#bath-salts" },
+          { label: "Body Scrubs", href: "/shop#body-scrubs" },
+          { label: "Bath Bombs", href: "/shop#bath-bombs" },
+          { label: "Body Butter/Lotion", href: "/shop#body-butter-lotions" },
+          { label: "Chap Stick", href: "/shop#chap-stick" },
+          { label: "Body Sprays", href: "/shop#body-spray" }
+        ]
+      },
+      { label: "Purses", href: "/shop#purses" },
+      { label: "Luggage", href: "/shop#luggage" }
+    ]
+  },
+  {
+    label: "Soaps",
+    href: "/shop#soaps",
+    children: [
+      { label: "Foaming Hand Soap", href: "/shop#foaming-hand-soap" },
+      { label: "Handmade Soaps", href: "/shop#handmade-soaps" }
+    ]
+  },
+  {
+    label: "Candles",
+    href: "/shop#candles",
+    children: [
+      { label: "Soy 9oz", href: "/shop#soy-9oz" },
+      { label: "Soy Wax Melts", href: "/shop#soy-wax-melts" }
+    ]
+  },
+  {
+    label: "Jewelry",
+    href: "/shop#jewelry",
+    children: [{ label: "Earrings", href: "/shop#fashion-earrings" }]
+  }
 ];

@@ -364,7 +364,7 @@ function isFarmEggProduct(product: Product) {
 
 function isHomemadeSoapProduct(product: Product) {
   const haystack = productSearchText(product);
-  return product.category_slugs?.includes("handmade-soap") || haystack.includes("handmade soap") || haystack.includes("homemade soap");
+  return product.category_slugs?.includes("handmade-soaps") || product.category_slugs?.includes("handmade-soap") || haystack.includes("handmade soap") || haystack.includes("homemade soap");
 }
 
 function isShaveSoapProduct(product: Product) {
@@ -537,7 +537,7 @@ function productMatchesFilter(product: Product, filterId: string) {
 
   if (filterId === "foaming-hand-soap" || filterId === "kitchen-selection-foaming-hand-soap") {
     const haystack = productSearchText(product);
-    return product.category_slugs?.includes("kitchen-selection") && haystack.includes("foaming hand");
+    return product.category_slugs?.includes("foaming-hand-soap") || haystack.includes("foaming hand");
   }
 
   if (filterId === "bottoms") {

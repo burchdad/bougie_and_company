@@ -109,7 +109,7 @@ export const shopDepartments = [
   {
     id: "kitchen-selection",
     title: "Kitchen Selection",
-    items: ["Soaps", "Hand Soaps", "Foaming Hand Soaps"]
+    items: ["Soaps", "Handmade Soaps", "Foaming Hand Soaps"]
   },
   {
     id: "gift-collection",

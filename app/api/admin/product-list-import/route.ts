@@ -1,5 +1,5 @@
 import { ensureProductAdminTables, isAdminRequest } from "@/lib/admin-products";
-import { slugify } from "@/lib/categories";
+import { canonicalCategoryItems, categoryItemSlug, flattenCategoryItems, normalizeCategorySlugAlias } from "@/lib/category-defaults";
 import { getSql } from "@/lib/db";
 
 export const runtime = "nodejs";
@@ -22,24 +22,11 @@ type ProductRow = {
   sku: string | null;
 };
 
-type CategoryNode = {
-  label: string;
-  slug?: string;
-  children?: CategoryNode[];
+type CategoryLookupRow = {
+  id: number;
+  slug: string;
+  parent_id: number | null;
 };
-
-const canonicalCategories: CategoryNode[] = [
-  { label: "Accessories", children: [{ label: "Purses" }, { label: "Luggage" }, { label: "Caps" }, { label: "Coozies" }, { label: "Coasters", children: [{ label: "Coasters", slug: "regular-coasters" }, { label: "Leather Coasters" }] }, { label: "Cocktail Infusions" }, { label: "Outdoor" }, { label: "Farm Fresh Eggs", slug: "farm-eggs" }] },
-  { label: "Equine Jewelry", children: [{ label: "Necklaces" }, { label: "Bracelets" }, { label: "Equine Earrings" }] },
-  { label: "Men's Collection", slug: "mens-collection", children: [{ label: "T-Shirts" }, { label: "Men's Care", slug: "mens-care" }, { label: "Beard Products" }, { label: "Mechanic Soap" }] },
-  { label: "Women's Collection", slug: "womens-collection", children: [{ label: "Dresses" }, { label: "Tops" }, { label: "Pants" }, { label: "Cardigans" }, { label: "Rompers & Jumpsuits" }] },
-  { label: "Bath & Body", children: [{ label: "Bath Bombs" }, { label: "Bath Salts" }, { label: "Body Scrubs" }, { label: "Body Butter & Lotions" }, { label: "Chap Stick" }, { label: "Body Spray" }, { label: "Clay Mask" }, { label: "Handmade Soap" }, { label: "Week From Hell" }] },
-  { label: "Candles", children: [{ label: "Soy 9oz" }, { label: "Soy Wax Melts" }, { label: "Candles & Wax Melts" }] },
-  { label: "Home Collection", children: [{ label: "Tea Towels & Pillows" }] },
-  { label: "Kitchen Selection", children: [{ label: "Soaps", children: [{ label: "Foaming Hand Soaps", slug: "foaming-hand-soap" }, { label: "Hand Soaps", slug: "hand-soaps" }] }] },
-  { label: "Gift Collection", children: [{ label: "Gift Cards" }, { label: "Gift Baskets", slug: "gift-basket" }] },
-  { label: "Jewelry", children: [{ label: "Fashion Earrings" }, { label: "Headbands" }] }
-];
 
 function cleanString(value: unknown) {
   return typeof value === "string" ? value.trim() : value === null || value === undefined ? "" : String(value).trim();
@@ -135,7 +122,7 @@ function kitchenSoapSlugsFor(name: string) {
   }
 
   if (lower.includes("dish soap") || lower.includes("hand soap") || lower.includes("soap")) {
-    return ["kitchen-selection", "soaps", "hand-soaps"];
+    return ["kitchen-selection", "soaps", "handmade-soaps"];
   }
 
   return ["kitchen-selection", "soaps"];
@@ -211,7 +198,7 @@ function categorySlugsFor(row: ImportRow) {
         return ["mens-collection", "mens-care"];
       }
 
-      return ["kitchen-selection", "soaps", "hand-soaps", "bath-body", "handmade-soap"];
+      return ["soaps", "handmade-soaps"];
     case "kitchen homemade dish disk soaps and hand soap":
       if (isShavingSoapName(name)) {
         return ["mens-collection", "mens-care"];
@@ -224,7 +211,7 @@ function categorySlugsFor(row: ImportRow) {
     case "luggage":
       return ["accessories", "luggage"];
     case "mechanic soap":
-      return ["kitchen-selection", "soaps", "hand-soaps", "mens-collection", "mens-care", "mechanic-soap"];
+      return ["mens-collection", "mens-care", "mechanic-soap"];
     case "outdoor":
       return ["accessories", "outdoor"];
     case "purses":
@@ -249,12 +236,12 @@ async function resetCategories() {
 
   await sql`TRUNCATE TABLE site_categories RESTART IDENTITY CASCADE`;
 
-  async function insert(nodes: CategoryNode[], parentId: number | null) {
+  async function insert(nodes: typeof canonicalCategoryItems, parentId: number | null) {
     for (const [index, node] of nodes.entries()) {
-      const slug = node.slug || slugify(node.label);
+      const slug = categoryItemSlug(node);
       const rows = await sql`
         INSERT INTO site_categories (label, slug, href, parent_id, sort_order, is_header)
-        VALUES (${node.label}, ${slug}, ${`/shop#${slug}`}, ${parentId}, ${index}, ${parentId === null})
+        VALUES (${node.label}, ${slug}, ${node.href || `/shop#${slug}`}, ${parentId}, ${index}, ${parentId === null})
         RETURNING id::int, slug
       `;
       const id = Number(rows[0].id);
@@ -265,12 +252,52 @@ async function resetCategories() {
     }
   }
 
-  await insert(canonicalCategories, null);
+  await insert(canonicalCategoryItems, null);
   return slugToId;
 }
 
+function buildCategorySlugLookup(rows: CategoryLookupRow[]) {
+  const rowsById = new Map(rows.map((row) => [row.id, row]));
+  const canonicalBySlug = new Map(flattenCategoryItems(canonicalCategoryItems).map((row) => [row.slug, row]));
+  const bestBySlug = new Map<string, { id: number; score: number }>();
+
+  function rootSlug(row: CategoryLookupRow): string {
+    let current = row;
+    const visited = new Set<number>();
+
+    while (current.parent_id && !visited.has(current.id)) {
+      visited.add(current.id);
+      current = rowsById.get(current.parent_id) || current;
+      if (!current.parent_id) {
+        break;
+      }
+    }
+
+    return normalizeCategorySlugAlias(current.slug);
+  }
+
+  for (const row of rows) {
+    const slug = normalizeCategorySlugAlias(row.slug);
+    const canonical = canonicalBySlug.get(slug);
+    const parent = row.parent_id ? rowsById.get(row.parent_id) : null;
+    const parentSlug = parent ? normalizeCategorySlugAlias(parent.slug) : null;
+    const score =
+      (canonical?.rootSlug === rootSlug(row) ? 4 : 0) +
+      (canonical?.parentSlug === parentSlug ? 2 : 0) +
+      (canonical?.parentSlug === null && row.parent_id === null ? 2 : 0) +
+      (row.parent_id === null ? 1 : 0);
+    const current = bestBySlug.get(slug);
+
+    if (!current || score > current.score) {
+      bestBySlug.set(slug, { id: row.id, score });
+    }
+  }
+
+  return new Map([...bestBySlug.entries()].map(([slug, value]) => [slug, value.id]));
+}
+
 function categoryIdsFor(slugs: string[], slugToId: Map<string, number>) {
-  return [...new Set(slugs.map((slug) => slugToId.get(slug)).filter((id): id is number => Number.isFinite(id)))];
+  return [...new Set(slugs.map((slug) => slugToId.get(normalizeCategorySlugAlias(slug))).filter((id): id is number => Number.isFinite(id)))];
 }
 
 function isApparelAssignment(slugs: string[]) {
@@ -338,8 +365,8 @@ export async function POST(request: Request) {
   const slugToId = body.resetCategories ? await resetCategories() : new Map<string, number>();
 
   if (!body.resetCategories) {
-    const categoryRows = await sql`SELECT id::int, slug FROM site_categories`;
-    categoryRows.forEach((row) => slugToId.set(String(row.slug), Number(row.id)));
+    const categoryRows = (await sql`SELECT id::int, slug, parent_id::int FROM site_categories`) as CategoryLookupRow[];
+    buildCategorySlugLookup(categoryRows).forEach((id, slug) => slugToId.set(slug, id));
   }
 
   const products = (await sql`SELECT epos_product_id, name, sku FROM epos_products WHERE is_deleted = FALSE`) as ProductRow[];
@@ -395,7 +422,7 @@ export async function POST(request: Request) {
     const assignedSlugs = categorySlugsFor(row);
     const suppressImportedImage = shouldSuppressImportedImage(row);
     const imageUrl = suppressImportedImage ? null : publicImageUrl(row.ImageUrl);
-    const disableFuzzyImageFallback = suppressImportedImage || (!imageUrl && assignedSlugs.includes("handmade-soap"));
+    const disableFuzzyImageFallback = suppressImportedImage || (!imageUrl && assignedSlugs.some((slug) => normalizeCategorySlugAlias(slug) === "handmade-soaps"));
     const blockEposImageImport = forceHidden || suppressImportedImage;
     const assignedIds = categoryIdsFor(assignedSlugs, slugToId);
 

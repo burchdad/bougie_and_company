@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Camera, EyeOff, FileText, Gift, KeyRound, LayoutDashboard, Loader2, Package, PackageSearch, Save, Search, Settings, ShoppingBag, Star, Tags, Trash2, Truck, UploadCloud } from "lucide-react";
+import { canonicalCategoryItems, flattenCategoryItems, normalizeCategorySlugAlias } from "@/lib/category-defaults";
 
 type AdminProduct = {
   epos_product_id: string;
@@ -180,6 +181,104 @@ function categoryDepth(category: SiteCategory, categories: SiteCategory[]) {
   return depth;
 }
 
+const canonicalCategoryMeta = flattenCategoryItems(canonicalCategoryItems);
+const canonicalSlugSet = new Set(canonicalCategoryMeta.map((item) => item.slug));
+const canonicalBySlug = new Map(canonicalCategoryMeta.map((item) => [item.slug, item]));
+
+function normalizedCategorySlugs(slugs: string[] | null | undefined) {
+  return new Set((slugs || []).map(normalizeCategorySlugAlias));
+}
+
+function categoryParentSlug(category: SiteCategory, categories: SiteCategory[]) {
+  const parent = category.parent_id ? categories.find((item) => item.id === category.parent_id) : null;
+  return parent ? normalizeCategorySlugAlias(parent.slug) : null;
+}
+
+function categoryRootSlug(category: SiteCategory, categories: SiteCategory[]) {
+  let current = category;
+  const visited = new Set<number>();
+
+  while (current.parent_id && !visited.has(current.id)) {
+    visited.add(current.id);
+    const parent = categories.find((item) => item.id === current.parent_id);
+    if (!parent) {
+      break;
+    }
+    current = parent;
+  }
+
+  return normalizeCategorySlugAlias(current.slug);
+}
+
+function categoryPath(category: SiteCategory, categories: SiteCategory[]) {
+  const labels = [category.label];
+  let currentParentId = category.parent_id;
+  const visited = new Set<number>();
+
+  while (currentParentId && !visited.has(currentParentId)) {
+    visited.add(currentParentId);
+    const parent = categories.find((item) => item.id === currentParentId);
+    if (!parent) {
+      break;
+    }
+    labels.unshift(parent.label);
+    currentParentId = parent.parent_id;
+  }
+
+  return labels.join(" / ");
+}
+
+function categoryCanonicalScore(category: SiteCategory, categories: SiteCategory[]) {
+  const slug = normalizeCategorySlugAlias(category.slug);
+  const canonical = canonicalBySlug.get(slug);
+  const parentSlug = categoryParentSlug(category, categories);
+  return (
+    (canonical?.rootSlug === categoryRootSlug(category, categories) ? 4 : 0) +
+    (canonical?.parentSlug === parentSlug ? 2 : 0) +
+    (canonical?.parentSlug === null && category.parent_id === null ? 2 : 0) +
+    (category.parent_id === null ? 1 : 0)
+  );
+}
+
+function canonicalCategoriesForDisplay(categories: SiteCategory[]) {
+  const bestBySlug = new Map<string, SiteCategory>();
+
+  for (const category of categories) {
+    const slug = normalizeCategorySlugAlias(category.slug);
+    if (!canonicalSlugSet.has(slug)) {
+      continue;
+    }
+
+    const current = bestBySlug.get(slug);
+    if (!current || categoryCanonicalScore(category, categories) > categoryCanonicalScore(current, categories)) {
+      bestBySlug.set(slug, category);
+    }
+  }
+
+  return [...bestBySlug.values()].sort((left, right) => {
+    const rootCompare = categoryRootSlug(left, categories).localeCompare(categoryRootSlug(right, categories));
+    return rootCompare || categoryDepth(left, categories) - categoryDepth(right, categories) || left.sort_order - right.sort_order || left.label.localeCompare(right.label);
+  });
+}
+
+function categoryAliasesForDisplay(categories: SiteCategory[], canonicalCategories: SiteCategory[]) {
+  const canonicalIds = new Set(canonicalCategories.map((category) => category.id));
+  const canonicalSlugs = new Set(canonicalCategories.map((category) => normalizeCategorySlugAlias(category.slug)));
+
+  return categories.filter((category) => {
+    const slug = normalizeCategorySlugAlias(category.slug);
+    return !canonicalIds.has(category.id) && (canonicalSlugs.has(slug) || !canonicalSlugSet.has(slug));
+  });
+}
+
+function productHasCategory(product: AdminProduct | null, category: SiteCategory) {
+  if (!product) {
+    return false;
+  }
+
+  return product.category_ids?.includes(category.id) || normalizedCategorySlugs(product.category_slugs).has(normalizeCategorySlugAlias(category.slug));
+}
+
 export function AdminDashboard() {
   const [adminKey, setAdminKey] = useState("");
   const [isSignedIn, setIsSignedIn] = useState(false);
@@ -218,7 +317,9 @@ export function AdminDashboard() {
   const selectedProduct = useMemo(() => (isCreatingProduct ? null : products.find((product) => product.epos_product_id === selectedId) || products[0]), [isCreatingProduct, products, selectedId]);
   const selectedCategory = useMemo(() => categories.find((category) => category.id === editingCategoryId) || null, [categories, editingCategoryId]);
   const selectedDiscount = useMemo(() => discounts.find((discount) => discount.id === editingDiscountId) || null, [discounts, editingDiscountId]);
-  const productCategoryOptions = useMemo(() => categories.map((category) => ({ ...category, depth: categoryDepth(category, categories) })), [categories]);
+  const canonicalCategoryOptions = useMemo(() => canonicalCategoriesForDisplay(categories), [categories]);
+  const navigationAliasOptions = useMemo(() => categoryAliasesForDisplay(categories, canonicalCategoryOptions), [categories, canonicalCategoryOptions]);
+  const productCategoryOptions = useMemo(() => canonicalCategoryOptions.map((category) => ({ ...category, depth: categoryDepth(category, categories) })), [canonicalCategoryOptions, categories]);
 
   async function loadProducts(searchTerm = query) {
     setLoading(true);
@@ -1077,7 +1178,7 @@ export function AdminDashboard() {
                 {activeTab === "categories" ? (
                   <div className="mt-5">
                     <div className="flex flex-wrap items-center justify-between gap-3">
-                      <p className="max-w-3xl text-sm leading-6 text-ivory/70">Add, edit, nest, and sort the categories that power the public header dropdowns and shop links.</p>
+                      <p className="max-w-3xl text-sm leading-6 text-ivory/70">Manage the canonical product categories. Repeated menu placements are treated as navigation aliases so products only need one real category assignment.</p>
                       <button
                         className="focus-ring rounded-md bg-champagne px-5 py-3 text-xs font-bold uppercase tracking-[0.16em] text-ink hover:bg-ivory"
                         onClick={() => {
@@ -1090,13 +1191,14 @@ export function AdminDashboard() {
                       </button>
                     </div>
                     <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-                      {categories.map((category) => (
+                      {canonicalCategoryOptions.map((category) => (
                         <div className="rounded-lg border border-champagne/25 bg-ink/50 p-4" key={category.id}>
                           <div className="flex items-start justify-between gap-3">
                             <div>
                               <p className="font-display text-2xl">{category.label}</p>
                               <p className="mt-1 text-xs uppercase tracking-[0.16em] text-champagne">{category.is_header ? "Header tab" : category.parent_id ? "Subcategory" : "Top level"} / order {category.sort_order}</p>
-                              <p className="mt-2 text-xs text-ivory/60">{category.href}</p>
+                              <p className="mt-2 text-xs text-ivory/60">{categoryPath(category, categories)}</p>
+                              <p className="mt-1 text-xs text-ivory/50">{category.href}</p>
                             </div>
                             <div className="flex gap-2">
                               <button
@@ -1115,6 +1217,20 @@ export function AdminDashboard() {
                         </div>
                       ))}
                     </div>
+                    {navigationAliasOptions.length ? (
+                      <div className="mt-6 rounded-lg border border-champagne/20 bg-ivory/5 p-4">
+                        <p className="text-xs font-bold uppercase tracking-[0.18em] text-champagne">Navigation aliases / legacy rows</p>
+                        <p className="mt-2 max-w-3xl text-sm leading-6 text-ivory/65">These rows exist for older menu placement or imported category paths. They are not shown as product assignment buckets in this test branch.</p>
+                        <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                          {navigationAliasOptions.map((category) => (
+                            <div className="rounded-md border border-champagne/15 bg-ink/40 px-3 py-2" key={category.id}>
+                              <p className="font-semibold text-ivory">{categoryPath(category, categories)}</p>
+                              <p className="mt-1 text-xs text-ivory/50">{category.href}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
                     {isCategoryModalOpen ? (
                       <div className="fixed inset-0 z-50 grid place-items-center bg-ink/80 px-4 py-8 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="category-modal-title">
                         <div className="max-h-[calc(100vh-4rem)] w-full max-w-xl overflow-auto rounded-lg border border-champagne/30 bg-ink p-5 shadow-luxe">
@@ -1147,8 +1263,8 @@ export function AdminDashboard() {
                               Parent category
                               <select className="focus-ring min-h-11 rounded-md border border-champagne/20 bg-ivory px-3 text-ink" defaultValue={selectedCategory?.parent_id || ""} name="parentId">
                                 <option value="">Top level</option>
-                                {categories.filter((category) => category.id !== selectedCategory?.id).map((category) => (
-                                  <option key={category.id} value={category.id}>{category.label}</option>
+                                {canonicalCategoryOptions.filter((category) => category.id !== selectedCategory?.id).map((category) => (
+                                  <option key={category.id} value={category.id}>{categoryPath(category, categories)}</option>
                                 ))}
                               </select>
                             </label>
@@ -1533,11 +1649,11 @@ export function AdminDashboard() {
                   <input name="department" type="hidden" value={selectedProduct?.department || ""} />
                   <fieldset className="grid gap-3 rounded-lg border border-saddle/15 bg-white p-4">
                     <legend className="px-1 text-sm font-semibold text-espresso">Website categories</legend>
-                    <p className="text-sm leading-6 text-espresso/70">Select every menu category this product should appear in. Subcategories are included here, and selecting a subcategory also keeps it visible under its parent section.</p>
+                    <p className="text-sm leading-6 text-espresso/70">Select the canonical product categories. Header/menu links can point to these same categories from more than one place.</p>
                     {productCategoryOptions.length ? (
                       <div className="grid max-h-72 gap-2 overflow-auto pr-1 sm:grid-cols-2">
                         {productCategoryOptions.map((category) => {
-                          const isChecked = Boolean(selectedProduct?.category_ids?.includes(category.id));
+                          const isChecked = productHasCategory(selectedProduct, category);
                           return (
                             <label
                               className="flex min-h-11 items-center gap-3 rounded-md border border-saddle/15 bg-cream/45 px-3 py-2 text-sm font-semibold text-espresso hover:border-saddle/35"
@@ -1545,7 +1661,7 @@ export function AdminDashboard() {
                               style={{ paddingLeft: `${0.75 + category.depth * 1.1}rem` }}
                             >
                               <input defaultChecked={isChecked} name="categoryIds" type="checkbox" value={category.id} />
-                              <span>{category.depth > 0 ? "- " : ""}{category.label}</span>
+                              <span>{category.depth > 0 ? "- " : ""}{categoryPath(category, categories)}</span>
                             </label>
                           );
                         })}
