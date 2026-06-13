@@ -674,6 +674,42 @@ function womensApparelSizeOptions(group?: ProductGroup): WomensApparelSizeOption
   }));
 }
 
+function womensApparelOptionLabel(product: Product) {
+  return variantColorLabel(cleanProductTitle(product));
+}
+
+function womensApparelVariantScore(product: Product, selectedSize?: string) {
+  const size = womensApparelSizeLabel(product);
+  const hasExactSize = Boolean(selectedSize && size === selectedSize);
+  const hasFlexibleSize = !size;
+  return Number(hasExactSize) * 4 + Number(hasFlexibleSize) * 2 + productVariantScore(product);
+}
+
+function womensApparelVariantOptions(group?: ProductGroup, selectedSize?: string) {
+  if (!isWomensApparelGroup(group)) {
+    return [];
+  }
+
+  const productsByOption = new Map<string, Product>();
+  group!.products.forEach((product) => {
+    if (!isWomensApparelProduct(product)) {
+      return;
+    }
+
+    const label = womensApparelOptionLabel(product);
+    if (!label) {
+      return;
+    }
+
+    const existing = productsByOption.get(label);
+    if (!existing || womensApparelVariantScore(product, selectedSize) > womensApparelVariantScore(existing, selectedSize)) {
+      productsByOption.set(label, product);
+    }
+  });
+
+  return [...productsByOption.entries()].map(([label, product]) => ({ label, product }));
+}
+
 function hasOnlyWomensSizeVariants(group?: ProductGroup) {
   return Boolean(
     group &&
@@ -843,7 +879,6 @@ export function ShopProducts() {
   const detailIsHomemadeSoap = Boolean(detailProduct && isHomemadeSoapProduct(detailProduct.product));
   const detailWomensSizeOptions = detailProduct?.group ? womensApparelSizeOptions(detailProduct.group) : [];
   const detailHasWomensSizeOptions = detailWomensSizeOptions.length > 0;
-  const detailHasVariants = Boolean(detailProduct?.group && detailProduct.group.products.length > 1 && !hasOnlyWomensSizeVariants(detailProduct.group));
   const detailGroupKey = detailProduct?.group?.key || detailProduct?.product.epos_product_id || "";
   const detailHasTshirtSizes = Boolean(detailProduct && isMensTshirtProduct(detailProduct.product));
   const selectedDetailTshirtSize = selectedSizes[detailGroupKey] || mensTshirtSizes[0];
@@ -851,6 +886,16 @@ export function ShopProducts() {
     selectedSizes[detailGroupKey] ||
     detailWomensSizeOptions.find((option) => option.product?.epos_product_id === detailProduct?.product.epos_product_id)?.label ||
     detailWomensSizeOptions[0]?.label;
+  const detailWomensVariantOptions = detailProduct?.group ? womensApparelVariantOptions(detailProduct.group, selectedDetailWomensSize) : [];
+  const detailHasWomensVariantOptions = detailWomensVariantOptions.length > 1;
+  const selectedDetailWomensVariantLabel =
+    selectedVariants[detailGroupKey] ||
+    (detailProduct ? womensApparelOptionLabel(detailProduct.product) : "") ||
+    detailWomensVariantOptions[0]?.label;
+  const detailHasVariants = Boolean(
+    detailProduct?.group &&
+      (detailHasWomensVariantOptions || (!isWomensApparelGroup(detailProduct.group) && detailProduct.group.products.length > 1 && !hasOnlyWomensSizeVariants(detailProduct.group)))
+  );
 
   return (
     <div className="mt-10">
@@ -888,15 +933,21 @@ export function ShopProducts() {
               const hasWomensSizeOptions = womensSizeOptions.length > 0;
               const selectedWomensSize = selectedSizes[group.key] || womensSizeOptions[0]?.label;
               const selectedWomensSizeOption = womensSizeOptions.find((option) => option.label === selectedWomensSize);
+              const womensVariantOptions = womensApparelVariantOptions(group, selectedWomensSize);
+              const hasWomensVariantOptions = womensVariantOptions.length > 1;
+              const defaultWomensVariantLabel = womensApparelOptionLabel(selectedWomensSizeOption?.product || group.products[0]) || womensVariantOptions[0]?.label;
+              const selectedWomensVariantLabel = selectedVariants[group.key] || defaultWomensVariantLabel;
+              const selectedWomensVariantOption = womensVariantOptions.find((option) => option.label === selectedWomensVariantLabel);
               const selectedVariantProduct = group.products.find((variant) => variant.epos_product_id === selectedProductId);
               const defaultProduct = group.products.find(hasAvailableStock) || group.products[0];
               const product =
+                selectedWomensVariantOption?.product ||
                 selectedWomensSizeOption?.product ||
                 selectedVariantProduct ||
                 defaultProduct;
               const imageProduct = product.primary_image_url ? product : group.products.find((variant) => variant.primary_image_url) || product;
               const price = displayPrice(product);
-              const hasVariants = group.products.length > 1 && !hasOnlyWomensSizeVariants(group);
+              const hasVariants = hasWomensVariantOptions || (!isWomensApparelGroup(group) && group.products.length > 1 && !hasOnlyWomensSizeVariants(group));
               const hasTshirtSizes = group.products.some(isMensTshirtProduct);
               const selectedTshirtSize = selectedSizes[group.key] || mensTshirtSizes[0];
               const isOutOfStock = !hasAvailableStock(product);
@@ -955,14 +1006,21 @@ export function ShopProducts() {
                         <select
                           className="focus-ring min-h-11 rounded-md border border-saddle/20 bg-ivory px-3 font-normal"
                           onChange={(event) => setSelectedVariants((current) => ({ ...current, [group.key]: event.target.value }))}
-                          value={product.epos_product_id}
+                          value={hasWomensVariantOptions ? selectedWomensVariantLabel : product.epos_product_id}
                         >
-                          {group.products.map((variant) => (
-                            <option key={variant.epos_product_id} value={variant.epos_product_id}>
-                              {variantLabel(variant)} / {money(variant.sale_price)}
-                              {!hasAvailableStock(variant) ? " / Out of stock" : ""}
-                            </option>
-                          ))}
+                          {hasWomensVariantOptions
+                            ? womensVariantOptions.map((option) => (
+                                <option key={option.label} value={option.label}>
+                                  {option.label} / {money(option.product.sale_price)}
+                                  {!hasAvailableStock(option.product) ? " / Out of stock" : ""}
+                                </option>
+                              ))
+                            : group.products.map((variant) => (
+                                <option key={variant.epos_product_id} value={variant.epos_product_id}>
+                                  {variantLabel(variant)} / {money(variant.sale_price)}
+                                  {!hasAvailableStock(variant) ? " / Out of stock" : ""}
+                                </option>
+                              ))}
                         </select>
                       </label>
                     ) : null}
@@ -1058,12 +1116,12 @@ export function ShopProducts() {
                           return;
                         }
 
-                        const fallbackProduct =
-                          detailProduct.group.products.find((variant) => variant.epos_product_id === selectedVariants[detailProduct.group!.key]) ||
+                        const nextProduct =
+                          womensApparelVariantOptions(detailProduct.group, nextOption.label).find((option) => option.label === selectedDetailWomensVariantLabel)?.product ||
+                          nextOption.product ||
                           detailProduct.product ||
                           detailProduct.group.products.find(hasAvailableStock) ||
                           detailProduct.group.products[0];
-                        const nextProduct = nextOption.product || fallbackProduct;
                         const nextImageProduct = nextProduct.primary_image_url ? nextProduct : detailProduct.group.products.find((variant) => variant.primary_image_url) || nextProduct;
                         setSelectedSizes((current) => ({ ...current, [detailProduct.group!.key]: nextOption.label }));
                         setDetailProduct({ ...detailProduct, product: nextProduct, imageProduct: nextImageProduct });
@@ -1085,6 +1143,19 @@ export function ShopProducts() {
                     <select
                       className="focus-ring min-h-11 rounded-md border border-saddle/20 bg-white px-3 font-normal"
                       onChange={(event) => {
+                        if (detailHasWomensVariantOptions && detailProduct.group) {
+                          const nextOption = detailWomensVariantOptions.find((option) => option.label === event.target.value);
+                          if (!nextOption) {
+                            return;
+                          }
+
+                          const nextProduct = nextOption.product;
+                          const nextImageProduct = nextProduct.primary_image_url ? nextProduct : detailProduct.group.products.find((variant) => variant.primary_image_url) || nextProduct;
+                          setSelectedVariants((current) => ({ ...current, [detailProduct.group!.key]: nextOption.label }));
+                          setDetailProduct({ ...detailProduct, product: nextProduct, imageProduct: nextImageProduct });
+                          return;
+                        }
+
                         const nextProduct = detailProduct.group?.products.find((variant) => variant.epos_product_id === event.target.value);
                         if (!nextProduct || !detailProduct.group) {
                           return;
@@ -1094,14 +1165,21 @@ export function ShopProducts() {
                         setSelectedVariants((current) => ({ ...current, [detailProduct.group!.key]: nextProduct.epos_product_id }));
                         setDetailProduct({ ...detailProduct, product: nextProduct, imageProduct: nextImageProduct });
                       }}
-                      value={detailProduct.product.epos_product_id}
+                      value={detailHasWomensVariantOptions ? selectedDetailWomensVariantLabel : detailProduct.product.epos_product_id}
                     >
-                      {detailProduct.group.products.map((variant) => (
-                        <option key={variant.epos_product_id} value={variant.epos_product_id}>
-                          {variantLabel(variant)} / {money(variant.sale_price)}
-                          {!hasAvailableStock(variant) ? " / Out of stock" : ""}
-                        </option>
-                      ))}
+                      {detailHasWomensVariantOptions
+                        ? detailWomensVariantOptions.map((option) => (
+                            <option key={option.label} value={option.label}>
+                              {option.label} / {money(option.product.sale_price)}
+                              {!hasAvailableStock(option.product) ? " / Out of stock" : ""}
+                            </option>
+                          ))
+                        : detailProduct.group.products.map((variant) => (
+                            <option key={variant.epos_product_id} value={variant.epos_product_id}>
+                              {variantLabel(variant)} / {money(variant.sale_price)}
+                              {!hasAvailableStock(variant) ? " / Out of stock" : ""}
+                            </option>
+                          ))}
                     </select>
                   </label>
                 ) : null}
