@@ -46,7 +46,8 @@ type DetailProduct = {
   group?: ProductGroup;
 };
 
-const mensTshirtSizes = ["Medium", "Large", "XL"];
+const mensTshirtSizes = ["Medium", "Large", "X-Large"];
+const womensApparelSizes = ["Small", "Medium", "Large", "X-Large"] as const;
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const homemadeSoapDisclaimer = "Handmade soap colors may vary slightly from batch to batch depending on when each bar is made.";
 
@@ -253,6 +254,8 @@ const apparelCategorySlugs = new Set([
   "rompers-jumpsuits",
   "t-shirts"
 ]);
+const womensApparelCategorySlugs = new Set(["clothing", "dresses", "tops", "bottoms", "pants", "cardigans", "rompers-jumpsuits"]);
+type WomensApparelSize = (typeof womensApparelSizes)[number];
 
 const categoryKeywordMap: Record<string, string[]> = {
   accessories: ["purse", "bag", "luggage", "weekender", "coozie", "koozie", "coaster", "infusion", "cocktail", "cap", "hat"],
@@ -356,6 +359,15 @@ function isMensTshirtProduct(product: Product) {
   const slugs = product.category_slugs || [];
   const text = `${product.name} ${product.marketing_title || ""} ${product.sku || ""}`.toLowerCase();
   return slugs.includes("t-shirts") || (slugs.includes("mens-collection") && /\b(t-shirt|tee)\b/i.test(text));
+}
+
+function isWomensApparelProduct(product: Product) {
+  const slugs = product.category_slugs || [];
+  return slugs.includes("womens-collection") && slugs.some((slug) => womensApparelCategorySlugs.has(slug));
+}
+
+function productVariantScore(product: Product) {
+  return Number(hasAvailableStock(product)) * 2 + Number(Boolean(product.primary_image_url));
 }
 
 function cartProductName(product: Product, option?: string) {
@@ -475,8 +487,8 @@ function displaySize(value: string) {
     m: "Medium",
     large: "Large",
     l: "Large",
-    xlarge: "XL",
-    xl: "XL",
+    xlarge: "X-Large",
+    xl: "X-Large",
     xxl: "XXL",
     xxxl: "XXXL",
     os: "One Size",
@@ -504,6 +516,23 @@ function variantSizeLabel(title: string, sku: string) {
   }
 
   return "";
+}
+
+function womensApparelSizeLabel(product: Product): WomensApparelSize | "" {
+  const size = variantSizeLabel(cleanProductTitle(product), product.sku || "");
+  const normalized = size.toLowerCase().replace(/[\s_-]+/g, "");
+  const labels: Record<string, WomensApparelSize> = {
+    s: "Small",
+    small: "Small",
+    m: "Medium",
+    medium: "Medium",
+    l: "Large",
+    large: "Large",
+    xl: "X-Large",
+    xlarge: "X-Large"
+  };
+
+  return labels[normalized] || "";
 }
 
 function variantColorLabel(title: string) {
@@ -608,6 +637,36 @@ function groupTitle(product: Product) {
   return baseTitle.replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+function womensApparelSizeOptions(group?: ProductGroup) {
+  if (!group) {
+    return [];
+  }
+
+  const productsBySize = new Map<WomensApparelSize, Product>();
+  group.products.forEach((product) => {
+    if (!isWomensApparelProduct(product)) {
+      return;
+    }
+
+    const size = womensApparelSizeLabel(product);
+    if (!size) {
+      return;
+    }
+
+    const existing = productsBySize.get(size);
+    if (!existing || productVariantScore(product) > productVariantScore(existing)) {
+      productsBySize.set(size, product);
+    }
+  });
+
+  return womensApparelSizes
+    .map((label) => {
+      const product = productsBySize.get(label);
+      return product ? { label, product } : null;
+    })
+    .filter((option): option is { label: WomensApparelSize; product: Product } => Boolean(option));
+}
+
 function groupProducts(products: Product[]) {
   const groups = new Map<string, ProductGroup>();
 
@@ -658,6 +717,7 @@ export function ShopProducts() {
   const [products, setProducts] = useState<Product[]>([]);
   const [activeDepartment, setActiveDepartment] = useState("all");
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
+  const [selectedSizes, setSelectedSizes] = useState<Record<string, string>>({});
   const [detailProduct, setDetailProduct] = useState<DetailProduct | null>(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
@@ -765,10 +825,13 @@ export function ShopProducts() {
   const detailAvailable = detailProduct ? hasAvailableStock(detailProduct.product) : false;
   const detailIsFarmEgg = Boolean(detailProduct && isFarmEggProduct(detailProduct.product));
   const detailIsHomemadeSoap = Boolean(detailProduct && isHomemadeSoapProduct(detailProduct.product));
-  const detailHasVariants = Boolean(detailProduct?.group && detailProduct.group.products.length > 1);
+  const detailWomensSizeOptions = detailProduct?.group ? womensApparelSizeOptions(detailProduct.group) : [];
+  const detailHasWomensSizeOptions = detailWomensSizeOptions.length > 0;
+  const detailHasVariants = Boolean(detailProduct?.group && detailProduct.group.products.length > 1 && !detailHasWomensSizeOptions);
   const detailGroupKey = detailProduct?.group?.key || detailProduct?.product.epos_product_id || "";
-  const detailHasTshirtSizes = Boolean(detailProduct && !detailHasVariants && isMensTshirtProduct(detailProduct.product));
-  const selectedDetailTshirtSize = selectedVariants[detailGroupKey] || mensTshirtSizes[0];
+  const detailHasTshirtSizes = Boolean(detailProduct && isMensTshirtProduct(detailProduct.product));
+  const selectedDetailTshirtSize = selectedSizes[detailGroupKey] || mensTshirtSizes[0];
+  const selectedDetailWomensSize = detailWomensSizeOptions.find((option) => option.product.epos_product_id === detailProduct?.product.epos_product_id)?.label;
 
   return (
     <div className="mt-10">
@@ -802,12 +865,21 @@ export function ShopProducts() {
           <div className="mt-5 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
             {filteredGroups.map((group) => {
               const selectedProductId = selectedVariants[group.key];
-              const product = group.products.find((variant) => variant.epos_product_id === selectedProductId) || group.products.find(hasAvailableStock) || group.products[0];
+              const womensSizeOptions = womensApparelSizeOptions(group);
+              const hasWomensSizeOptions = womensSizeOptions.length > 0;
+              const selectedWomensSizeOption = womensSizeOptions.find((option) => option.product.epos_product_id === selectedProductId);
+              const defaultWomensSizeOption = womensSizeOptions.find((option) => hasAvailableStock(option.product)) || womensSizeOptions[0];
+              const product =
+                selectedWomensSizeOption?.product ||
+                (hasWomensSizeOptions ? defaultWomensSizeOption?.product : group.products.find((variant) => variant.epos_product_id === selectedProductId)) ||
+                group.products.find(hasAvailableStock) ||
+                group.products[0];
               const imageProduct = product.primary_image_url ? product : group.products.find((variant) => variant.primary_image_url) || product;
               const price = displayPrice(product);
-              const hasVariants = group.products.length > 1;
-              const hasTshirtSizes = !hasVariants && isMensTshirtProduct(product);
-              const selectedTshirtSize = selectedVariants[group.key] || mensTshirtSizes[0];
+              const hasVariants = group.products.length > 1 && !hasWomensSizeOptions;
+              const hasTshirtSizes = group.products.some(isMensTshirtProduct);
+              const selectedTshirtSize = selectedSizes[group.key] || mensTshirtSizes[0];
+              const selectedWomensSize = womensSizeOptions.find((option) => option.product.epos_product_id === product.epos_product_id)?.label;
               const isOutOfStock = !hasAvailableStock(product);
               const isFarmEgg = isFarmEggProduct(product);
               const isHomemadeSoap = isHomemadeSoapProduct(product);
@@ -841,6 +913,23 @@ export function ShopProducts() {
                     <button className="mt-2 block text-left" onClick={() => openProduct(product, group.title, imageProduct, group)} type="button">
                       <h3 className="line-clamp-2 min-h-14 font-display text-2xl leading-tight text-ink hover:text-saddle">{group.title}</h3>
                     </button>
+                    {hasWomensSizeOptions ? (
+                      <label className="mt-4 grid gap-2 text-sm font-semibold text-espresso">
+                        Select size
+                        <select
+                          className="focus-ring min-h-11 rounded-md border border-saddle/20 bg-ivory px-3 font-normal"
+                          onChange={(event) => setSelectedVariants((current) => ({ ...current, [group.key]: event.target.value }))}
+                          value={product.epos_product_id}
+                        >
+                          {womensSizeOptions.map((option) => (
+                            <option key={option.product.epos_product_id} value={option.product.epos_product_id}>
+                              {option.label} / {money(option.product.sale_price)}
+                              {!hasAvailableStock(option.product) ? " / Out of stock" : ""}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : null}
                     {hasVariants ? (
                       <label className="mt-4 grid gap-2 text-sm font-semibold text-espresso">
                         Select option
@@ -863,7 +952,7 @@ export function ShopProducts() {
                         Select size
                         <select
                           className="focus-ring min-h-11 rounded-md border border-saddle/20 bg-ivory px-3 font-normal"
-                          onChange={(event) => setSelectedVariants((current) => ({ ...current, [group.key]: event.target.value }))}
+                          onChange={(event) => setSelectedSizes((current) => ({ ...current, [group.key]: event.target.value }))}
                           value={selectedTshirtSize}
                         >
                           {mensTshirtSizes.map((size) => (
@@ -885,7 +974,7 @@ export function ShopProducts() {
                             return;
                           }
 
-                          addToCart(product, hasTshirtSizes ? selectedTshirtSize : undefined);
+                          addToCart(product, hasTshirtSizes ? selectedTshirtSize : selectedWomensSize);
                         }}
                         type="button"
                       >
@@ -939,6 +1028,33 @@ export function ShopProducts() {
                 {detailIsFarmEgg ? <p className="mt-5 rounded-md bg-cream px-4 py-3 text-sm font-semibold text-saddle">Local delivery only. Please contact to place order.</p> : null}
                 {detailIsHomemadeSoap ? <p className="mt-5 rounded-md bg-cream px-4 py-3 text-sm font-semibold leading-6 text-saddle">{homemadeSoapDisclaimer}</p> : null}
                 {detailProduct.product.sku ? <p className="mt-4 text-xs font-bold uppercase tracking-[0.18em] text-saddle/75">Style {detailProduct.product.sku}</p> : null}
+                {detailHasWomensSizeOptions && detailProduct.group ? (
+                  <label className="mt-6 grid gap-2 text-sm font-semibold text-espresso">
+                    Select size
+                    <select
+                      className="focus-ring min-h-11 rounded-md border border-saddle/20 bg-white px-3 font-normal"
+                      onChange={(event) => {
+                        const nextOption = detailWomensSizeOptions.find((option) => option.product.epos_product_id === event.target.value);
+                        if (!nextOption || !detailProduct.group) {
+                          return;
+                        }
+
+                        const nextProduct = nextOption.product;
+                        const nextImageProduct = nextProduct.primary_image_url ? nextProduct : detailProduct.group.products.find((variant) => variant.primary_image_url) || nextProduct;
+                        setSelectedVariants((current) => ({ ...current, [detailProduct.group!.key]: nextProduct.epos_product_id }));
+                        setDetailProduct({ ...detailProduct, product: nextProduct, imageProduct: nextImageProduct });
+                      }}
+                      value={detailProduct.product.epos_product_id}
+                    >
+                      {detailWomensSizeOptions.map((option) => (
+                        <option key={option.product.epos_product_id} value={option.product.epos_product_id}>
+                          {option.label} / {money(option.product.sale_price)}
+                          {!hasAvailableStock(option.product) ? " / Out of stock" : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : null}
                 {detailHasVariants && detailProduct.group ? (
                   <label className="mt-6 grid gap-2 text-sm font-semibold text-espresso">
                     Select option
@@ -970,7 +1086,7 @@ export function ShopProducts() {
                     Select size
                     <select
                       className="focus-ring min-h-11 rounded-md border border-saddle/20 bg-white px-3 font-normal"
-                      onChange={(event) => setSelectedVariants((current) => ({ ...current, [detailGroupKey]: event.target.value }))}
+                      onChange={(event) => setSelectedSizes((current) => ({ ...current, [detailGroupKey]: event.target.value }))}
                       value={selectedDetailTshirtSize}
                     >
                       {mensTshirtSizes.map((size) => (
@@ -990,7 +1106,7 @@ export function ShopProducts() {
                       return;
                     }
 
-                    addToCart(detailProduct.product, detailHasTshirtSizes ? selectedDetailTshirtSize : undefined);
+                    addToCart(detailProduct.product, detailHasTshirtSizes ? selectedDetailTshirtSize : selectedDetailWomensSize);
                   }}
                   type="button"
                 >
