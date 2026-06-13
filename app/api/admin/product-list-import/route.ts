@@ -154,6 +154,11 @@ function bathSaltOrScrubSlugsFor(name: string) {
   return ["bath-body"];
 }
 
+function isShavingSoapName(name: string) {
+  const lower = name.toLowerCase();
+  return lower.includes("shave soap") || lower.includes("shaving soap");
+}
+
 function categorySlugsFor(row: ImportRow) {
   const category = normalize(row.CategoryId);
   const name = cleanString(row.Name);
@@ -202,8 +207,16 @@ function categorySlugsFor(row: ImportRow) {
     case "gift card":
       return ["gift-collection", "gift-cards"];
     case "handmade soap":
+      if (isShavingSoapName(name)) {
+        return ["mens-collection", "mens-care"];
+      }
+
       return ["kitchen-selection", "soaps", "hand-soaps", "bath-body", "handmade-soap"];
     case "kitchen homemade dish disk soaps and hand soap":
+      if (isShavingSoapName(name)) {
+        return ["mens-collection", "mens-care"];
+      }
+
       return kitchenSoapSlugsFor(name);
     case "leather coasters":
       if (sku === "BCLC591") return [];

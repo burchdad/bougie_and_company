@@ -328,8 +328,8 @@ const categoryKeywordMap: Record<string, string[]> = {
   "kitchen-selection": ["dish soap", "foaming hand", "hand soap", "handmade soap", "homemade soap", "kitchen"],
   "leather-coasters": ["leather coaster"],
   luggage: ["luggage", "weekender", "duffle", "travel"],
-  "mens-care": ["men", "beard", "mechanic", "body spray", "shampoo", "chap"],
-  "mens-collection": ["men", "beard", "mechanic", "cap", "t-shirt", "body spray", "shampoo"],
+  "mens-care": ["men", "beard", "mechanic", "shave", "shaving", "body spray", "shampoo", "chap"],
+  "mens-collection": ["men", "beard", "mechanic", "shave", "shaving", "cap", "t-shirt", "body spray", "shampoo"],
   necklaces: ["necklace"],
   "outdoor-items": ["outdoor"],
   outdoor: ["outdoor"],
@@ -365,6 +365,20 @@ function isFarmEggProduct(product: Product) {
 function isHomemadeSoapProduct(product: Product) {
   const haystack = productSearchText(product);
   return product.category_slugs?.includes("handmade-soap") || haystack.includes("handmade soap") || haystack.includes("homemade soap");
+}
+
+function isShaveSoapProduct(product: Product) {
+  const haystack = productSearchText(product);
+  return haystack.includes("shave soap") || haystack.includes("shaving soap");
+}
+
+function isFoamingHandSoapProduct(product: Product) {
+  const haystack = productSearchText(product);
+  return product.category_slugs?.includes("foaming-hand-soap") || haystack.includes("foaming hand");
+}
+
+function isHandmadeSoapFilterProduct(product: Product) {
+  return isHomemadeSoapProduct(product) && !isShaveSoapProduct(product);
 }
 
 function isGiftCardProduct(product: Product) {
@@ -486,8 +500,18 @@ function productMatchesFilter(product: Product, filterId: string) {
     return product.category_slugs?.includes("gift-cards") || haystack.includes("gift card") || haystack.includes("gift certificate");
   }
 
-  if (filterId === "handmade-soaps" || filterId === "soaps") {
-    return productSearchText(product).includes("soap");
+  if (filterId === "handmade-soaps") {
+    return isHandmadeSoapFilterProduct(product);
+  }
+
+  if (filterId === "soaps") {
+    const slugs = product.category_slugs || [];
+    const haystack = productSearchText(product);
+    return (
+      !slugs.includes("mens-care") &&
+      !isShaveSoapProduct(product) &&
+      (slugs.includes("soaps") || isHandmadeSoapFilterProduct(product) || isFoamingHandSoapProduct(product) || haystack.includes("hand soap"))
+    );
   }
 
   if (filterId === "soy-9oz" || filterId === "candles-soy-9oz") {
@@ -506,8 +530,9 @@ function productMatchesFilter(product: Product, filterId: string) {
   }
 
   if (filterId === "hand-soaps") {
+    const slugs = product.category_slugs || [];
     const haystack = productSearchText(product);
-    return product.category_slugs?.includes("soaps") && haystack.includes("soap") && !haystack.includes("foaming hand");
+    return slugs.includes("soaps") && !slugs.includes("mens-care") && haystack.includes("soap") && !haystack.includes("foaming hand") && !isShaveSoapProduct(product);
   }
 
   if (filterId === "foaming-hand-soap" || filterId === "kitchen-selection-foaming-hand-soap") {
