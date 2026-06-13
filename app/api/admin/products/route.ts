@@ -227,7 +227,12 @@ export async function POST(request: Request) {
       category_id = EXCLUDED.category_id,
       sale_price = EXCLUDED.sale_price,
       cost_price = EXCLUDED.cost_price,
-      raw = EXCLUDED.raw,
+      raw = EXCLUDED.raw || jsonb_strip_nulls(jsonb_build_object(
+        'SkipEposImageImport',
+        CASE WHEN epos_products.raw->>'SkipEposImageImport' = 'true' THEN true ELSE NULL END,
+        'DisableFuzzyImageFallback',
+        CASE WHEN epos_products.raw->>'DisableFuzzyImageFallback' = 'true' THEN true ELSE NULL END
+      )),
       is_deleted = FALSE,
       synced_at = NOW()
   `;
