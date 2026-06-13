@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     return Response.json(
       {
         ok: true,
-        message: `Epos image import checked ${result.productsScanned} product${result.productsScanned === 1 ? "" : "s"}, uploaded ${result.uploaded} image${result.uploaded === 1 ? "" : "s"}, and hydrated ${hydration?.hydrated ?? 0} existing image link${hydration?.hydrated === 1 ? "" : "s"} into Blob.`,
+        message: `Epos image import checked ${result.productsScanned} product${result.productsScanned === 1 ? "" : "s"}, uploaded ${result.uploaded} image${result.uploaded === 1 ? "" : "s"}, hydrated ${hydration?.hydrated ?? 0} existing image link${hydration?.hydrated === 1 ? "" : "s"} into Blob, and removed ${hydration?.removedStale ?? 0} stale image link${hydration?.removedStale === 1 ? "" : "s"}.`,
         result,
         hydration
       },

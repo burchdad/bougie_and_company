@@ -800,6 +800,7 @@ export function AdminDashboard() {
           scanned: number;
           hydrated: number;
           failed: number;
+          removedStale?: number;
           remainingExternal: number;
         } | null;
       };
@@ -820,7 +821,7 @@ export function AdminDashboard() {
       const hydration = result.hydration;
       setMessage(
         counts
-          ? `${result.message} Blob hydrated ${hydration?.hydrated ?? 0} existing external image link${hydration?.hydrated === 1 ? "" : "s"}; ${hydration?.remainingExternal ?? 0} external image row${hydration?.remainingExternal === 1 ? "" : "s"} remain. Uploaded ${counts.uploaded}, failed ${counts.failed}, and ${counts.remainingWithoutPhotos} product${counts.remainingWithoutPhotos === 1 ? "" : "s"} still have no photo.`
+          ? `${result.message} Blob hydrated ${hydration?.hydrated ?? 0} existing external image link${hydration?.hydrated === 1 ? "" : "s"}; removed ${hydration?.removedStale ?? 0} stale image link${hydration?.removedStale === 1 ? "" : "s"}; ${hydration?.remainingExternal ?? 0} external image row${hydration?.remainingExternal === 1 ? "" : "s"} remain. Uploaded ${counts.uploaded}, failed ${counts.failed}, and ${counts.remainingWithoutPhotos} product${counts.remainingWithoutPhotos === 1 ? "" : "s"} still have no photo.`
           : result.message || "Epos image import complete."
       );
       await loadProducts(query);

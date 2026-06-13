@@ -48,6 +48,7 @@ type BlobHydrationResult = {
   scanned: number;
   hydrated: number;
   failed: number;
+  removedStale: number;
   remainingExternal: number;
   failureSamples: ImageImportResult["failureSamples"];
 };
@@ -782,6 +783,7 @@ export async function hydrateExternalProductImages({ limit = 50 } = {}) {
     scanned: rows.length,
     hydrated: 0,
     failed: 0,
+    removedStale: 0,
     remainingExternal: 0,
     failureSamples: []
   };
@@ -797,6 +799,13 @@ export async function hydrateExternalProductImages({ limit = 50 } = {}) {
       const response = await fetch(imageUrl, { cache: "no-store" });
 
       if (!response.ok) {
+        if (response.status === 404 || response.status === 410) {
+          await sql`DELETE FROM product_images WHERE id = ${String(row.id)}`;
+          result.removedStale += 1;
+          addFailureSample(result, imageUrl, "hydrate-stale-removed", { status: response.status, contentType: response.headers.get("content-type") });
+          continue;
+        }
+
         result.failed += 1;
         addFailureSample(result, imageUrl, "hydrate-fetch-not-ok", { status: response.status, contentType: response.headers.get("content-type") });
         continue;
