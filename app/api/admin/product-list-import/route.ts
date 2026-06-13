@@ -188,6 +188,8 @@ function categorySlugsFor(row: ImportRow) {
       return ["bath-body", "clay-mask"];
     case "cocktail infusions":
       return ["accessories", "cocktail-infusions"];
+    case "coasters":
+      return ["accessories", "coasters", "regular-coasters"];
     case "coozie":
       return ["accessories", "coozies"];
     case "ear rings":

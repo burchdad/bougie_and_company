@@ -19,7 +19,7 @@ export const defaultMenuItems: CategoryMenuItem[] = [
       { label: "Men's Care", href: "/shop#mens-care", children: [{ label: "Body Spray", href: "/shop#body-spray" }, { label: "Beard Products", href: "/shop#beard-products" }, { label: "Homemade Mechanic Soaps", href: "/shop#mechanic-soap" }] },
       { label: "Women's Care", href: "/shop#bath-body", children: [{ label: "Week From Hell", href: "/shop#week-from-hell" }, { label: "Bath Salts", href: "/shop#bath-salts" }, { label: "Body Scrubs", href: "/shop#body-scrubs" }, { label: "Bath Bombs", href: "/shop#bath-bombs" }, { label: "Body Butter/Lotion", href: "/shop#body-butter-lotions" }, { label: "Chap Stick", href: "/shop#chap-stick" }, { label: "Body Sprays", href: "/shop#body-spray" }, { label: "Purses", href: "/shop#purses" }] },
       { label: "Coozies", href: "/shop#coozies" },
-      { label: "Coasters", href: "/shop#coasters", children: [{ label: "Coasters", href: "/shop#coasters" }, { label: "Leather Coasters", href: "/shop#leather-coasters" }] },
+      { label: "Coasters", href: "/shop#coasters", children: [{ label: "Coasters", href: "/shop#regular-coasters" }, { label: "Leather Coasters", href: "/shop#leather-coasters" }] },
       { label: "Cocktail Infusions", href: "/shop#cocktail-infusions" },
       { label: "Farm Fresh Eggs", href: "/shop#farm-eggs" }
     ]

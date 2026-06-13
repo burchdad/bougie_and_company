@@ -337,6 +337,7 @@ const categoryKeywordMap: Record<string, string[]> = {
   purses: ["purse", "bag"],
   "farm-eggs": ["farm fresh egg", "farm eggs"],
   regular: ["regular coaster"],
+  "regular-coasters": ["coaster"],
   "rompers-jumpsuits": ["romper", "jumpsuit"],
   "candles-soy-9oz": ["9oz", "9 oz"],
   "candles-soy-wax-melts": ["wax melt", "wax melts"],
@@ -496,6 +497,20 @@ function productMatchesFilter(product: Product, filterId: string) {
 
   if (filterId === "bottoms") {
     return product.category_slugs?.includes("pants") || product.category_slugs?.includes("bottoms");
+  }
+
+  if (filterId === "regular-coasters") {
+    const slugs = product.category_slugs || [];
+    if (slugs.includes("regular-coasters")) {
+      return true;
+    }
+
+    if (product.has_explicit_categories) {
+      return false;
+    }
+
+    const haystack = productSearchText(product);
+    return haystack.includes("coaster") && !haystack.includes("leather");
   }
 
   if (product.category_slugs?.includes(filterId)) {
