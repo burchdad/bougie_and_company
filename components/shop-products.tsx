@@ -39,6 +39,11 @@ type ProductGroup = {
   products: Product[];
 };
 
+type WomensApparelSizeOption = {
+  label: WomensApparelSize;
+  product?: Product;
+};
+
 type DetailProduct = {
   product: Product;
   imageProduct: Product;
@@ -366,6 +371,10 @@ function isWomensApparelProduct(product: Product) {
   return slugs.includes("womens-collection") && slugs.some((slug) => womensApparelCategorySlugs.has(slug));
 }
 
+function isWomensApparelGroup(group?: ProductGroup) {
+  return Boolean(group?.products.some(isWomensApparelProduct));
+}
+
 function productVariantScore(product: Product) {
   return Number(hasAvailableStock(product)) * 2 + Number(Boolean(product.primary_image_url));
 }
@@ -637,13 +646,13 @@ function groupTitle(product: Product) {
   return baseTitle.replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-function womensApparelSizeOptions(group?: ProductGroup) {
-  if (!group) {
+function womensApparelSizeOptions(group?: ProductGroup): WomensApparelSizeOption[] {
+  if (!isWomensApparelGroup(group)) {
     return [];
   }
 
   const productsBySize = new Map<WomensApparelSize, Product>();
-  group.products.forEach((product) => {
+  group!.products.forEach((product) => {
     if (!isWomensApparelProduct(product)) {
       return;
     }
@@ -659,12 +668,19 @@ function womensApparelSizeOptions(group?: ProductGroup) {
     }
   });
 
-  return womensApparelSizes
-    .map((label) => {
-      const product = productsBySize.get(label);
-      return product ? { label, product } : null;
-    })
-    .filter((option): option is { label: WomensApparelSize; product: Product } => Boolean(option));
+  return womensApparelSizes.map((label) => ({
+    label,
+    product: productsBySize.get(label)
+  }));
+}
+
+function hasOnlyWomensSizeVariants(group?: ProductGroup) {
+  return Boolean(
+    group &&
+      isWomensApparelGroup(group) &&
+      group.products.length > 1 &&
+      group.products.every((product) => Boolean(womensApparelSizeLabel(product)))
+  );
 }
 
 function groupProducts(products: Product[]) {
@@ -827,11 +843,14 @@ export function ShopProducts() {
   const detailIsHomemadeSoap = Boolean(detailProduct && isHomemadeSoapProduct(detailProduct.product));
   const detailWomensSizeOptions = detailProduct?.group ? womensApparelSizeOptions(detailProduct.group) : [];
   const detailHasWomensSizeOptions = detailWomensSizeOptions.length > 0;
-  const detailHasVariants = Boolean(detailProduct?.group && detailProduct.group.products.length > 1 && !detailHasWomensSizeOptions);
+  const detailHasVariants = Boolean(detailProduct?.group && detailProduct.group.products.length > 1 && !hasOnlyWomensSizeVariants(detailProduct.group));
   const detailGroupKey = detailProduct?.group?.key || detailProduct?.product.epos_product_id || "";
   const detailHasTshirtSizes = Boolean(detailProduct && isMensTshirtProduct(detailProduct.product));
   const selectedDetailTshirtSize = selectedSizes[detailGroupKey] || mensTshirtSizes[0];
-  const selectedDetailWomensSize = detailWomensSizeOptions.find((option) => option.product.epos_product_id === detailProduct?.product.epos_product_id)?.label;
+  const selectedDetailWomensSize =
+    selectedSizes[detailGroupKey] ||
+    detailWomensSizeOptions.find((option) => option.product?.epos_product_id === detailProduct?.product.epos_product_id)?.label ||
+    detailWomensSizeOptions[0]?.label;
 
   return (
     <div className="mt-10">
@@ -867,19 +886,19 @@ export function ShopProducts() {
               const selectedProductId = selectedVariants[group.key];
               const womensSizeOptions = womensApparelSizeOptions(group);
               const hasWomensSizeOptions = womensSizeOptions.length > 0;
-              const selectedWomensSizeOption = womensSizeOptions.find((option) => option.product.epos_product_id === selectedProductId);
-              const defaultWomensSizeOption = womensSizeOptions.find((option) => hasAvailableStock(option.product)) || womensSizeOptions[0];
+              const selectedWomensSize = selectedSizes[group.key] || womensSizeOptions[0]?.label;
+              const selectedWomensSizeOption = womensSizeOptions.find((option) => option.label === selectedWomensSize);
+              const selectedVariantProduct = group.products.find((variant) => variant.epos_product_id === selectedProductId);
+              const defaultProduct = group.products.find(hasAvailableStock) || group.products[0];
               const product =
                 selectedWomensSizeOption?.product ||
-                (hasWomensSizeOptions ? defaultWomensSizeOption?.product : group.products.find((variant) => variant.epos_product_id === selectedProductId)) ||
-                group.products.find(hasAvailableStock) ||
-                group.products[0];
+                selectedVariantProduct ||
+                defaultProduct;
               const imageProduct = product.primary_image_url ? product : group.products.find((variant) => variant.primary_image_url) || product;
               const price = displayPrice(product);
-              const hasVariants = group.products.length > 1 && !hasWomensSizeOptions;
+              const hasVariants = group.products.length > 1 && !hasOnlyWomensSizeVariants(group);
               const hasTshirtSizes = group.products.some(isMensTshirtProduct);
               const selectedTshirtSize = selectedSizes[group.key] || mensTshirtSizes[0];
-              const selectedWomensSize = womensSizeOptions.find((option) => option.product.epos_product_id === product.epos_product_id)?.label;
               const isOutOfStock = !hasAvailableStock(product);
               const isFarmEgg = isFarmEggProduct(product);
               const isHomemadeSoap = isHomemadeSoapProduct(product);
@@ -918,13 +937,13 @@ export function ShopProducts() {
                         Select size
                         <select
                           className="focus-ring min-h-11 rounded-md border border-saddle/20 bg-ivory px-3 font-normal"
-                          onChange={(event) => setSelectedVariants((current) => ({ ...current, [group.key]: event.target.value }))}
-                          value={product.epos_product_id}
+                          onChange={(event) => setSelectedSizes((current) => ({ ...current, [group.key]: event.target.value }))}
+                          value={selectedWomensSize}
                         >
                           {womensSizeOptions.map((option) => (
-                            <option key={option.product.epos_product_id} value={option.product.epos_product_id}>
-                              {option.label} / {money(option.product.sale_price)}
-                              {!hasAvailableStock(option.product) ? " / Out of stock" : ""}
+                            <option key={option.label} value={option.label}>
+                              {option.label} / {money((option.product || product).sale_price)}
+                              {option.product && !hasAvailableStock(option.product) ? " / Out of stock" : ""}
                             </option>
                           ))}
                         </select>
@@ -1034,22 +1053,27 @@ export function ShopProducts() {
                     <select
                       className="focus-ring min-h-11 rounded-md border border-saddle/20 bg-white px-3 font-normal"
                       onChange={(event) => {
-                        const nextOption = detailWomensSizeOptions.find((option) => option.product.epos_product_id === event.target.value);
+                        const nextOption = detailWomensSizeOptions.find((option) => option.label === event.target.value);
                         if (!nextOption || !detailProduct.group) {
                           return;
                         }
 
-                        const nextProduct = nextOption.product;
+                        const fallbackProduct =
+                          detailProduct.group.products.find((variant) => variant.epos_product_id === selectedVariants[detailProduct.group!.key]) ||
+                          detailProduct.product ||
+                          detailProduct.group.products.find(hasAvailableStock) ||
+                          detailProduct.group.products[0];
+                        const nextProduct = nextOption.product || fallbackProduct;
                         const nextImageProduct = nextProduct.primary_image_url ? nextProduct : detailProduct.group.products.find((variant) => variant.primary_image_url) || nextProduct;
-                        setSelectedVariants((current) => ({ ...current, [detailProduct.group!.key]: nextProduct.epos_product_id }));
+                        setSelectedSizes((current) => ({ ...current, [detailProduct.group!.key]: nextOption.label }));
                         setDetailProduct({ ...detailProduct, product: nextProduct, imageProduct: nextImageProduct });
                       }}
-                      value={detailProduct.product.epos_product_id}
+                      value={selectedDetailWomensSize}
                     >
                       {detailWomensSizeOptions.map((option) => (
-                        <option key={option.product.epos_product_id} value={option.product.epos_product_id}>
-                          {option.label} / {money(option.product.sale_price)}
-                          {!hasAvailableStock(option.product) ? " / Out of stock" : ""}
+                        <option key={option.label} value={option.label}>
+                          {option.label} / {money((option.product || detailProduct.product).sale_price)}
+                          {option.product && !hasAvailableStock(option.product) ? " / Out of stock" : ""}
                         </option>
                       ))}
                     </select>
