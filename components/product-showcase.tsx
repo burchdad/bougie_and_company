@@ -2,15 +2,90 @@
 
 import Image from "next/image";
 import { ShoppingBag } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { bestSellers } from "@/lib/data";
 
+type StorefrontProduct = {
+  name: string;
+  sale_price: string | null;
+  marketing_title: string | null;
+};
+
+type ProductResponse = {
+  ok: boolean;
+  products?: StorefrontProduct[];
+};
+
+function normalize(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function money(value: string | null) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? `$${parsed.toFixed(2)}` : null;
+}
+
 export function ProductShowcase() {
+  const [storefrontProducts, setStorefrontProducts] = useState<StorefrontProduct[]>([]);
+
+  useEffect(() => {
+    let ignore = false;
+
+    async function loadPrices() {
+      try {
+        const response = await fetch("/api/products", { cache: "no-store" });
+        const result = (await response.json()) as ProductResponse;
+        if (!ignore && response.ok && result.ok) {
+          setStorefrontProducts(result.products || []);
+        }
+      } catch {
+        setStorefrontProducts([]);
+      }
+    }
+
+    loadPrices();
+    return () => {
+      ignore = true;
+    };
+  }, []);
+
+  const livePrices = useMemo(() => {
+    const prices = new Map<string, string>();
+    storefrontProducts.forEach((product) => {
+      const price = money(product.sale_price);
+      if (!price) {
+        return;
+      }
+
+      [product.name, product.marketing_title].filter(Boolean).forEach((label) => {
+        prices.set(normalize(String(label)), price);
+      });
+    });
+    return prices;
+  }, [storefrontProducts]);
+
+  function productPrice(product: (typeof bestSellers)[number]) {
+    const productName = normalize(product.name);
+    const exactPrice = livePrices.get(productName);
+    if (exactPrice) {
+      return exactPrice;
+    }
+
+    for (const [name, price] of livePrices.entries()) {
+      if (name.includes(productName) || productName.includes(name)) {
+        return price;
+      }
+    }
+
+    return product.price;
+  }
+
   function addProduct(product: (typeof bestSellers)[number]) {
     window.dispatchEvent(
       new CustomEvent("bougie:add-to-cart", {
         detail: {
           name: product.name,
-          price: product.price,
+          price: productPrice(product),
           category: product.category
         }
       })
@@ -40,7 +115,7 @@ export function ProductShowcase() {
             <h3 className="mt-2 font-display text-2xl text-ink">{product.name}</h3>
             <p className="mt-2 min-h-[4.5rem] text-sm leading-6 text-espresso/65">{product.description}</p>
             <div className="mt-5 flex items-center justify-between">
-              <span className="font-bold text-espresso">{product.price}</span>
+              <span className="font-bold text-espresso">{productPrice(product)}</span>
               <button className="focus-ring inline-flex items-center gap-2 rounded-md bg-ink px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] text-ivory hover:bg-saddle" onClick={() => addProduct(product)} type="button">
                 <ShoppingBag className="h-4 w-4" />
                 Add

@@ -399,7 +399,12 @@ function displayPrice(product: Product) {
     return syncedPrice !== "Price in store" ? syncedPrice : giftCardDisplayPrice(product) || syncedPrice;
   }
 
-  return isFarmEggProduct(product) ? "$4.00 / dozen" : money(product.sale_price);
+  if (isFarmEggProduct(product)) {
+    const syncedPrice = money(product.sale_price);
+    return syncedPrice !== "Price in store" ? `${syncedPrice} / dozen` : "Price in store";
+  }
+
+  return money(product.sale_price);
 }
 
 function stockCount(value: string | null) {
