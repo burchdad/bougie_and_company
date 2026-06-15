@@ -201,6 +201,7 @@ export function AdminDashboard() {
   const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [syncingCatalog, setSyncingCatalog] = useState(false);
+  const [syncingPrices, setSyncingPrices] = useState(false);
   const [importingImages, setImportingImages] = useState(false);
   const [repairingStock, setRepairingStock] = useState(false);
   const [savingShipping, setSavingShipping] = useState(false);
@@ -900,6 +901,39 @@ export function AdminDashboard() {
     }
   }
 
+  async function handleSyncEposPrices() {
+    setSyncingPrices(true);
+    setMessage("");
+
+    try {
+      const response = await fetch("/api/epos/prices", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(adminKey ? { "x-admin-key": adminKey } : {})
+        }
+      });
+      const result = (await response.json()) as {
+        ok: boolean;
+        message?: string;
+        productsScanned?: number;
+        pricesUpdated?: number;
+      };
+
+      if (!response.ok || !result.ok) {
+        setMessage(result.message || `Could not sync Epos prices. HTTP ${response.status}`);
+        return;
+      }
+
+      setMessage(`Epos price sync complete. Checked ${result.productsScanned || 0} products and updated ${result.pricesUpdated || 0} price record${result.pricesUpdated === 1 ? "" : "s"}. No products, stock, categories, or images were changed.`);
+      await loadProducts(query);
+    } catch {
+      setMessage("Could not connect to the Epos price sync backend.");
+    } finally {
+      setSyncingPrices(false);
+    }
+  }
+
   async function handleRepairStock() {
     setRepairingStock(true);
     setMessage("");
@@ -1382,7 +1416,7 @@ export function AdminDashboard() {
                   <div className="flex flex-wrap gap-2">
                     <button
                       className="focus-ring rounded-md bg-champagne px-5 py-3 text-xs font-bold uppercase tracking-[0.16em] text-ink hover:bg-ivory disabled:cursor-not-allowed disabled:opacity-60"
-                      disabled={syncingCatalog}
+                      disabled={syncingCatalog || syncingPrices}
                       onClick={handleSyncEposCatalog}
                       type="button"
                     >
@@ -1390,7 +1424,15 @@ export function AdminDashboard() {
                     </button>
                     <button
                       className="focus-ring rounded-md border border-champagne/45 px-5 py-3 text-xs font-bold uppercase tracking-[0.16em] text-champagne hover:bg-champagne hover:text-ink disabled:cursor-not-allowed disabled:opacity-60"
-                      disabled={importingImages || syncingCatalog}
+                      disabled={syncingPrices || syncingCatalog}
+                      onClick={handleSyncEposPrices}
+                      type="button"
+                    >
+                      {syncingPrices ? "Syncing Prices" : "Sync Prices Only"}
+                    </button>
+                    <button
+                      className="focus-ring rounded-md border border-champagne/45 px-5 py-3 text-xs font-bold uppercase tracking-[0.16em] text-champagne hover:bg-champagne hover:text-ink disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={importingImages || syncingCatalog || syncingPrices}
                       onClick={handleImportEposImages}
                       type="button"
                     >
@@ -1398,7 +1440,7 @@ export function AdminDashboard() {
                     </button>
                     <button
                       className="focus-ring rounded-md border border-champagne/45 px-5 py-3 text-xs font-bold uppercase tracking-[0.16em] text-champagne hover:bg-champagne hover:text-ink disabled:cursor-not-allowed disabled:opacity-60"
-                      disabled={repairingStock || syncingCatalog}
+                      disabled={repairingStock || syncingCatalog || syncingPrices}
                       onClick={handleRepairStock}
                       type="button"
                     >

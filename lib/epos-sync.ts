@@ -8,6 +8,11 @@ type SyncResult = {
   images?: Awaited<ReturnType<typeof importEposProductImages>>;
 };
 
+type PriceSyncResult = {
+  productsScanned: number;
+  pricesUpdated: number;
+};
+
 async function ensureEposTables() {
   const sql = getSql();
 
@@ -181,6 +186,44 @@ export async function syncEposStock() {
   }
 
   return stockRecords.length;
+}
+
+export async function syncEposPricesOnly(): Promise<PriceSyncResult> {
+  await ensureEposTables();
+
+  const sql = getSql();
+  const products = await fetchEposCollection<EposProduct>("Product");
+  let pricesUpdated = 0;
+
+  for (const product of products) {
+    const productId = getEposId(product);
+
+    if (!productId) {
+      continue;
+    }
+
+    const salePrice = getEposNumber(product, ["SalePrice", "Price", "UnitPrice", "salePrice", "price"]);
+    const costPrice = getEposNumber(product, ["CostPrice", "costPrice"]);
+
+    const rows = await sql`
+      UPDATE epos_products
+      SET
+        sale_price = ${salePrice},
+        cost_price = ${costPrice},
+        synced_at = NOW()
+      WHERE epos_product_id = ${productId}
+        AND is_deleted = FALSE
+        AND (
+          sale_price IS DISTINCT FROM ${salePrice}
+          OR cost_price IS DISTINCT FROM ${costPrice}
+        )
+      RETURNING epos_product_id
+    `;
+
+    pricesUpdated += rows.length;
+  }
+
+  return { productsScanned: products.length, pricesUpdated };
 }
 
 export async function syncEposCatalog(options: { importImages?: boolean; imageLimit?: number; skipExistingImages?: boolean } = {}): Promise<SyncResult> {
