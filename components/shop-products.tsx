@@ -53,6 +53,7 @@ type DetailProduct = {
 
 const mensTshirtSizes = ["Medium", "Large", "X-Large"];
 const womensApparelSizes = ["Small", "Medium", "Large", "X-Large"] as const;
+const equineJewelryColors = ["Gold", "Silver"] as const;
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const homemadeSoapDisclaimer = "Handmade soap colors may vary slightly from batch to batch depending on when each bar is made.";
 
@@ -279,6 +280,7 @@ const apparelCategorySlugs = new Set([
   "t-shirts"
 ]);
 const womensApparelCategorySlugs = new Set(["clothing", "dresses", "tops", "bottoms", "pants", "cardigans", "rompers-jumpsuits"]);
+const equineJewelryCategorySlugs = new Set(["equine-jewelry", "necklaces", "bracelets", "equine-earrings"]);
 type WomensApparelSize = (typeof womensApparelSizes)[number];
 
 const categoryKeywordMap: Record<string, string[]> = {
@@ -429,6 +431,12 @@ function isMensTshirtProduct(product: Product) {
 function isWomensApparelProduct(product: Product) {
   const slugs = product.category_slugs || [];
   return slugs.includes("womens-collection") && slugs.some((slug) => womensApparelCategorySlugs.has(slug));
+}
+
+function isEquineJewelryProduct(product: Product) {
+  const slugs = product.category_slugs || [];
+  const haystack = productSearchText(product);
+  return slugs.some((slug) => equineJewelryCategorySlugs.has(slug)) || haystack.includes("equine") || haystack.includes("snaffle") || haystack.includes("horse");
 }
 
 function isWomensApparelGroup(group?: ProductGroup) {
@@ -874,6 +882,7 @@ export function ShopProducts() {
   const [activeDepartment, setActiveDepartment] = useState("all");
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
   const [selectedSizes, setSelectedSizes] = useState<Record<string, string>>({});
+  const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
   const [detailProduct, setDetailProduct] = useState<DetailProduct | null>(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
@@ -986,6 +995,8 @@ export function ShopProducts() {
   const detailGroupKey = detailProduct?.group?.key || detailProduct?.product.epos_product_id || "";
   const detailHasTshirtSizes = Boolean(detailProduct && isMensTshirtProduct(detailProduct.product));
   const selectedDetailTshirtSize = selectedSizes[detailGroupKey] || mensTshirtSizes[0];
+  const detailHasEquineJewelryOptions = Boolean(detailProduct && isEquineJewelryProduct(detailProduct.product));
+  const selectedDetailEquineJewelryColor = selectedOptions[detailGroupKey] || equineJewelryColors[0];
   const selectedDetailWomensSize =
     selectedSizes[detailGroupKey] ||
     detailWomensSizeOptions.find((option) => option.product?.epos_product_id === detailProduct?.product.epos_product_id)?.label ||
@@ -1054,6 +1065,8 @@ export function ShopProducts() {
               const hasVariants = hasWomensVariantOptions || (!isWomensApparelGroup(group) && group.products.length > 1 && !hasOnlyWomensSizeVariants(group));
               const hasTshirtSizes = group.products.some(isMensTshirtProduct);
               const selectedTshirtSize = selectedSizes[group.key] || mensTshirtSizes[0];
+              const hasEquineJewelryOptions = group.products.some(isEquineJewelryProduct);
+              const selectedEquineJewelryColor = selectedOptions[group.key] || equineJewelryColors[0];
               const isOutOfStock = !isPurchasableProduct(product);
               const isFarmEgg = isFarmEggProduct(product);
               const isHomemadeSoap = isHomemadeSoapProduct(product);
@@ -1146,6 +1159,22 @@ export function ShopProducts() {
                         </select>
                       </label>
                     ) : null}
+                    {hasEquineJewelryOptions ? (
+                      <label className="mt-4 grid gap-2 text-sm font-semibold text-espresso">
+                        Select color
+                        <select
+                          className="focus-ring min-h-11 rounded-md border border-saddle/20 bg-ivory px-3 font-normal"
+                          onChange={(event) => setSelectedOptions((current) => ({ ...current, [group.key]: event.target.value }))}
+                          value={selectedEquineJewelryColor}
+                        >
+                          {equineJewelryColors.map((color) => (
+                            <option key={color} value={color}>
+                              {color} / {price}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : null}
                     <div className="mt-5 flex items-center justify-between gap-3">
                       <span className="font-bold text-espresso">{price}</span>
                       <button
@@ -1157,7 +1186,7 @@ export function ShopProducts() {
                             return;
                           }
 
-                          addToCart(product, hasTshirtSizes ? selectedTshirtSize : selectedWomensSize);
+                          addToCart(product, hasEquineJewelryOptions ? selectedEquineJewelryColor : hasTshirtSizes ? selectedTshirtSize : selectedWomensSize);
                         }}
                         type="button"
                       >
@@ -1303,6 +1332,22 @@ export function ShopProducts() {
                     </select>
                   </label>
                 ) : null}
+                {detailHasEquineJewelryOptions ? (
+                  <label className="mt-6 grid gap-2 text-sm font-semibold text-espresso">
+                    Select color
+                    <select
+                      className="focus-ring min-h-11 rounded-md border border-saddle/20 bg-white px-3 font-normal"
+                      onChange={(event) => setSelectedOptions((current) => ({ ...current, [detailGroupKey]: event.target.value }))}
+                      value={selectedDetailEquineJewelryColor}
+                    >
+                      {equineJewelryColors.map((color) => (
+                        <option key={color} value={color}>
+                          {color} / {detailPrice}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : null}
                 <button
                   className="focus-ring mt-7 inline-flex w-full items-center justify-center gap-2 rounded-md bg-ink px-5 py-4 text-sm font-bold uppercase tracking-[0.18em] text-ivory hover:bg-saddle disabled:cursor-not-allowed disabled:bg-espresso/30 sm:w-auto"
                   disabled={!detailIsFarmEgg && (detailPrice === "Price in store" || !detailAvailable)}
@@ -1312,7 +1357,7 @@ export function ShopProducts() {
                       return;
                     }
 
-                    addToCart(detailProduct.product, detailHasTshirtSizes ? selectedDetailTshirtSize : selectedDetailWomensSize);
+                    addToCart(detailProduct.product, detailHasEquineJewelryOptions ? selectedDetailEquineJewelryColor : detailHasTshirtSizes ? selectedDetailTshirtSize : selectedDetailWomensSize);
                   }}
                   type="button"
                 >
