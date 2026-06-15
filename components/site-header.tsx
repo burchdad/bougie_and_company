@@ -9,6 +9,14 @@ import { HeaderActions } from "@/components/header-actions";
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
 
+  function handleShopCategoryClick(categoryId: string) {
+    if (window.location.pathname !== "/shop") {
+      return;
+    }
+
+    window.dispatchEvent(new CustomEvent("bougie:shop-category", { detail: { categoryId } }));
+  }
+
   return (
     <header className="border-b border-saddle/10 bg-ivory/95 backdrop-blur-xl">
       <div className="bg-ink px-4 py-2 text-center text-sm font-bold tracking-[0.08em] text-champagne">
@@ -18,7 +26,7 @@ export function SiteHeader() {
         <div className="mx-auto flex max-w-7xl items-center justify-center gap-6 sm:justify-start">
           <Link className="hover:text-champagne" href="/shipping-returns">Shipping & Returns</Link>
           <Link className="hover:text-champagne" href="/contact">Contact Us</Link>
-          <Link className="hover:text-champagne" href="/shop#gift-cards">Gift Card</Link>
+          <Link className="hover:text-champagne" href="/shop#gift-cards" onClick={() => handleShopCategoryClick("gift-cards")}>Gift Card</Link>
         </div>
       </div>
       <div className="mx-auto grid max-w-7xl grid-cols-3 items-center px-4 py-5 sm:px-6 lg:px-8">
