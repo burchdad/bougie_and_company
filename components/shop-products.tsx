@@ -395,7 +395,8 @@ function giftCardDisplayPrice(product: Product) {
 
 function displayPrice(product: Product) {
   if (isGiftCardProduct(product)) {
-    return giftCardDisplayPrice(product) || money(product.sale_price);
+    const syncedPrice = money(product.sale_price);
+    return syncedPrice !== "Price in store" ? syncedPrice : giftCardDisplayPrice(product) || syncedPrice;
   }
 
   return isFarmEggProduct(product) ? "$4.00 / dozen" : money(product.sale_price);
