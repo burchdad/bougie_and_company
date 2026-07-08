@@ -24,7 +24,7 @@ export const metadata: Metadata = {
     default: "Bougie & Company Boutique | Luxury Texas Boutique",
     template: "%s | Bougie & Company Boutique"
   },
-  description: "A luxury Texas boutique and mercantile offering boutique clothing, equine jewelry, home goods, bath and body, gifts, men's products, women's products, and kitchen goods.",
+  description: "Luxury Texas boutique in Rusk offering clothing, equine jewelry, home goods, bath and body, gifts, men's products, women's products, and kitchen goods.",
   alternates: {
     canonical: "/"
   },
