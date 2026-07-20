@@ -13,6 +13,7 @@ import { dearLoverFixtureEnvelope } from "../fixtures/dear-lover";
 const supplierKey = "dear-lover";
 const searchPath = "/h-dropship-searchProducts.json";
 const supplierAuthenticationRequired = "SUPPLIER_AUTHENTICATION_REQUIRED";
+const browserUserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36";
 
 type DearLoverEnvelope = {
   data?: {
@@ -83,6 +84,21 @@ function supplierAuthError(detail: string) {
   return new Error(`${supplierAuthenticationRequired}: ${detail}`);
 }
 
+async function nonJsonSupplierError(response: Response) {
+  const contentType = response.headers.get("content-type") || "unknown content type";
+  const body = (await response.text()).slice(0, 500).toLowerCase();
+
+  if (body.includes("login") || body.includes("sign in") || body.includes("password")) {
+    return supplierAuthError(`Dear-Lover returned login HTML instead of JSON (HTTP ${response.status}, ${contentType}). Refresh DEAR_LOVER_AUTH_COOKIE.`);
+  }
+
+  if (body.includes("cloudflare") || body.includes("cf-browser-verification") || body.includes("enable javascript")) {
+    return supplierAuthError(`Dear-Lover returned a browser verification page instead of JSON (HTTP ${response.status}, ${contentType}). The supplier may be blocking server-side sync.`);
+  }
+
+  return supplierAuthError(`Dear-Lover returned ${contentType} instead of JSON from the catalog endpoint (HTTP ${response.status}). The supplier session may be missing, expired, or missing required browser cookies.`);
+}
+
 export const dearLoverAdapter: SupplierAdapter = {
   supplierKey,
 
@@ -104,9 +120,14 @@ export const dearLoverAdapter: SupplierAdapter = {
     }
 
     const authCookie = getDearLoverAuthCookie();
-    const response = await fetch(buildSearchUrl(params), {
+    const url = buildSearchUrl(params);
+    const response = await fetch(url, {
       headers: {
-        accept: "application/json",
+        accept: "application/json, text/javascript, */*; q=0.01",
+        "accept-language": "en-US,en;q=0.9",
+        referer: new URL("/h-dropship-publishList.html", getDearLoverBaseUrl()).toString(),
+        "user-agent": browserUserAgent,
+        "x-requested-with": "XMLHttpRequest",
         ...(authCookie ? { cookie: authCookie } : {})
       },
       cache: "no-store"
@@ -122,7 +143,7 @@ export const dearLoverAdapter: SupplierAdapter = {
 
     const contentType = response.headers.get("content-type") || "";
     if (!contentType.includes("application/json")) {
-      throw supplierAuthError("Dear-Lover did not return JSON. The supplier session may be missing or expired.");
+      throw await nonJsonSupplierError(response);
     }
 
     const raw = await response.json() as DearLoverEnvelope;
