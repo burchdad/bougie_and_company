@@ -1,6 +1,10 @@
+export * from "./core";
 export * from "./interfaces";
 export * from "./adapters";
+export * from "./catalog";
+export * from "./inventory";
+export * from "./observability";
+export * from "./persistence";
 export * from "./pricing";
 export * from "./publishing";
 export * from "./sync";
-

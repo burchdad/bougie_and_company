@@ -1,9 +1,3 @@
-export type { DropshipAdminProduct } from "../../dropshipping/db";
-export {
-  getDropshipProducts,
-  getPublishedDropshipStoreProducts,
-  importDropshipProduct,
-  publishAllSyncedDropshipProducts,
-  updateDropshipPublication
-} from "../../dropshipping/db";
+export { PublishingService, type PublishProductInput } from "./publishing-service";
+export { StorefrontSerializer } from "./storefront-serializer";
 

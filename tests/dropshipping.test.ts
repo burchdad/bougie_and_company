@@ -1,5 +1,14 @@
 import assert from "node:assert/strict";
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
 import test from "node:test";
+import { CatalogSyncService } from "../lib/ghost-commerce-engine/catalog";
+import { createDearLoverAdapter, normalizeDearLoverProduct } from "../lib/ghost-commerce-engine/adapters";
+import { CommerceError } from "../lib/ghost-commerce-engine/core";
+import { ghostCommerceEngineMetadata } from "../lib/ghost-commerce-engine/core/metadata";
+import { PricingService } from "../lib/ghost-commerce-engine/pricing";
+import { PublishingService, StorefrontSerializer } from "../lib/ghost-commerce-engine/publishing";
+import { commerceProductFactory, FixtureCommerceAdapter, InMemoryCommerceRepository } from "../lib/ghost-commerce-engine/testing";
 import { isDropshippingEnabled, isDropshippingFixtureEnabled } from "../lib/dropshipping/config";
 import { calculateDropshipRetailPrice } from "../lib/dropshipping/pricing";
 import { dearLoverAdapter } from "../lib/dropshipping/suppliers/dear-lover";
@@ -167,4 +176,145 @@ test("public dropship serialization excludes raw supplier/private pricing fields
     assert.equal(serialized.includes("shippingCost"), false);
     assert.equal(serialized.includes("cookie"), false);
   });
+});
+
+test("Ghost Commerce Engine pricing service preserves existing retail pricing behavior", () => {
+  const service = new PricingService();
+  const result = service.calculate({
+    wholesalePrice: 12.29,
+    shippingCost: 10.3,
+    markupType: "percentage",
+    markupValue: 50
+  });
+
+  assert.equal(result.retailPrice, calculateDropshipRetailPrice({ wholesalePrice: 12.29, shippingCost: 10.3, markupType: "percentage", markupValue: 50 }));
+  assert.equal(result.source, "percentage");
+});
+
+test("Ghost Commerce Engine fixture adapter satisfies supplier contract and exposes capabilities", async () => {
+  const adapter = new FixtureCommerceAdapter();
+  const connection = await adapter.testConnection();
+  const result = await adapter.searchProducts({ page: 1, pageSize: 1 });
+
+  assert.equal(connection.ok, true);
+  assert.equal(adapter.capabilities.catalogSync, true);
+  assert.equal(adapter.capabilities.orderSubmission, false);
+  assert.equal(result.products.length, 1);
+  assert.equal(result.products[0].supplierKey, "fixture");
+});
+
+test("Dear-Lover engine normalizer keeps supplier fields inside generic commerce product model", () => {
+  const product = normalizeDearLoverProduct({
+    codeno: "DL-001",
+    id: 1001,
+    title: "Dear Lover Dress",
+    image_src: "http://example.test/dress.jpg",
+    sale_price: "19.50",
+    suggest_price: "49.00",
+    shipping_cost: "7.25",
+    category_names: "Dresses, Women Clothing",
+    inventory_quantity: 3,
+    variants: [{ id: 2001, codeno: "DL-001-S", inventory_quantity: 3, is_instock: 1, color_size: { color: "Black", size: "Small" } }]
+  });
+
+  assert.equal(product.supplierKey, "dear-lover");
+  assert.equal(product.imageUrl, "https://example.test/dress.jpg");
+  assert.deepEqual(product.categoryNames, ["Dresses", "Women Clothing"]);
+  assert.equal(product.variants[0].isInStock, true);
+  assert.equal("dearLoverProductId" in product, false);
+});
+
+test("Dear-Lover engine transport maps login HTML to typed commerce authentication error", async () => {
+  const adapter = createDearLoverAdapter({
+    baseUrl: "https://ds.dear-lover.test",
+    fetchImpl: async () => new Response("<html>login</html>", { status: 200, headers: { "content-type": "text/html" } })
+  });
+
+  await assert.rejects(
+    () => adapter.searchProducts({ page: 1, pageSize: 1 }),
+    (error) => error instanceof CommerceError && error.code === "COMMERCE_AUTHENTICATION_REQUIRED"
+  );
+});
+
+test("CatalogSyncService upserts repeatedly without duplicating products or variants", async () => {
+  const product = commerceProductFactory();
+  const adapter = new FixtureCommerceAdapter([product]);
+  const repository = new InMemoryCommerceRepository();
+  const service = new CatalogSyncService({ adapter, repository });
+
+  const first = await service.sync({ pages: 1, pageSize: 1 });
+  const second = await service.sync({ pages: 1, pageSize: 1 });
+
+  assert.equal(first.status, "success");
+  assert.equal(second.status, "success");
+  assert.equal(repository.products.size, 1);
+  assert.equal((await repository.getSupplierProduct("fixture", "product-1"))?.variants.length, 1);
+  assert.equal(repository.syncRuns.size, 2);
+});
+
+test("PublishingService imports, publishes, unpublishes, and storefront serialization stays public-safe", async () => {
+  const repository = new InMemoryCommerceRepository();
+  const product = commerceProductFactory();
+  await repository.upsertProduct(product);
+  await repository.upsertVariants(product, product.variants);
+
+  const publishing = new PublishingService(repository);
+  const imported = await publishing.importSupplierProduct({
+    supplierKey: product.supplierKey,
+    supplierProductId: product.supplierProductId,
+    markupType: "percentage",
+    markupValue: 60,
+    collection: "dropshipping",
+    publish: true
+  });
+  const storefront = new StorefrontSerializer().serialize(product, imported);
+
+  assert.equal(imported.isPublished, true);
+  assert.equal(storefront.length, 1);
+  assert.equal(storefront[0].salePrice, "36.99");
+  assert.equal(JSON.stringify(storefront).includes("wholesale"), false);
+  assert.equal(JSON.stringify(storefront).includes("raw"), false);
+
+  const unpublished = await publishing.unpublishProduct(product.supplierKey, product.supplierProductId);
+  assert.equal(unpublished.isPublished, false);
+});
+
+test("Ghost Commerce Engine metadata advertises v0.2 alpha and non-checkout supplier capability", () => {
+  assert.equal(ghostCommerceEngineMetadata.version, "0.2.0-alpha");
+  assert.deepEqual(ghostCommerceEngineMetadata.supportedSupplierKeys, ["dear-lover"]);
+  assert.equal(ghostCommerceEngineMetadata.adapterCapabilities["dear-lover"].orderSubmission, false);
+});
+
+test("Ghost Commerce Engine core files do not import Bougie app, components, or Next route layers", () => {
+  const root = join(process.cwd(), "lib", "ghost-commerce-engine");
+  const banned = [
+    "@/app",
+    "@/components",
+    "@/lib/integrations",
+    "next/",
+    "next/server",
+    "../../dropshipping",
+    "../dropshipping"
+  ];
+  const files: string[] = [];
+
+  function walk(dir: string) {
+    for (const entry of readdirSync(dir)) {
+      const fullPath = join(dir, entry);
+      if (statSync(fullPath).isDirectory()) {
+        walk(fullPath);
+      } else if (fullPath.endsWith(".ts")) {
+        files.push(fullPath);
+      }
+    }
+  }
+
+  walk(root);
+
+  for (const file of files) {
+    const source = readFileSync(file, "utf8");
+    for (const pattern of banned) {
+      assert.equal(source.includes(pattern), false, `${file} imports banned pattern ${pattern}`);
+    }
+  }
 });

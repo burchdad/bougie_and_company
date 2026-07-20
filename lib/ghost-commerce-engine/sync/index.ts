@@ -1,6 +1,2 @@
-export {
-  ensureDropshippingTables,
-  listSuppliers,
-  syncSupplierProducts
-} from "../../dropshipping/db";
+export { CatalogSyncService } from "../catalog/sync-service";
 
