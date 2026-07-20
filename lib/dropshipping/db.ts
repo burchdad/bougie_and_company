@@ -102,6 +102,10 @@ function dropshipTables(sql: ReturnType<typeof getSql>) {
   };
 }
 
+async function executeTrustedStatement(sql: ReturnType<typeof getSql>, statement: string) {
+  await sql.query(statement, []);
+}
+
 async function verifyDropshippingTables(sql: ReturnType<typeof getSql>) {
   const schema = getDropshippingSchema();
   if (!schema) {
@@ -138,10 +142,10 @@ export async function ensureDropshippingTables() {
   const tables = dropshipTables(sql);
 
   if (schema) {
-    await sql.unsafe(`CREATE SCHEMA IF NOT EXISTS ${quoteIdentifier(schema)}`);
+    await executeTrustedStatement(sql, `CREATE SCHEMA IF NOT EXISTS ${quoteIdentifier(schema)}`);
   }
 
-  await sql.unsafe(`
+  await executeTrustedStatement(sql, `
     CREATE TABLE IF NOT EXISTS ${names.sources} (
       id BIGSERIAL PRIMARY KEY,
       key TEXT NOT NULL UNIQUE,
@@ -153,7 +157,7 @@ export async function ensureDropshippingTables() {
     )
   `);
 
-  await sql.unsafe(`
+  await executeTrustedStatement(sql, `
     CREATE TABLE IF NOT EXISTS ${names.products} (
       id BIGSERIAL PRIMARY KEY,
       supplier_key TEXT NOT NULL,
@@ -180,7 +184,7 @@ export async function ensureDropshippingTables() {
     )
   `);
 
-  await sql.unsafe(`
+  await executeTrustedStatement(sql, `
     CREATE TABLE IF NOT EXISTS ${names.variants} (
       id BIGSERIAL PRIMARY KEY,
       supplier_key TEXT NOT NULL,
@@ -204,7 +208,7 @@ export async function ensureDropshippingTables() {
     )
   `);
 
-  await sql.unsafe(`
+  await executeTrustedStatement(sql, `
     CREATE TABLE IF NOT EXISTS ${names.images} (
       id BIGSERIAL PRIMARY KEY,
       supplier_key TEXT NOT NULL,
@@ -218,7 +222,7 @@ export async function ensureDropshippingTables() {
     )
   `);
 
-  await sql.unsafe(`
+  await executeTrustedStatement(sql, `
     CREATE TABLE IF NOT EXISTS ${names.categories} (
       id BIGSERIAL PRIMARY KEY,
       supplier_key TEXT NOT NULL,
@@ -230,7 +234,7 @@ export async function ensureDropshippingTables() {
     )
   `);
 
-  await sql.unsafe(`
+  await executeTrustedStatement(sql, `
     CREATE TABLE IF NOT EXISTS ${names.syncRuns} (
       id BIGSERIAL PRIMARY KEY,
       supplier_key TEXT NOT NULL,
@@ -246,7 +250,7 @@ export async function ensureDropshippingTables() {
     )
   `);
 
-  await sql.unsafe(`
+  await executeTrustedStatement(sql, `
     CREATE TABLE IF NOT EXISTS ${names.published} (
       id BIGSERIAL PRIMARY KEY,
       supplier_key TEXT NOT NULL,
@@ -267,10 +271,10 @@ export async function ensureDropshippingTables() {
     )
   `);
 
-  await sql.unsafe(`CREATE INDEX IF NOT EXISTS supplier_products_supplier_idx ON ${names.products} (supplier_key, last_synced_at DESC)`);
-  await sql.unsafe(`CREATE INDEX IF NOT EXISTS supplier_products_title_idx ON ${names.products} USING GIN (to_tsvector('english', title))`);
-  await sql.unsafe(`CREATE INDEX IF NOT EXISTS supplier_variants_product_idx ON ${names.variants} (supplier_key, supplier_product_id)`);
-  await sql.unsafe(`CREATE INDEX IF NOT EXISTS supplier_sync_runs_supplier_idx ON ${names.syncRuns} (supplier_key, started_at DESC)`);
+  await executeTrustedStatement(sql, `CREATE INDEX IF NOT EXISTS supplier_products_supplier_idx ON ${names.products} (supplier_key, last_synced_at DESC)`);
+  await executeTrustedStatement(sql, `CREATE INDEX IF NOT EXISTS supplier_products_title_idx ON ${names.products} USING GIN (to_tsvector('english', title))`);
+  await executeTrustedStatement(sql, `CREATE INDEX IF NOT EXISTS supplier_variants_product_idx ON ${names.variants} (supplier_key, supplier_product_id)`);
+  await executeTrustedStatement(sql, `CREATE INDEX IF NOT EXISTS supplier_sync_runs_supplier_idx ON ${names.syncRuns} (supplier_key, started_at DESC)`);
 
   await sql`
     INSERT INTO ${tables.sources} (key, name, base_url, is_active, updated_at)
