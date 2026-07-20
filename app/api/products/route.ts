@@ -1,4 +1,6 @@
 import { getAdminProducts } from "@/lib/admin-products";
+import { isDropshippingEnabled } from "@/lib/dropshipping/config";
+import { getPublishedDropshipStoreProducts } from "@/lib/dropshipping/db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,7 +39,16 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const query = searchParams.get("q")?.trim() || "";
     const requestedLimit = Number(searchParams.get("limit") || 1000);
-    const rows = (await getAdminProducts(query, Number.isFinite(requestedLimit) ? requestedLimit : 1000)) as ProductRow[];
+    const rows = await getAdminProducts(query, Number.isFinite(requestedLimit) ? requestedLimit : 1000) as ProductRow[];
+    let dropshipProducts: Awaited<ReturnType<typeof getPublishedDropshipStoreProducts>> = [];
+
+    if (isDropshippingEnabled()) {
+      try {
+        dropshipProducts = await getPublishedDropshipStoreProducts();
+      } catch (error) {
+        console.error(error instanceof Error ? `Dropship products unavailable: ${error.message}` : "Dropship products unavailable.");
+      }
+    }
     const products = rows
       .filter((product) => !product.is_hidden)
       .map((product) => ({
@@ -45,7 +56,7 @@ export async function GET(request: Request) {
         stock: String(getDisplayStock(product))
       }));
 
-    return Response.json({ ok: true, products }, { headers: { "Cache-Control": "no-store" } });
+    return Response.json({ ok: true, products: [...products, ...dropshipProducts] }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Product catalog is not available yet.";
     console.error(message);
