@@ -46,6 +46,10 @@ type DropshipQuery = {
   inStock?: boolean | null;
 };
 
+function isUndefinedTableError(error: unknown) {
+  return error instanceof Error && (error.message.includes("does not exist") || "code" in error && (error as { code?: string }).code === "42P01");
+}
+
 function numberOrNull(value: unknown) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
@@ -96,6 +100,35 @@ function dropshipTables(sql: ReturnType<typeof getSql>) {
     syncRuns: sql.unsafe(names.syncRuns),
     published: sql.unsafe(names.published)
   };
+}
+
+async function verifyDropshippingTables(sql: ReturnType<typeof getSql>) {
+  const schema = getDropshippingSchema();
+  if (!schema) {
+    return;
+  }
+
+  const requiredTables = [
+    "supplier_sources",
+    "supplier_products",
+    "supplier_variants",
+    "supplier_images",
+    "supplier_categories",
+    "supplier_sync_runs",
+    "dropship_published_products"
+  ];
+  const rows = await sql`
+    SELECT table_name
+    FROM information_schema.tables
+    WHERE table_schema = ${schema}
+      AND table_name IN (SELECT value::text FROM jsonb_array_elements_text(${JSON.stringify(requiredTables)}::jsonb))
+  `;
+  const found = new Set(rows.map((row) => String(row.table_name)));
+  const missing = requiredTables.filter((table) => !found.has(table));
+
+  if (missing.length) {
+    throw new Error(`Dropshipping schema initialization incomplete. Missing table(s): ${missing.join(", ")}.`);
+  }
 }
 
 export async function ensureDropshippingTables() {
@@ -245,6 +278,8 @@ export async function ensureDropshippingTables() {
     ON CONFLICT (key)
     DO UPDATE SET name = EXCLUDED.name, base_url = EXCLUDED.base_url, is_active = TRUE, updated_at = NOW()
   `;
+
+  await verifyDropshippingTables(sql);
 }
 
 export async function listSuppliers() {
@@ -528,9 +563,17 @@ function mapAdminProduct(row: Record<string, unknown>): DropshipAdminProduct {
 }
 
 export async function getDropshipProducts(query: DropshipQuery = {}) {
-  await ensureDropshippingTables();
   const sql = getSql();
   const tables = dropshipTables(sql);
+  try {
+    await ensureDropshippingTables();
+  } catch (error) {
+    if (isUndefinedTableError(error)) {
+      console.error(error instanceof Error ? `Dropshipping tables unavailable: ${error.message}` : "Dropshipping tables unavailable.");
+      return [];
+    }
+    throw error;
+  }
   const page = Math.max(1, Math.trunc(Number(query.page || 1)));
   const pageSize = Math.max(1, Math.min(100, Math.trunc(Number(query.pageSize || 30))));
   const offset = (page - 1) * pageSize;

@@ -580,6 +580,31 @@ export function AdminDashboard({ dropshippingEnabled = false }: { dropshippingEn
     }
   }
 
+  async function handleSetupDropshipping() {
+    setSyncingDropship(true);
+    setMessage("");
+
+    try {
+      const response = await fetch("/api/admin/dropshipping/setup", {
+        method: "POST",
+        headers: adminKey ? { "x-admin-key": adminKey } : {}
+      });
+      const result = (await response.json()) as { ok: boolean; message?: string };
+
+      if (!response.ok || !result.ok) {
+        setMessage(result.message || "Could not initialize dropshipping tables.");
+        return;
+      }
+
+      setMessage(result.message || "Dropshipping tables are ready.");
+      await loadDropshipProducts(dropshipQuery);
+    } catch {
+      setMessage("Could not connect to the dropshipping setup backend.");
+    } finally {
+      setSyncingDropship(false);
+    }
+  }
+
   async function handleDropshipSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -1242,6 +1267,14 @@ export function AdminDashboard({ dropshippingEnabled = false }: { dropshippingEn
                         type="button"
                       >
                         {syncingDropship ? "Syncing" : "Sync Dear-Lover"}
+                      </button>
+                      <button
+                        className="focus-ring rounded-md border border-champagne/45 px-5 py-3 text-xs font-bold uppercase tracking-[0.16em] text-champagne hover:bg-champagne hover:text-ink disabled:cursor-wait disabled:opacity-60"
+                        disabled={syncingDropship}
+                        onClick={handleSetupDropshipping}
+                        type="button"
+                      >
+                        Ensure Tables
                       </button>
                     </div>
                     {message ? (
