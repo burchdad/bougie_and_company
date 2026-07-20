@@ -104,6 +104,46 @@ test("Dear-Lover unauthenticated HTML responses fail safely", async () => {
   });
 });
 
+test("Dear-Lover parses JSON bodies even when content type is text/html", async () => {
+  await withEnv({ DROPSHIPPING_USE_FIXTURE: "false", VERCEL_ENV: "preview", DEAR_LOVER_AUTH_COOKIE: "session=test" }, async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () => new Response(JSON.stringify({
+      status: true,
+      msg: "success",
+      data: {
+        page: 1,
+        psize: 1,
+        total: 1,
+        total_page: 1,
+        has_more: false,
+        list: [
+          {
+            codeno: "LIVE-001",
+            id: 1001,
+            title: "Live Supplier Dress",
+            image_src: "https://us01-imgcdn.dear-lover.com/test.jpg",
+            sale_price: "19.50",
+            suggest_price: "49.00",
+            shipping_cost: "7.25",
+            category_names: "Dresses",
+            inventory_quantity: 3,
+            variants: [{ id: 2001, codeno: "LIVE-001-S", inventory_quantity: 3, is_instock: 1, color_size: { color: "Black", size: "Small" } }]
+          }
+        ]
+      }
+    }), { status: 200, headers: { "content-type": "text/html; charset=UTF-8" } });
+
+    try {
+      const result = await dearLoverAdapter.searchProducts({ page: 1, pageSize: 1 });
+      assert.equal(result.products.length, 1);
+      assert.equal(result.products[0].supplierProductId, "1001");
+      assert.equal(result.products[0].variants[0].isInStock, true);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+});
+
 test("public dropship serialization excludes raw supplier/private pricing fields", async () => {
   await withEnv({ DROPSHIPPING_USE_FIXTURE: "true", VERCEL_ENV: "preview" }, async () => {
     const result = await dearLoverAdapter.searchProducts({ page: 1, pageSize: 2 });

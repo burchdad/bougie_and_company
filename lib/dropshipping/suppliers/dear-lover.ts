@@ -84,9 +84,17 @@ function supplierAuthError(detail: string) {
   return new Error(`${supplierAuthenticationRequired}: ${detail}`);
 }
 
-async function nonJsonSupplierError(response: Response) {
+function parseSupplierJson(text: string): DearLoverEnvelope | null {
+  try {
+    return JSON.parse(text) as DearLoverEnvelope;
+  } catch {
+    return null;
+  }
+}
+
+function nonJsonSupplierError(response: Response, text: string) {
   const contentType = response.headers.get("content-type") || "unknown content type";
-  const body = (await response.text()).slice(0, 500).toLowerCase();
+  const body = text.slice(0, 500).toLowerCase();
 
   if (body.includes("login") || body.includes("sign in") || body.includes("password")) {
     return supplierAuthError(`Dear-Lover returned login HTML instead of JSON (HTTP ${response.status}, ${contentType}). Refresh DEAR_LOVER_AUTH_COOKIE.`);
@@ -141,12 +149,12 @@ export const dearLoverAdapter: SupplierAdapter = {
       throw new Error(`Dear-Lover search failed with HTTP ${response.status}.`);
     }
 
-    const contentType = response.headers.get("content-type") || "";
-    if (!contentType.includes("application/json")) {
-      throw await nonJsonSupplierError(response);
+    const responseText = await response.text();
+    const raw = parseSupplierJson(responseText);
+    if (!raw) {
+      throw nonJsonSupplierError(response, responseText);
     }
 
-    const raw = await response.json() as DearLoverEnvelope;
     if (isLikelyAuthenticationFailure(raw)) {
       throw supplierAuthError("Dear-Lover rejected the supplier request. Refresh server-side supplier authentication or disable sync.");
     }
