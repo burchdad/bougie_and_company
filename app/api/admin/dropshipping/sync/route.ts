@@ -1,5 +1,5 @@
 import { isAdminRequest } from "@/lib/admin-products";
-import { isDearLoverSyncEnabled, isDropshippingEnabled, isDropshippingSyncEnabled } from "@/lib/dropshipping/config";
+import { isDearLoverSyncEnabled, isDropshippingEnabled, isDropshippingFixtureEnabled, isDropshippingSyncEnabled } from "@/lib/dropshipping/config";
 import { syncSupplierProducts } from "@/lib/dropshipping/db";
 
 export const runtime = "nodejs";
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
       keywords: body.keywords || ""
     });
 
-    return Response.json({ ok: true, result }, { headers: { "Cache-Control": "no-store" } });
+    return Response.json({ ok: true, result: { ...result, fixtureMode: isDropshippingFixtureEnabled() } }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Dropship sync failed.";
     console.error(message);

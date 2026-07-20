@@ -559,6 +559,7 @@ export function AdminDashboard({ dropshippingEnabled = false }: { dropshippingEn
           productsUpserted: number;
           variantsSeen: number;
           variantsUpserted: number;
+          fixtureMode?: boolean;
           failures?: string[];
         };
       };
@@ -570,7 +571,7 @@ export function AdminDashboard({ dropshippingEnabled = false }: { dropshippingEn
 
       setMessage(
         result.result
-          ? `Dear-Lover sync complete. Saw ${result.result.productsSeen} products and ${result.result.variantsSeen} variants; saved ${result.result.productsUpserted} products and ${result.result.variantsUpserted} variants.`
+          ? `${result.result.fixtureMode ? "Fixture sync complete. Live Dear-Lover sync is still disabled for this Preview. " : "Dear-Lover sync complete. "}Saw ${result.result.productsSeen} products and ${result.result.variantsSeen} variants; saved ${result.result.productsUpserted} products and ${result.result.variantsUpserted} variants.`
           : "Dear-Lover sync complete."
       );
       await loadDropshipProducts(dropshipQuery);

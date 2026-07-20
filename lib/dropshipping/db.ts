@@ -712,7 +712,7 @@ export async function publishAllSyncedDropshipProducts(input: {
   }
 
   const rows = await sql`
-    INSERT INTO ${tables.published} (
+    INSERT INTO ${tables.published} AS published (
       supplier_key,
       supplier_product_id,
       markup_type,
