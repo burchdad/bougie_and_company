@@ -73,6 +73,32 @@ type SiteOrder = {
   created_at: string;
 };
 
+type DropshipProduct = {
+  id: string;
+  supplier_key: string;
+  supplier_product_id: string;
+  supplier_sku: string | null;
+  title: string;
+  category_names: string[];
+  image_url: string | null;
+  wholesale_price: string | null;
+  suggested_retail_price: string | null;
+  shipping_cost: string | null;
+  warehouse_type: string | null;
+  total_inventory: string;
+  variants_count: number;
+  in_stock_variants: number;
+  published_id: string | null;
+  title_override: string | null;
+  description_override: string | null;
+  price_override: string | null;
+  markup_type: "percentage" | "fixed" | "manual" | null;
+  markup_value: string | null;
+  is_published: boolean;
+  collection: string | null;
+  retail_price: number;
+};
+
 type ShippingSettings = {
   origin_postal_code: string;
   free_shipping_threshold: string;
@@ -95,6 +121,7 @@ const adminTabs = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "orders", label: "Orders", icon: ShoppingBag },
   { id: "products", label: "Products", icon: Package },
+  { id: "dropshipping", label: "Dropshipping", icon: PackageSearch },
   { id: "categories", label: "Categories", icon: Tags },
   { id: "discounts", label: "Discounts", icon: Gift },
   { id: "shipping", label: "Shipping", icon: Truck },
@@ -185,6 +212,7 @@ export function AdminDashboard() {
   const [isSignedIn, setIsSignedIn] = useState(false);
   const [activeTab, setActiveTab] = useState<AdminTab>("dashboard");
   const [products, setProducts] = useState<AdminProduct[]>([]);
+  const [dropshipProducts, setDropshipProducts] = useState<DropshipProduct[]>([]);
   const [categories, setCategories] = useState<SiteCategory[]>([]);
   const [discounts, setDiscounts] = useState<SiteDiscount[]>([]);
   const [orders, setOrders] = useState<SiteOrder[]>([]);
@@ -193,6 +221,8 @@ export function AdminDashboard() {
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [editingDiscountId, setEditingDiscountId] = useState<number | null>(null);
   const [query, setQuery] = useState("");
+  const [dropshipQuery, setDropshipQuery] = useState("");
+  const [dropshipSelectedId, setDropshipSelectedId] = useState("");
   const [selectedId, setSelectedId] = useState("");
   const [isCreatingProduct, setIsCreatingProduct] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -201,6 +231,8 @@ export function AdminDashboard() {
   const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [syncingCatalog, setSyncingCatalog] = useState(false);
+  const [syncingDropship, setSyncingDropship] = useState(false);
+  const [savingDropshipId, setSavingDropshipId] = useState<string | null>(null);
   const [syncingPrices, setSyncingPrices] = useState(false);
   const [importingImages, setImportingImages] = useState(false);
   const [repairingStock, setRepairingStock] = useState(false);
@@ -217,6 +249,7 @@ export function AdminDashboard() {
   }, []);
 
   const selectedProduct = useMemo(() => (isCreatingProduct ? null : products.find((product) => product.epos_product_id === selectedId) || products[0]), [isCreatingProduct, products, selectedId]);
+  const selectedDropshipProduct = useMemo(() => dropshipProducts.find((product) => product.id === dropshipSelectedId) || dropshipProducts[0], [dropshipProducts, dropshipSelectedId]);
   const selectedCategory = useMemo(() => categories.find((category) => category.id === editingCategoryId) || null, [categories, editingCategoryId]);
   const selectedDiscount = useMemo(() => discounts.find((discount) => discount.id === editingDiscountId) || null, [discounts, editingDiscountId]);
   const productCategoryOptions = useMemo(() => categories.map((category) => ({ ...category, depth: categoryDepth(category, categories) })), [categories]);
@@ -241,6 +274,31 @@ export function AdminDashboard() {
       setSelectedId((current) => (nextProducts.some((product) => product.epos_product_id === current) ? current : nextProducts[0]?.epos_product_id || ""));
     } catch {
       setMessage("Could not connect to the admin product backend.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadDropshipProducts(searchTerm = dropshipQuery) {
+    setLoading(true);
+    setMessage("");
+
+    try {
+      const response = await fetch(`/api/admin/dropshipping/products?supplierKey=dear-lover&search=${encodeURIComponent(searchTerm)}&pageSize=50`, {
+        headers: adminKey ? { "x-admin-key": adminKey } : {}
+      });
+      const result = (await response.json()) as { ok: boolean; products?: DropshipProduct[]; message?: string };
+
+      if (!response.ok || !result.ok) {
+        setMessage(result.message || "Could not load dropship products.");
+        return;
+      }
+
+      const nextProducts = result.products || [];
+      setDropshipProducts(nextProducts);
+      setDropshipSelectedId((current) => (nextProducts.some((product) => product.id === current) ? current : nextProducts[0]?.id || ""));
+    } catch {
+      setMessage("Could not connect to the dropshipping backend.");
     } finally {
       setLoading(false);
     }
@@ -412,6 +470,12 @@ export function AdminDashboard() {
     if (isSignedIn && activeTab === "products" && categories.length === 0) {
       loadCategories();
     }
+    if (isSignedIn && activeTab === "dropshipping" && dropshipProducts.length === 0) {
+      loadDropshipProducts("");
+    }
+    if (isSignedIn && activeTab === "dropshipping" && categories.length === 0) {
+      loadCategories();
+    }
     if (isSignedIn && activeTab === "categories" && categories.length === 0) {
       loadCategories();
     }
@@ -465,6 +529,113 @@ export function AdminDashboard() {
   async function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     await loadProducts(query);
+  }
+
+  async function handleDropshipSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await loadDropshipProducts(dropshipQuery);
+  }
+
+  async function handleSyncDropship() {
+    setSyncingDropship(true);
+    setMessage("");
+
+    try {
+      const response = await fetch("/api/admin/dropshipping/sync", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(adminKey ? { "x-admin-key": adminKey } : {})
+        },
+        body: JSON.stringify({ supplierKey: "dear-lover", pages: 1, pageSize: 30 })
+      });
+      const result = (await response.json()) as {
+        ok: boolean;
+        message?: string;
+        result?: {
+          productsSeen: number;
+          productsUpserted: number;
+          variantsSeen: number;
+          variantsUpserted: number;
+          failures?: string[];
+        };
+      };
+
+      if (!response.ok || !result.ok) {
+        setMessage(result.message || "Could not sync Dear-Lover products.");
+        return;
+      }
+
+      setMessage(
+        result.result
+          ? `Dear-Lover sync complete. Saw ${result.result.productsSeen} products and ${result.result.variantsSeen} variants; saved ${result.result.productsUpserted} products and ${result.result.variantsUpserted} variants.`
+          : "Dear-Lover sync complete."
+      );
+      await loadDropshipProducts(dropshipQuery);
+    } catch {
+      setMessage("Could not connect to the Dear-Lover sync backend.");
+    } finally {
+      setSyncingDropship(false);
+    }
+  }
+
+  async function handleDropshipSave(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!selectedDropshipProduct) {
+      return;
+    }
+
+    const form = new FormData(event.currentTarget);
+    const publish = form.get("isPublished") === "on";
+    const markupType = String(form.get("markupType") || "percentage");
+    const markupValue = String(form.get("markupValue") || "");
+    const priceOverride = String(form.get("priceOverride") || "");
+    const collection = String(form.get("collection") || "");
+    const payload = {
+      supplierKey: selectedDropshipProduct.supplier_key,
+      supplierProductId: selectedDropshipProduct.supplier_product_id,
+      markupType,
+      markupValue: markupValue ? Number(markupValue) : null,
+      priceOverride: priceOverride ? Number(priceOverride) : null,
+      collection: collection || null,
+      publish,
+      titleOverride: String(form.get("titleOverride") || ""),
+      descriptionOverride: String(form.get("descriptionOverride") || ""),
+      isPublished: publish
+    };
+
+    setSavingDropshipId(selectedDropshipProduct.id);
+    setMessage("");
+
+    try {
+      const response = await fetch(
+        selectedDropshipProduct.published_id
+          ? `/api/admin/dropshipping/products/${selectedDropshipProduct.published_id}`
+          : "/api/admin/dropshipping/products/import",
+        {
+          method: selectedDropshipProduct.published_id ? "PATCH" : "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(adminKey ? { "x-admin-key": adminKey } : {})
+          },
+          body: JSON.stringify(payload)
+        }
+      );
+      const result = (await response.json()) as { ok: boolean; message?: string };
+
+      if (!response.ok || !result.ok) {
+        setMessage(result.message || "Could not save dropship publication.");
+        return;
+      }
+
+      setMessage(publish ? "Dropship product is published to the storefront." : "Dropship product was saved as an unpublished import.");
+      await loadDropshipProducts(dropshipQuery);
+    } catch {
+      setMessage("Could not connect to the dropship import backend.");
+    } finally {
+      setSavingDropshipId(null);
+    }
   }
 
   async function handleSave(event: FormEvent<HTMLFormElement>) {
@@ -1027,6 +1198,11 @@ export function AdminDashboard() {
                     <p className="mt-4 font-display text-3xl">Products</p>
                     <p className="mt-2 text-sm text-ivory/65">{products.length || "Live"} Epos products, photo uploads, and storefront copy.</p>
                   </button>
+                  <button className="focus-ring rounded-lg border border-champagne/25 bg-ivory/5 p-5 text-left hover:bg-ivory/10" onClick={() => setActiveTab("dropshipping")} type="button">
+                    <PackageSearch className="h-7 w-7 text-champagne" />
+                    <p className="mt-4 font-display text-3xl">Dropshipping</p>
+                    <p className="mt-2 text-sm text-ivory/65">Dear-Lover sync, review, pricing, and storefront publishing.</p>
+                  </button>
                   <button className="focus-ring rounded-lg border border-champagne/25 bg-ivory/5 p-5 text-left hover:bg-ivory/10" onClick={() => setActiveTab("categories")} type="button">
                     <Tags className="h-7 w-7 text-champagne" />
                     <p className="mt-4 font-display text-3xl">Categories</p>
@@ -1049,6 +1225,184 @@ export function AdminDashboard() {
             {activeTab !== "dashboard" && activeTab !== "products" ? (
               <div className="min-h-[34rem] rounded-lg border border-champagne/25 bg-ivory/5 p-5">
                 <h2 className="font-display text-4xl">{adminTabs.find((tab) => tab.id === activeTab)?.label}</h2>
+                {activeTab === "dropshipping" ? (
+                  <div className="mt-5">
+                    <div className="flex flex-wrap items-end justify-between gap-4">
+                      <div>
+                        <p className="max-w-3xl text-sm leading-6 text-ivory/70">Sync supplier catalog data into review tables, then publish only selected dropship products to the storefront.</p>
+                        <p className="mt-2 text-xs font-bold uppercase tracking-[0.18em] text-champagne">Supplier: Dear-Lover</p>
+                      </div>
+                      <button
+                        className="focus-ring rounded-md bg-champagne px-5 py-3 text-xs font-bold uppercase tracking-[0.16em] text-ink hover:bg-ivory disabled:cursor-wait disabled:opacity-60"
+                        disabled={syncingDropship}
+                        onClick={handleSyncDropship}
+                        type="button"
+                      >
+                        {syncingDropship ? "Syncing" : "Sync Dear-Lover"}
+                      </button>
+                    </div>
+                    {message ? (
+                      <div className="mt-4 rounded-lg border border-champagne/25 bg-ink/85 px-4 py-3 text-sm font-semibold text-champagne" role="status">
+                        {message}
+                      </div>
+                    ) : null}
+                    <div className="mt-6 grid gap-6 xl:grid-cols-[22rem_minmax(0,1fr)] 2xl:grid-cols-[24rem_minmax(0,1fr)]">
+                      <aside className="rounded-lg border border-champagne/20 bg-ink/80 p-4">
+                        <form className="flex gap-2" onSubmit={handleDropshipSearch}>
+                          <label className="relative flex-1">
+                            <span className="sr-only">Search dropship products</span>
+                            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-saddle" />
+                            <input
+                              className="focus-ring min-h-11 w-full rounded-md border border-champagne/20 bg-ivory pl-10 pr-3 text-sm text-ink"
+                              onChange={(event) => setDropshipQuery(event.target.value)}
+                              placeholder="Search supplier catalog"
+                              value={dropshipQuery}
+                            />
+                          </label>
+                          <button className="focus-ring rounded-md bg-champagne px-4 text-xs font-bold uppercase tracking-[0.14em] text-ink" type="submit">
+                            Go
+                          </button>
+                        </form>
+                        <div className="mt-4 max-h-[44rem] overflow-auto pr-1">
+                          {loading ? (
+                            <div className="flex items-center gap-2 rounded-md bg-ivory/10 p-4 text-sm text-ivory/75">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              Loading supplier products
+                            </div>
+                          ) : null}
+                          {!loading && !dropshipProducts.length ? (
+                            <div className="rounded-md border border-dashed border-champagne/30 p-5 text-center text-sm text-ivory/70">No supplier products synced yet.</div>
+                          ) : null}
+                          <div className="grid gap-2">
+                            {dropshipProducts.map((product) => (
+                              <button
+                                className={`focus-ring rounded-md border p-3 text-left transition ${selectedDropshipProduct?.id === product.id ? "border-champagne bg-champagne/15" : "border-champagne/10 bg-ivory/5 hover:bg-ivory/10"}`}
+                                key={product.id}
+                                onClick={() => setDropshipSelectedId(product.id)}
+                                type="button"
+                              >
+                                <span className="line-clamp-2 font-semibold text-ivory">{product.title_override || product.title}</span>
+                                <span className="mt-1 block text-xs uppercase tracking-[0.16em] text-champagne">{product.supplier_sku || product.supplier_product_id} / ${product.retail_price.toFixed(2)}</span>
+                                <span className={`mt-2 inline-flex rounded-full px-2 py-1 text-[0.65rem] font-bold uppercase tracking-[0.14em] ${product.is_published ? "bg-champagne text-ink" : "bg-ivory/10 text-ivory/65"}`}>
+                                  {product.is_published ? "Published" : product.published_id ? "Imported" : "Supplier"}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </aside>
+
+                      {selectedDropshipProduct ? (
+                        <form className="rounded-lg border border-champagne/20 bg-ivory p-5 text-ink shadow-luxe" key={selectedDropshipProduct.id} onSubmit={handleDropshipSave}>
+                          <div className="grid gap-6 lg:grid-cols-[16rem_minmax(0,1fr)]">
+                            <div>
+                              <div className="overflow-hidden rounded-lg border border-saddle/15 bg-white">
+                                {selectedDropshipProduct.image_url ? (
+                                  <Image
+                                    alt={selectedDropshipProduct.title}
+                                    className="aspect-square w-full object-contain"
+                                    height={500}
+                                    src={selectedDropshipProduct.image_url}
+                                    width={500}
+                                  />
+                                ) : (
+                                  <div className="grid aspect-square place-items-center text-center text-espresso/60">
+                                    <Camera className="h-9 w-9" />
+                                  </div>
+                                )}
+                              </div>
+                              <div className="mt-4 grid gap-2 rounded-lg border border-saddle/15 bg-cream/50 p-4 text-sm text-espresso/75">
+                                <p><span className="font-bold text-espresso">SKU:</span> {selectedDropshipProduct.supplier_sku || "Not set"}</p>
+                                <p><span className="font-bold text-espresso">Inventory:</span> {selectedDropshipProduct.total_inventory}</p>
+                                <p><span className="font-bold text-espresso">Variants:</span> {selectedDropshipProduct.in_stock_variants}/{selectedDropshipProduct.variants_count} in stock</p>
+                                <p><span className="font-bold text-espresso">Warehouse:</span> {selectedDropshipProduct.warehouse_type || "Unknown"}</p>
+                              </div>
+                            </div>
+                            <div>
+                              <p className="text-xs font-bold uppercase tracking-[0.2em] text-saddle">Supplier Product</p>
+                              <h3 className="mt-2 font-display text-4xl leading-tight text-ink">{selectedDropshipProduct.title}</h3>
+                              <p className="mt-3 text-sm leading-6 text-espresso/70">{selectedDropshipProduct.category_names.join(", ") || "No supplier category"}</p>
+                              <div className="mt-5 grid gap-3 sm:grid-cols-4">
+                                <div className="rounded-md border border-saddle/15 bg-white p-3">
+                                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-saddle">Wholesale</p>
+                                  <p className="mt-1 font-semibold">${Number(selectedDropshipProduct.wholesale_price || 0).toFixed(2)}</p>
+                                </div>
+                                <div className="rounded-md border border-saddle/15 bg-white p-3">
+                                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-saddle">Shipping</p>
+                                  <p className="mt-1 font-semibold">${Number(selectedDropshipProduct.shipping_cost || 0).toFixed(2)}</p>
+                                </div>
+                                <div className="rounded-md border border-saddle/15 bg-white p-3">
+                                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-saddle">Suggested</p>
+                                  <p className="mt-1 font-semibold">${Number(selectedDropshipProduct.suggested_retail_price || 0).toFixed(2)}</p>
+                                </div>
+                                <div className="rounded-md border border-saddle/15 bg-white p-3">
+                                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-saddle">Retail</p>
+                                  <p className="mt-1 font-semibold">${selectedDropshipProduct.retail_price.toFixed(2)}</p>
+                                </div>
+                              </div>
+                              <div className="mt-5 grid gap-4">
+                                <label className="grid gap-2 text-sm font-semibold text-espresso">
+                                  Storefront title override
+                                  <input className="focus-ring min-h-12 rounded-md border border-saddle/20 bg-white px-4 font-normal" defaultValue={selectedDropshipProduct.title_override || ""} name="titleOverride" placeholder={selectedDropshipProduct.title} />
+                                </label>
+                                <label className="grid gap-2 text-sm font-semibold text-espresso">
+                                  Storefront description override
+                                  <textarea className="focus-ring min-h-28 rounded-md border border-saddle/20 bg-white px-4 py-3 font-normal" defaultValue={selectedDropshipProduct.description_override || ""} name="descriptionOverride" />
+                                </label>
+                                <div className="grid gap-3 md:grid-cols-4">
+                                  <label className="grid gap-2 text-sm font-semibold text-espresso">
+                                    Markup
+                                    <select className="focus-ring min-h-12 rounded-md border border-saddle/20 bg-white px-3 font-normal" defaultValue={selectedDropshipProduct.markup_type || "percentage"} name="markupType">
+                                      <option value="percentage">Percentage</option>
+                                      <option value="fixed">Fixed</option>
+                                      <option value="manual">Manual</option>
+                                    </select>
+                                  </label>
+                                  <label className="grid gap-2 text-sm font-semibold text-espresso">
+                                    Markup value
+                                    <input className="focus-ring min-h-12 rounded-md border border-saddle/20 bg-white px-4 font-normal" defaultValue={selectedDropshipProduct.markup_value || "60"} name="markupValue" step="0.01" type="number" />
+                                  </label>
+                                  <label className="grid gap-2 text-sm font-semibold text-espresso">
+                                    Price override
+                                    <input className="focus-ring min-h-12 rounded-md border border-saddle/20 bg-white px-4 font-normal" defaultValue={selectedDropshipProduct.price_override || ""} name="priceOverride" step="0.01" type="number" />
+                                  </label>
+                                  <label className="grid gap-2 text-sm font-semibold text-espresso">
+                                    Collection
+                                    <select className="focus-ring min-h-12 rounded-md border border-saddle/20 bg-white px-3 font-normal" defaultValue={selectedDropshipProduct.collection || "dropshipping"} name="collection">
+                                      <option value="dropshipping">Dropshipping</option>
+                                      {categories.map((category) => (
+                                        <option key={category.id} value={category.slug}>{category.label}</option>
+                                      ))}
+                                    </select>
+                                  </label>
+                                </div>
+                                <label className="flex min-h-12 items-center gap-3 rounded-md border border-saddle/15 bg-white px-4 text-sm font-semibold text-espresso">
+                                  <input defaultChecked={selectedDropshipProduct.is_published} name="isPublished" type="checkbox" />
+                                  Publish to storefront
+                                </label>
+                                <button
+                                  className="focus-ring inline-flex items-center justify-center gap-2 justify-self-start rounded-md bg-ink px-5 py-3 text-sm font-bold uppercase tracking-[0.16em] text-ivory hover:bg-saddle disabled:cursor-wait disabled:opacity-60"
+                                  disabled={savingDropshipId === selectedDropshipProduct.id}
+                                  type="submit"
+                                >
+                                  {savingDropshipId === selectedDropshipProduct.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                                  Save Dropship Product
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </form>
+                      ) : (
+                        <div className="grid min-h-96 place-items-center rounded-lg border border-dashed border-champagne/25 bg-ink/60 text-center">
+                          <div>
+                            <PackageSearch className="mx-auto h-10 w-10 text-champagne" />
+                            <p className="mt-3 font-display text-3xl">Sync supplier products</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : null}
                 {activeTab === "orders" ? (
                   <div className="mt-5">
                     <div className="flex flex-wrap items-center justify-between gap-3">

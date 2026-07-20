@@ -25,6 +25,12 @@ type Product = {
   is_hidden: boolean | null;
   primary_image_url: string | null;
   primary_image_alt: string | null;
+  is_dropship?: boolean;
+  supplier_key?: string;
+  supplier_product_id?: string;
+  supplier_variant_id?: string;
+  dropship_variant_label?: string | null;
+  dropship_warehouse_type?: string | null;
 };
 
 type ProductResponse = {
@@ -419,6 +425,10 @@ function hasAvailableStock(product: Product) {
 }
 
 function isPurchasableProduct(product: Product) {
+  if (product.is_dropship) {
+    return hasAvailableStock(product);
+  }
+
   return isGiftCardProduct(product) || hasAvailableStock(product);
 }
 
@@ -680,6 +690,10 @@ function variantColorLabel(title: string) {
 }
 
 function variantLabel(product: Product) {
+  if (product.dropship_variant_label) {
+    return product.dropship_variant_label;
+  }
+
   const title = cleanProductTitle(product);
   const sku = product.sku || "";
   const size = variantSizeLabel(title, sku);
@@ -726,6 +740,10 @@ function normalizedVariantBaseTitle(product: Product) {
 }
 
 function hasVariantSignal(product: Product) {
+  if (product.is_dropship) {
+    return true;
+  }
+
   const slugs = product.category_slugs || [];
   if (!slugs.some((slug) => apparelCategorySlugs.has(slug))) {
     return false;
@@ -738,6 +756,10 @@ function hasVariantSignal(product: Product) {
 }
 
 function groupKey(product: Product) {
+  if (product.is_dropship && product.supplier_product_id) {
+    return `dropship:${product.supplier_key || "supplier"}:${product.supplier_product_id}`;
+  }
+
   if (!hasVariantSignal(product)) {
     return product.epos_product_id;
   }
@@ -746,6 +768,10 @@ function groupKey(product: Product) {
 }
 
 function groupTitle(product: Product) {
+  if (product.is_dropship) {
+    return cleanProductTitle(product);
+  }
+
   if (!hasVariantSignal(product)) {
     return titleWithoutLeadingSku(cleanProductTitle(product)).trim();
   }
@@ -962,6 +988,11 @@ export function ShopProducts() {
   const isGiftBasketCategory = activeDepartment === "gift-basket" || activeDepartment === "gift-baskets";
 
   function addToCart(product: Product, option?: string) {
+    if (product.is_dropship) {
+      setMessage("Dropship items are visible for Phase 1 review. Supplier checkout and order placement will be added in Phase 2.");
+      return;
+    }
+
     if (!isPurchasableProduct(product) || isFarmEggProduct(product)) {
       return;
     }
@@ -1191,7 +1222,7 @@ export function ShopProducts() {
                         type="button"
                       >
                         <ShoppingBag className="h-4 w-4" />
-                        {isFarmEgg ? "Contact" : isOutOfStock ? "Sold Out" : "Add"}
+                        {isFarmEgg ? "Contact" : isOutOfStock ? "Sold Out" : product.is_dropship ? "Review" : "Add"}
                       </button>
                     </div>
                     {isFarmEgg ? <p className="mt-3 text-sm font-semibold text-saddle">Local delivery only. Please contact to place order.</p> : null}
@@ -1362,7 +1393,7 @@ export function ShopProducts() {
                   type="button"
                 >
                   <ShoppingBag className="h-4 w-4" />
-                  {detailIsFarmEgg ? "Contact To Order" : detailAvailable ? "Add To Cart" : "Sold Out"}
+                  {detailIsFarmEgg ? "Contact To Order" : !detailAvailable ? "Sold Out" : detailProduct.product.is_dropship ? "Review Item" : "Add To Cart"}
                 </button>
               </div>
             </div>

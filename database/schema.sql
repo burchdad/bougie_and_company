@@ -133,3 +133,119 @@ CREATE TABLE IF NOT EXISTS site_discounts (
 );
 
 CREATE INDEX IF NOT EXISTS site_discounts_active_idx ON site_discounts (is_active, starts_at, ends_at);
+
+CREATE TABLE IF NOT EXISTS supplier_sources (
+  id BIGSERIAL PRIMARY KEY,
+  key TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  base_url TEXT,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS supplier_products (
+  id BIGSERIAL PRIMARY KEY,
+  supplier_key TEXT NOT NULL,
+  supplier_product_id TEXT NOT NULL,
+  supplier_sku TEXT,
+  title TEXT NOT NULL,
+  description TEXT,
+  category_names TEXT[] NOT NULL DEFAULT ARRAY[]::TEXT[],
+  image_url TEXT,
+  second_image_url TEXT,
+  wholesale_price NUMERIC(12, 2),
+  original_price NUMERIC(12, 2),
+  suggested_retail_price NUMERIC(12, 2),
+  shipping_cost NUMERIC(12, 2),
+  currency TEXT,
+  warehouse_type TEXT,
+  total_inventory NUMERIC NOT NULL DEFAULT 0,
+  route_url TEXT,
+  raw_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+  last_synced_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (supplier_key, supplier_product_id)
+);
+
+CREATE TABLE IF NOT EXISTS supplier_variants (
+  id BIGSERIAL PRIMARY KEY,
+  supplier_key TEXT NOT NULL,
+  supplier_product_id TEXT NOT NULL,
+  supplier_variant_id TEXT NOT NULL,
+  sku TEXT,
+  barcode TEXT,
+  title TEXT,
+  color TEXT,
+  size TEXT,
+  size_name TEXT,
+  price NUMERIC(12, 2),
+  weight NUMERIC(12, 4),
+  inventory_quantity NUMERIC NOT NULL DEFAULT 0,
+  is_in_stock BOOLEAN NOT NULL DEFAULT FALSE,
+  raw_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+  last_synced_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (supplier_key, supplier_variant_id)
+);
+
+CREATE TABLE IF NOT EXISTS supplier_images (
+  id BIGSERIAL PRIMARY KEY,
+  supplier_key TEXT NOT NULL,
+  supplier_product_id TEXT NOT NULL,
+  url TEXT NOT NULL,
+  alt_text TEXT,
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  raw_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (supplier_key, supplier_product_id, url)
+);
+
+CREATE TABLE IF NOT EXISTS supplier_categories (
+  id BIGSERIAL PRIMARY KEY,
+  supplier_key TEXT NOT NULL,
+  name TEXT NOT NULL,
+  raw_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (supplier_key, name)
+);
+
+CREATE TABLE IF NOT EXISTS supplier_sync_runs (
+  id BIGSERIAL PRIMARY KEY,
+  supplier_key TEXT NOT NULL,
+  status TEXT NOT NULL,
+  started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  finished_at TIMESTAMPTZ,
+  products_seen INTEGER NOT NULL DEFAULT 0,
+  products_upserted INTEGER NOT NULL DEFAULT 0,
+  variants_seen INTEGER NOT NULL DEFAULT 0,
+  variants_upserted INTEGER NOT NULL DEFAULT 0,
+  error_message TEXT,
+  metadata_json JSONB NOT NULL DEFAULT '{}'::jsonb
+);
+
+CREATE TABLE IF NOT EXISTS dropship_published_products (
+  id BIGSERIAL PRIMARY KEY,
+  supplier_key TEXT NOT NULL,
+  supplier_product_id TEXT NOT NULL,
+  local_product_id TEXT,
+  title_override TEXT,
+  description_override TEXT,
+  price_override NUMERIC(12, 2),
+  markup_type TEXT NOT NULL DEFAULT 'percentage',
+  markup_value NUMERIC(12, 2) NOT NULL DEFAULT 60,
+  is_published BOOLEAN NOT NULL DEFAULT FALSE,
+  collection TEXT,
+  seo_title TEXT,
+  seo_description TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (supplier_key, supplier_product_id)
+);
+
+CREATE INDEX IF NOT EXISTS supplier_products_supplier_idx ON supplier_products (supplier_key, last_synced_at DESC);
+CREATE INDEX IF NOT EXISTS supplier_variants_product_idx ON supplier_variants (supplier_key, supplier_product_id);
+CREATE INDEX IF NOT EXISTS supplier_sync_runs_supplier_idx ON supplier_sync_runs (supplier_key, started_at DESC);
