@@ -662,7 +662,7 @@ export async function importDropshipProduct(input: {
   }
 
   const rows = await sql`
-    INSERT INTO ${tables.published} (
+    INSERT INTO ${tables.published} AS published (
       supplier_key,
       supplier_product_id,
       markup_type,
@@ -694,6 +694,54 @@ export async function importDropshipProduct(input: {
   `;
 
   return rows[0];
+}
+
+export async function publishAllSyncedDropshipProducts(input: {
+  supplierKey: string;
+  markupType?: MarkupType;
+  markupValue?: number | null;
+  collection?: string | null;
+}) {
+  await ensureDropshippingTables();
+  const sql = getSql();
+  const tables = dropshipTables(sql);
+  const markupType = input.markupType || "percentage";
+
+  if (!["percentage", "fixed", "manual"].includes(markupType)) {
+    throw new Error("Invalid markup type.");
+  }
+
+  const rows = await sql`
+    INSERT INTO ${tables.published} (
+      supplier_key,
+      supplier_product_id,
+      markup_type,
+      markup_value,
+      collection,
+      is_published,
+      updated_at
+    )
+    SELECT
+      p.supplier_key,
+      p.supplier_product_id,
+      ${markupType},
+      ${input.markupValue ?? (markupType === "percentage" ? 60 : 0)},
+      ${input.collection || "dropshipping"},
+      TRUE,
+      NOW()
+    FROM ${tables.products} p
+    WHERE p.supplier_key = ${input.supplierKey}
+    ON CONFLICT (supplier_key, supplier_product_id)
+    DO UPDATE SET
+      markup_type = published.markup_type,
+      markup_value = published.markup_value,
+      collection = COALESCE(published.collection, EXCLUDED.collection),
+      is_published = TRUE,
+      updated_at = NOW()
+    RETURNING id::text
+  `;
+
+  return { publishedCount: rows.length };
 }
 
 export async function updateDropshipPublication(id: string, input: {

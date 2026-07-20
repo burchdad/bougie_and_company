@@ -232,6 +232,7 @@ export function AdminDashboard({ dropshippingEnabled = false }: { dropshippingEn
   const [uploading, setUploading] = useState(false);
   const [syncingCatalog, setSyncingCatalog] = useState(false);
   const [syncingDropship, setSyncingDropship] = useState(false);
+  const [publishingDropship, setPublishingDropship] = useState(false);
   const [savingDropshipId, setSavingDropshipId] = useState<string | null>(null);
   const [syncingPrices, setSyncingPrices] = useState(false);
   const [importingImages, setImportingImages] = useState(false);
@@ -548,7 +549,7 @@ export function AdminDashboard({ dropshippingEnabled = false }: { dropshippingEn
           "Content-Type": "application/json",
           ...(adminKey ? { "x-admin-key": adminKey } : {})
         },
-        body: JSON.stringify({ supplierKey: "dear-lover", pages: 1, pageSize: 30 })
+        body: JSON.stringify({ supplierKey: "dear-lover", pages: 20, pageSize: 100 })
       });
       const result = (await response.json()) as {
         ok: boolean;
@@ -602,6 +603,40 @@ export function AdminDashboard({ dropshippingEnabled = false }: { dropshippingEn
       setMessage("Could not connect to the dropshipping setup backend.");
     } finally {
       setSyncingDropship(false);
+    }
+  }
+
+  async function handlePublishAllDropship() {
+    setPublishingDropship(true);
+    setMessage("");
+
+    try {
+      const response = await fetch("/api/admin/dropshipping/products/publish-all", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(adminKey ? { "x-admin-key": adminKey } : {})
+        },
+        body: JSON.stringify({
+          supplierKey: "dear-lover",
+          markupType: "percentage",
+          markupValue: 60,
+          collection: "dropshipping"
+        })
+      });
+      const result = (await response.json()) as { ok: boolean; message?: string; result?: { publishedCount: number } };
+
+      if (!response.ok || !result.ok) {
+        setMessage(result.message || "Could not publish synced dropship products.");
+        return;
+      }
+
+      setMessage(`Published ${result.result?.publishedCount ?? 0} synced dropship product${result.result?.publishedCount === 1 ? "" : "s"} to the storefront.`);
+      await loadDropshipProducts(dropshipQuery);
+    } catch {
+      setMessage("Could not connect to the dropshipping publish backend.");
+    } finally {
+      setPublishingDropship(false);
     }
   }
 
@@ -1257,20 +1292,28 @@ export function AdminDashboard({ dropshippingEnabled = false }: { dropshippingEn
                   <div className="mt-5">
                     <div className="flex flex-wrap items-end justify-between gap-4">
                       <div>
-                        <p className="max-w-3xl text-sm leading-6 text-ivory/70">Sync supplier catalog data into review tables, then publish only selected dropship products to the storefront.</p>
+                        <p className="max-w-3xl text-sm leading-6 text-ivory/70">Sync supplier catalog data into review tables, then publish selected products or bulk publish every synced dropship product to the storefront.</p>
                         <p className="mt-2 text-xs font-bold uppercase tracking-[0.18em] text-champagne">Supplier: Dear-Lover</p>
                       </div>
                       <button
                         className="focus-ring rounded-md bg-champagne px-5 py-3 text-xs font-bold uppercase tracking-[0.16em] text-ink hover:bg-ivory disabled:cursor-wait disabled:opacity-60"
-                        disabled={syncingDropship}
+                        disabled={syncingDropship || publishingDropship}
                         onClick={handleSyncDropship}
                         type="button"
                       >
                         {syncingDropship ? "Syncing" : "Sync Dear-Lover"}
                       </button>
                       <button
+                        className="focus-ring rounded-md bg-ivory px-5 py-3 text-xs font-bold uppercase tracking-[0.16em] text-ink hover:bg-champagne disabled:cursor-wait disabled:opacity-60"
+                        disabled={syncingDropship || publishingDropship || !dropshipProducts.length}
+                        onClick={handlePublishAllDropship}
+                        type="button"
+                      >
+                        {publishingDropship ? "Publishing" : "Publish All Synced"}
+                      </button>
+                      <button
                         className="focus-ring rounded-md border border-champagne/45 px-5 py-3 text-xs font-bold uppercase tracking-[0.16em] text-champagne hover:bg-champagne hover:text-ink disabled:cursor-wait disabled:opacity-60"
-                        disabled={syncingDropship}
+                        disabled={syncingDropship || publishingDropship}
                         onClick={handleSetupDropshipping}
                         type="button"
                       >
