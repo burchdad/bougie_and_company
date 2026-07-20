@@ -15,6 +15,14 @@ const nextConfig = {
       {
         protocol: "https",
         hostname: "api.eposnowhq.com"
+      },
+      {
+        protocol: "https",
+        hostname: "placehold.co"
+      },
+      {
+        protocol: "https",
+        hostname: "**.dear-lover.com"
       }
     ]
   },
