@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { AdminDashboard } from "@/components/admin-dashboard";
+import { isDropshippingEnabled } from "@/lib/dropshipping/config";
 
 export const metadata: Metadata = {
   title: "Admin Dashboard",
@@ -7,5 +8,5 @@ export const metadata: Metadata = {
 };
 
 export default function AdminPage() {
-  return <AdminDashboard />;
+  return <AdminDashboard dropshippingEnabled={isDropshippingEnabled()} />;
 }

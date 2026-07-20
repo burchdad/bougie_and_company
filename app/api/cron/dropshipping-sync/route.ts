@@ -1,3 +1,4 @@
+import { isDearLoverSyncEnabled, isDropshippingEnabled, isDropshippingSyncEnabled } from "@/lib/dropshipping/config";
 import { syncSupplierProducts } from "@/lib/dropshipping/db";
 
 export const runtime = "nodejs";
@@ -7,8 +8,11 @@ export async function GET(request: Request) {
   const cronSecret = process.env.CRON_SECRET;
   const authHeader = request.headers.get("authorization");
 
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
     return Response.json({ ok: false, message: "Unauthorized cron request." }, { status: 401 });
+  }
+  if (!isDropshippingEnabled() || !isDropshippingSyncEnabled() || !isDearLoverSyncEnabled()) {
+    return Response.json({ ok: false, message: "Dropshipping sync is disabled for this environment." }, { status: 403 });
   }
 
   try {

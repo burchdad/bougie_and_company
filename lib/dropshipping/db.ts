@@ -1,4 +1,5 @@
 import { getSql } from "@/lib/db";
+import { getDropshippingSchema } from "./config";
 import { calculateDropshipRetailPrice } from "./pricing";
 import { getSupplierAdapter, listSupplierAdapters } from "./suppliers";
 import type { MarkupType, NormalizedSupplierProduct, SupplierSyncParams } from "./types";
@@ -62,11 +63,38 @@ function stringArray(value: unknown) {
   return [];
 }
 
+function quoteIdentifier(value: string) {
+  return `"${value.replace(/"/g, "\"\"")}"`;
+}
+
+function tableName(name: string) {
+  const schema = getDropshippingSchema();
+  return schema ? `${quoteIdentifier(schema)}.${quoteIdentifier(name)}` : quoteIdentifier(name);
+}
+
+function dropshipTables(sql: ReturnType<typeof getSql>) {
+  return {
+    sources: sql.unsafe(tableName("supplier_sources")),
+    products: sql.unsafe(tableName("supplier_products")),
+    variants: sql.unsafe(tableName("supplier_variants")),
+    images: sql.unsafe(tableName("supplier_images")),
+    categories: sql.unsafe(tableName("supplier_categories")),
+    syncRuns: sql.unsafe(tableName("supplier_sync_runs")),
+    published: sql.unsafe(tableName("dropship_published_products"))
+  };
+}
+
 export async function ensureDropshippingTables() {
   const sql = getSql();
+  const schema = getDropshippingSchema();
+  const tables = dropshipTables(sql);
+
+  if (schema) {
+    await sql.unsafe(`CREATE SCHEMA IF NOT EXISTS ${quoteIdentifier(schema)}`);
+  }
 
   await sql`
-    CREATE TABLE IF NOT EXISTS supplier_sources (
+    CREATE TABLE IF NOT EXISTS ${tables.sources} (
       id BIGSERIAL PRIMARY KEY,
       key TEXT NOT NULL UNIQUE,
       name TEXT NOT NULL,
@@ -78,7 +106,7 @@ export async function ensureDropshippingTables() {
   `;
 
   await sql`
-    CREATE TABLE IF NOT EXISTS supplier_products (
+    CREATE TABLE IF NOT EXISTS ${tables.products} (
       id BIGSERIAL PRIMARY KEY,
       supplier_key TEXT NOT NULL,
       supplier_product_id TEXT NOT NULL,
@@ -105,7 +133,7 @@ export async function ensureDropshippingTables() {
   `;
 
   await sql`
-    CREATE TABLE IF NOT EXISTS supplier_variants (
+    CREATE TABLE IF NOT EXISTS ${tables.variants} (
       id BIGSERIAL PRIMARY KEY,
       supplier_key TEXT NOT NULL,
       supplier_product_id TEXT NOT NULL,
@@ -129,7 +157,7 @@ export async function ensureDropshippingTables() {
   `;
 
   await sql`
-    CREATE TABLE IF NOT EXISTS supplier_images (
+    CREATE TABLE IF NOT EXISTS ${tables.images} (
       id BIGSERIAL PRIMARY KEY,
       supplier_key TEXT NOT NULL,
       supplier_product_id TEXT NOT NULL,
@@ -143,7 +171,7 @@ export async function ensureDropshippingTables() {
   `;
 
   await sql`
-    CREATE TABLE IF NOT EXISTS supplier_categories (
+    CREATE TABLE IF NOT EXISTS ${tables.categories} (
       id BIGSERIAL PRIMARY KEY,
       supplier_key TEXT NOT NULL,
       name TEXT NOT NULL,
@@ -155,7 +183,7 @@ export async function ensureDropshippingTables() {
   `;
 
   await sql`
-    CREATE TABLE IF NOT EXISTS supplier_sync_runs (
+    CREATE TABLE IF NOT EXISTS ${tables.syncRuns} (
       id BIGSERIAL PRIMARY KEY,
       supplier_key TEXT NOT NULL,
       status TEXT NOT NULL,
@@ -171,7 +199,7 @@ export async function ensureDropshippingTables() {
   `;
 
   await sql`
-    CREATE TABLE IF NOT EXISTS dropship_published_products (
+    CREATE TABLE IF NOT EXISTS ${tables.published} (
       id BIGSERIAL PRIMARY KEY,
       supplier_key TEXT NOT NULL,
       supplier_product_id TEXT NOT NULL,
@@ -191,13 +219,13 @@ export async function ensureDropshippingTables() {
     )
   `;
 
-  await sql`CREATE INDEX IF NOT EXISTS supplier_products_supplier_idx ON supplier_products (supplier_key, last_synced_at DESC)`;
-  await sql`CREATE INDEX IF NOT EXISTS supplier_products_title_idx ON supplier_products USING GIN (to_tsvector('english', title))`;
-  await sql`CREATE INDEX IF NOT EXISTS supplier_variants_product_idx ON supplier_variants (supplier_key, supplier_product_id)`;
-  await sql`CREATE INDEX IF NOT EXISTS supplier_sync_runs_supplier_idx ON supplier_sync_runs (supplier_key, started_at DESC)`;
+  await sql`CREATE INDEX IF NOT EXISTS supplier_products_supplier_idx ON ${tables.products} (supplier_key, last_synced_at DESC)`;
+  await sql`CREATE INDEX IF NOT EXISTS supplier_products_title_idx ON ${tables.products} USING GIN (to_tsvector('english', title))`;
+  await sql`CREATE INDEX IF NOT EXISTS supplier_variants_product_idx ON ${tables.variants} (supplier_key, supplier_product_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS supplier_sync_runs_supplier_idx ON ${tables.syncRuns} (supplier_key, started_at DESC)`;
 
   await sql`
-    INSERT INTO supplier_sources (key, name, base_url, is_active, updated_at)
+    INSERT INTO ${tables.sources} (key, name, base_url, is_active, updated_at)
     VALUES ('dear-lover', 'Dear-Lover', 'https://ds.dear-lover.com', TRUE, NOW())
     ON CONFLICT (key)
     DO UPDATE SET name = EXCLUDED.name, base_url = EXCLUDED.base_url, is_active = TRUE, updated_at = NOW()
@@ -207,9 +235,10 @@ export async function ensureDropshippingTables() {
 export async function listSuppliers() {
   await ensureDropshippingTables();
   const sql = getSql();
+  const tables = dropshipTables(sql);
   const rows = await sql`
     SELECT key, name, base_url, is_active
-    FROM supplier_sources
+    FROM ${tables.sources}
     ORDER BY name ASC
   `;
   const configured = new Set(rows.map((row) => String(row.key)));
@@ -227,9 +256,10 @@ export async function listSuppliers() {
 
 async function upsertSupplierProduct(product: NormalizedSupplierProduct) {
   const sql = getSql();
+  const tables = dropshipTables(sql);
 
   await sql`
-    INSERT INTO supplier_products (
+    INSERT INTO ${tables.products} (
       supplier_key,
       supplier_product_id,
       supplier_sku,
@@ -294,7 +324,7 @@ async function upsertSupplierProduct(product: NormalizedSupplierProduct) {
 
   for (const variant of product.variants) {
     await sql`
-      INSERT INTO supplier_variants (
+      INSERT INTO ${tables.variants} (
         supplier_key,
         supplier_product_id,
         supplier_variant_id,
@@ -351,7 +381,7 @@ async function upsertSupplierProduct(product: NormalizedSupplierProduct) {
 
   for (const image of product.images) {
     await sql`
-      INSERT INTO supplier_images (supplier_key, supplier_product_id, url, alt_text, sort_order, raw_json)
+      INSERT INTO ${tables.images} (supplier_key, supplier_product_id, url, alt_text, sort_order, raw_json)
       VALUES (${product.supplierKey}, ${product.supplierProductId}, ${image.url}, ${image.altText || null}, ${image.sortOrder || 0}, ${JSON.stringify(image.raw || {})}::jsonb)
       ON CONFLICT (supplier_key, supplier_product_id, url)
       DO UPDATE SET alt_text = EXCLUDED.alt_text, sort_order = EXCLUDED.sort_order, raw_json = EXCLUDED.raw_json
@@ -360,7 +390,7 @@ async function upsertSupplierProduct(product: NormalizedSupplierProduct) {
 
   for (const category of product.categories) {
     await sql`
-      INSERT INTO supplier_categories (supplier_key, name, raw_json, updated_at)
+      INSERT INTO ${tables.categories} (supplier_key, name, raw_json, updated_at)
       VALUES (${product.supplierKey}, ${category.name}, ${JSON.stringify(category.raw || {})}::jsonb, NOW())
       ON CONFLICT (supplier_key, name)
       DO UPDATE SET raw_json = EXCLUDED.raw_json, updated_at = NOW()
@@ -372,8 +402,9 @@ export async function syncSupplierProducts(supplierKey: string, params: Supplier
   await ensureDropshippingTables();
   const adapter = getSupplierAdapter(supplierKey);
   const sql = getSql();
+  const tables = dropshipTables(sql);
   const started = await sql`
-    INSERT INTO supplier_sync_runs (supplier_key, status, metadata_json)
+    INSERT INTO ${tables.syncRuns} (supplier_key, status, metadata_json)
     VALUES (${supplierKey}, 'running', ${JSON.stringify(params)}::jsonb)
     RETURNING id::int
   `;
@@ -409,7 +440,7 @@ export async function syncSupplierProducts(supplierKey: string, params: Supplier
 
     const status = failures.length ? "partial" : "success";
     await sql`
-      UPDATE supplier_sync_runs
+      UPDATE ${tables.syncRuns}
       SET status = ${status},
         finished_at = NOW(),
         products_seen = ${productsSeen},
@@ -424,7 +455,7 @@ export async function syncSupplierProducts(supplierKey: string, params: Supplier
   } catch (error) {
     const message = error instanceof Error ? error.message : "Supplier sync failed.";
     await sql`
-      UPDATE supplier_sync_runs
+      UPDATE ${tables.syncRuns}
       SET status = 'failed',
         finished_at = NOW(),
         products_seen = ${productsSeen},
@@ -484,6 +515,7 @@ function mapAdminProduct(row: Record<string, unknown>): DropshipAdminProduct {
 export async function getDropshipProducts(query: DropshipQuery = {}) {
   await ensureDropshippingTables();
   const sql = getSql();
+  const tables = dropshipTables(sql);
   const page = Math.max(1, Math.trunc(Number(query.page || 1)));
   const pageSize = Math.max(1, Math.min(100, Math.trunc(Number(query.pageSize || 30))));
   const offset = (page - 1) * pageSize;
@@ -521,9 +553,9 @@ export async function getDropshipProducts(query: DropshipQuery = {}) {
       d.markup_value::text,
       COALESCE(d.is_published, FALSE) AS is_published,
       d.collection
-    FROM supplier_products p
-    LEFT JOIN supplier_variants v ON v.supplier_key = p.supplier_key AND v.supplier_product_id = p.supplier_product_id
-    LEFT JOIN dropship_published_products d ON d.supplier_key = p.supplier_key AND d.supplier_product_id = p.supplier_product_id
+    FROM ${tables.products} p
+    LEFT JOIN ${tables.variants} v ON v.supplier_key = p.supplier_key AND v.supplier_product_id = p.supplier_product_id
+    LEFT JOIN ${tables.published} d ON d.supplier_key = p.supplier_key AND d.supplier_product_id = p.supplier_product_id
     WHERE p.supplier_key = ${supplierKey}
       AND (${search} = '' OR p.title ILIKE ${`%${search}%`} OR p.supplier_sku ILIKE ${`%${search}%`} OR p.supplier_product_id ILIKE ${`%${search}%`})
       AND (${category} = '' OR ${category} = ANY(p.category_names))
@@ -549,9 +581,10 @@ export async function importDropshipProduct(input: {
 }) {
   await ensureDropshippingTables();
   const sql = getSql();
+  const tables = dropshipTables(sql);
   const productRows = await sql`
     SELECT supplier_key, supplier_product_id
-    FROM supplier_products
+    FROM ${tables.products}
     WHERE supplier_key = ${input.supplierKey}
       AND supplier_product_id = ${input.supplierProductId}
     LIMIT 1
@@ -567,7 +600,7 @@ export async function importDropshipProduct(input: {
   }
 
   const rows = await sql`
-    INSERT INTO dropship_published_products (
+    INSERT INTO ${tables.published} (
       supplier_key,
       supplier_product_id,
       markup_type,
@@ -614,6 +647,7 @@ export async function updateDropshipPublication(id: string, input: {
 }) {
   await ensureDropshippingTables();
   const sql = getSql();
+  const tables = dropshipTables(sql);
   const markupType = input.markupType || "percentage";
 
   if (!["percentage", "fixed", "manual"].includes(markupType)) {
@@ -621,7 +655,7 @@ export async function updateDropshipPublication(id: string, input: {
   }
 
   const rows = await sql`
-    UPDATE dropship_published_products
+    UPDATE ${tables.published}
     SET title_override = ${input.titleOverride || null},
       description_override = ${input.descriptionOverride || null},
       markup_type = ${markupType},
@@ -646,6 +680,7 @@ export async function updateDropshipPublication(id: string, input: {
 export async function getPublishedDropshipStoreProducts() {
   await ensureDropshippingTables();
   const sql = getSql();
+  const tables = dropshipTables(sql);
   const rows = await sql`
     SELECT
       p.supplier_key,
@@ -675,9 +710,9 @@ export async function getPublishedDropshipStoreProducts() {
       v.price::text AS variant_price,
       v.inventory_quantity::text,
       v.is_in_stock
-    FROM dropship_published_products d
-    JOIN supplier_products p ON p.supplier_key = d.supplier_key AND p.supplier_product_id = d.supplier_product_id
-    JOIN supplier_variants v ON v.supplier_key = p.supplier_key AND v.supplier_product_id = p.supplier_product_id
+    FROM ${tables.published} d
+    JOIN ${tables.products} p ON p.supplier_key = d.supplier_key AND p.supplier_product_id = d.supplier_product_id
+    JOIN ${tables.variants} v ON v.supplier_key = p.supplier_key AND v.supplier_product_id = p.supplier_product_id
     WHERE d.is_published = TRUE
     ORDER BY p.title ASC, v.size_name ASC, v.title ASC
   `;

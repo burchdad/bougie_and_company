@@ -1,4 +1,5 @@
 import { isAdminRequest } from "@/lib/admin-products";
+import { isDropshippingEnabled } from "@/lib/dropshipping/config";
 import { importDropshipProduct } from "@/lib/dropshipping/db";
 import type { MarkupType } from "@/lib/dropshipping/types";
 
@@ -8,6 +9,9 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request) {
   if (!isAdminRequest(request)) {
     return Response.json({ ok: false, message: "Admin access required." }, { status: 401 });
+  }
+  if (!isDropshippingEnabled()) {
+    return Response.json({ ok: false, message: "Dropshipping is disabled." }, { status: 404 });
   }
 
   try {

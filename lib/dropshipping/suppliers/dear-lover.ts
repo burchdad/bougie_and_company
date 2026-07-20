@@ -7,10 +7,11 @@ import type {
   SupplierSyncParams,
   SupplierSyncResult
 } from "../types";
+import { getDearLoverAuthCookie, getDearLoverBaseUrl } from "../config";
 
 const supplierKey = "dear-lover";
-const baseUrl = "https://ds.dear-lover.com";
 const searchPath = "/h-dropship-searchProducts.json";
+const supplierAuthenticationRequired = "SUPPLIER_AUTHENTICATION_REQUIRED";
 
 type DearLoverEnvelope = {
   data?: {
@@ -57,7 +58,7 @@ function normalizeImageUrl(value: unknown) {
 }
 
 function buildSearchUrl(params: SupplierSearchParams) {
-  const url = new URL(searchPath, baseUrl);
+  const url = new URL(searchPath, getDearLoverBaseUrl());
   url.searchParams.set("sort", params.sort || "");
   url.searchParams.set("page", String(params.page || 1));
   url.searchParams.set("psize", String(params.pageSize || 30));
@@ -69,22 +70,49 @@ function buildSearchUrl(params: SupplierSearchParams) {
   return url;
 }
 
+function isLikelyAuthenticationFailure(value: unknown) {
+  const record = asRecord(value);
+  const status = String(record.status || "").toLowerCase();
+  const message = String(record.msg || record.message || record.error || "").toLowerCase();
+
+  return status === "false" || message.includes("login") || message.includes("auth") || message.includes("session") || message.includes("cookie");
+}
+
+function supplierAuthError(detail: string) {
+  return new Error(`${supplierAuthenticationRequired}: ${detail}`);
+}
+
 export const dearLoverAdapter: SupplierAdapter = {
   supplierKey,
 
   async searchProducts(params: SupplierSearchParams): Promise<SupplierSearchResult> {
+    const authCookie = getDearLoverAuthCookie();
     const response = await fetch(buildSearchUrl(params), {
       headers: {
-        accept: "application/json"
+        accept: "application/json",
+        ...(authCookie ? { cookie: authCookie } : {})
       },
       cache: "no-store"
     });
+
+    if (response.status === 401 || response.status === 403) {
+      throw supplierAuthError(`Dear-Lover returned HTTP ${response.status}. Configure a server-only supplier authentication method or disable sync.`);
+    }
 
     if (!response.ok) {
       throw new Error(`Dear-Lover search failed with HTTP ${response.status}.`);
     }
 
+    const contentType = response.headers.get("content-type") || "";
+    if (!contentType.includes("application/json")) {
+      throw supplierAuthError("Dear-Lover did not return JSON. The supplier session may be missing or expired.");
+    }
+
     const raw = await response.json() as DearLoverEnvelope;
+    if (isLikelyAuthenticationFailure(raw)) {
+      throw supplierAuthError("Dear-Lover rejected the supplier request. Refresh server-side supplier authentication or disable sync.");
+    }
+
     const data = raw.data || {};
     const list = Array.isArray(data.list) ? data.list : [];
     const products = list.map((item) => this.normalizeProduct(item));

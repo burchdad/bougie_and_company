@@ -207,7 +207,7 @@ function categoryDepth(category: SiteCategory, categories: SiteCategory[]) {
   return depth;
 }
 
-export function AdminDashboard() {
+export function AdminDashboard({ dropshippingEnabled = false }: { dropshippingEnabled?: boolean }) {
   const [adminKey, setAdminKey] = useState("");
   const [isSignedIn, setIsSignedIn] = useState(false);
   const [activeTab, setActiveTab] = useState<AdminTab>("dashboard");
@@ -420,6 +420,7 @@ export function AdminDashboard() {
 
     return { featured, hidden, withPhotos };
   }, [products]);
+  const visibleAdminTabs = useMemo(() => adminTabs.filter((tab) => dropshippingEnabled || tab.id !== "dropshipping"), [dropshippingEnabled]);
 
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -470,10 +471,10 @@ export function AdminDashboard() {
     if (isSignedIn && activeTab === "products" && categories.length === 0) {
       loadCategories();
     }
-    if (isSignedIn && activeTab === "dropshipping" && dropshipProducts.length === 0) {
+    if (dropshippingEnabled && isSignedIn && activeTab === "dropshipping" && dropshipProducts.length === 0) {
       loadDropshipProducts("");
     }
-    if (isSignedIn && activeTab === "dropshipping" && categories.length === 0) {
+    if (dropshippingEnabled && isSignedIn && activeTab === "dropshipping" && categories.length === 0) {
       loadCategories();
     }
     if (isSignedIn && activeTab === "categories" && categories.length === 0) {
@@ -1167,7 +1168,7 @@ export function AdminDashboard() {
           <aside className="flex min-h-[38rem] flex-col rounded-lg border border-champagne/25 bg-ink/80 p-4 shadow-luxe">
             <p className="px-3 text-xs font-bold uppercase tracking-[0.22em] text-champagne">Admin</p>
             <nav className="mt-4 grid gap-1">
-              {adminTabs.map((tab) => {
+              {visibleAdminTabs.map((tab) => {
                 const Icon = tab.icon;
                 return (
                   <button
@@ -1198,11 +1199,13 @@ export function AdminDashboard() {
                     <p className="mt-4 font-display text-3xl">Products</p>
                     <p className="mt-2 text-sm text-ivory/65">{products.length || "Live"} Epos products, photo uploads, and storefront copy.</p>
                   </button>
-                  <button className="focus-ring rounded-lg border border-champagne/25 bg-ivory/5 p-5 text-left hover:bg-ivory/10" onClick={() => setActiveTab("dropshipping")} type="button">
-                    <PackageSearch className="h-7 w-7 text-champagne" />
-                    <p className="mt-4 font-display text-3xl">Dropshipping</p>
-                    <p className="mt-2 text-sm text-ivory/65">Dear-Lover sync, review, pricing, and storefront publishing.</p>
-                  </button>
+                  {dropshippingEnabled ? (
+                    <button className="focus-ring rounded-lg border border-champagne/25 bg-ivory/5 p-5 text-left hover:bg-ivory/10" onClick={() => setActiveTab("dropshipping")} type="button">
+                      <PackageSearch className="h-7 w-7 text-champagne" />
+                      <p className="mt-4 font-display text-3xl">Dropshipping</p>
+                      <p className="mt-2 text-sm text-ivory/65">Dear-Lover sync, review, pricing, and storefront publishing.</p>
+                    </button>
+                  ) : null}
                   <button className="focus-ring rounded-lg border border-champagne/25 bg-ivory/5 p-5 text-left hover:bg-ivory/10" onClick={() => setActiveTab("categories")} type="button">
                     <Tags className="h-7 w-7 text-champagne" />
                     <p className="mt-4 font-display text-3xl">Categories</p>
@@ -1225,7 +1228,7 @@ export function AdminDashboard() {
             {activeTab !== "dashboard" && activeTab !== "products" ? (
               <div className="min-h-[34rem] rounded-lg border border-champagne/25 bg-ivory/5 p-5">
                 <h2 className="font-display text-4xl">{adminTabs.find((tab) => tab.id === activeTab)?.label}</h2>
-                {activeTab === "dropshipping" ? (
+                {dropshippingEnabled && activeTab === "dropshipping" ? (
                   <div className="mt-5">
                     <div className="flex flex-wrap items-end justify-between gap-4">
                       <div>
