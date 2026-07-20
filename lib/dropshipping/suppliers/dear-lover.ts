@@ -7,7 +7,8 @@ import type {
   SupplierSyncParams,
   SupplierSyncResult
 } from "../types";
-import { getDearLoverAuthCookie, getDearLoverBaseUrl } from "../config";
+import { getDearLoverAuthCookie, getDearLoverBaseUrl, isDropshippingFixtureEnabled } from "../config";
+import { dearLoverFixtureEnvelope } from "../fixtures/dear-lover";
 
 const supplierKey = "dear-lover";
 const searchPath = "/h-dropship-searchProducts.json";
@@ -86,6 +87,22 @@ export const dearLoverAdapter: SupplierAdapter = {
   supplierKey,
 
   async searchProducts(params: SupplierSearchParams): Promise<SupplierSearchResult> {
+    if (isDropshippingFixtureEnabled()) {
+      const raw = dearLoverFixtureEnvelope();
+      const data = raw.data;
+      const products = data.list.map((item) => this.normalizeProduct(item));
+
+      return {
+        products,
+        page: data.page,
+        pageSize: data.psize,
+        total: data.total,
+        totalPages: data.total_page,
+        hasMore: data.has_more,
+        raw
+      };
+    }
+
     const authCookie = getDearLoverAuthCookie();
     const response = await fetch(buildSearchUrl(params), {
       headers: {

@@ -13,6 +13,11 @@ function cleanNumber(value: number | null | undefined) {
   return Number.isFinite(Number(value)) ? Number(value) : null;
 }
 
+function nonNegativeNumber(value: number | null | undefined) {
+  const parsed = cleanNumber(value);
+  return parsed !== null && parsed > 0 ? parsed : 0;
+}
+
 function roundToNinetyNine(value: number) {
   if (value <= 0) {
     return 0;
@@ -24,19 +29,19 @@ function roundToNinetyNine(value: number) {
 }
 
 export function calculateDropshipRetailPrice(input: PriceInput) {
-  const wholesalePrice = cleanNumber(input.wholesalePrice) || 0;
-  const shippingCost = cleanNumber(input.shippingCost) || 0;
+  const wholesalePrice = nonNegativeNumber(input.wholesalePrice);
+  const shippingCost = nonNegativeNumber(input.shippingCost);
   const suggestedRetailPrice = cleanNumber(input.suggestedRetailPrice);
-  const markupValue = cleanNumber(input.markupValue);
+  const markupValue = nonNegativeNumber(input.markupValue);
   const priceOverride = cleanNumber(input.priceOverride);
   const floor = wholesalePrice + shippingCost;
   let retail: number;
 
   if (priceOverride !== null && priceOverride > 0) {
     retail = priceOverride;
-  } else if (input.markupType === "percentage" && markupValue !== null) {
+  } else if (input.markupType === "percentage") {
     retail = floor * (1 + markupValue / 100);
-  } else if (input.markupType === "fixed" && markupValue !== null) {
+  } else if (input.markupType === "fixed") {
     retail = floor + markupValue;
   } else if (suggestedRetailPrice !== null && suggestedRetailPrice > 0) {
     retail = suggestedRetailPrice;

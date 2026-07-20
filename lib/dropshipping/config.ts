@@ -22,6 +22,11 @@ export function getDearLoverAuthCookie() {
   return process.env.DEAR_LOVER_AUTH_COOKIE || "";
 }
 
+export function isDropshippingFixtureEnabled() {
+  const runtime = process.env.VERCEL_ENV || process.env.NODE_ENV || "development";
+  return process.env.DROPSHIPPING_USE_FIXTURE === "true" && runtime !== "production";
+}
+
 export function getDropshippingSchema() {
   const schema = process.env.DROPSHIPPING_SCHEMA || "";
   if (!schema) {

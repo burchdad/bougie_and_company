@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "lint": "next lint",
+    "test": "tsx --test tests/dropshipping.test.ts",
     "sync:epos": "node scripts/sync-epos-catalog.mjs",
     "start": "next start"
   },
@@ -27,6 +28,7 @@
     "eslint": "^8.57.0",
     "eslint-config-next": "^15.0.0",
     "postcss": "^8.4.39",
-    "tailwindcss": "^3.4.6"
+    "tailwindcss": "^3.4.6",
+    "tsx": "^4.23.1"
   }
 }

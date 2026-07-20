@@ -989,7 +989,7 @@ export function ShopProducts() {
 
   function addToCart(product: Product, option?: string) {
     if (product.is_dropship) {
-      setMessage("Dropship items are visible for Phase 1 review. Supplier checkout and order placement will be added in Phase 2.");
+      setMessage("Dropshipping checkout is not yet enabled. Supplier checkout and order placement will be added in Phase 2.");
       return;
     }
 
