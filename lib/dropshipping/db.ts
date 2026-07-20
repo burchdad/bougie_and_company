@@ -72,29 +72,44 @@ function tableName(name: string) {
   return schema ? `${quoteIdentifier(schema)}.${quoteIdentifier(name)}` : quoteIdentifier(name);
 }
 
-function dropshipTables(sql: ReturnType<typeof getSql>) {
+function dropshipTableNames() {
   return {
-    sources: sql.unsafe(tableName("supplier_sources")),
-    products: sql.unsafe(tableName("supplier_products")),
-    variants: sql.unsafe(tableName("supplier_variants")),
-    images: sql.unsafe(tableName("supplier_images")),
-    categories: sql.unsafe(tableName("supplier_categories")),
-    syncRuns: sql.unsafe(tableName("supplier_sync_runs")),
-    published: sql.unsafe(tableName("dropship_published_products"))
+    sources: tableName("supplier_sources"),
+    products: tableName("supplier_products"),
+    variants: tableName("supplier_variants"),
+    images: tableName("supplier_images"),
+    categories: tableName("supplier_categories"),
+    syncRuns: tableName("supplier_sync_runs"),
+    published: tableName("dropship_published_products")
+  };
+}
+
+function dropshipTables(sql: ReturnType<typeof getSql>) {
+  const names = dropshipTableNames();
+
+  return {
+    sources: sql.unsafe(names.sources),
+    products: sql.unsafe(names.products),
+    variants: sql.unsafe(names.variants),
+    images: sql.unsafe(names.images),
+    categories: sql.unsafe(names.categories),
+    syncRuns: sql.unsafe(names.syncRuns),
+    published: sql.unsafe(names.published)
   };
 }
 
 export async function ensureDropshippingTables() {
   const sql = getSql();
   const schema = getDropshippingSchema();
+  const names = dropshipTableNames();
   const tables = dropshipTables(sql);
 
   if (schema) {
     await sql.unsafe(`CREATE SCHEMA IF NOT EXISTS ${quoteIdentifier(schema)}`);
   }
 
-  await sql`
-    CREATE TABLE IF NOT EXISTS ${tables.sources} (
+  await sql.unsafe(`
+    CREATE TABLE IF NOT EXISTS ${names.sources} (
       id BIGSERIAL PRIMARY KEY,
       key TEXT NOT NULL UNIQUE,
       name TEXT NOT NULL,
@@ -103,10 +118,10 @@ export async function ensureDropshippingTables() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
-  `;
+  `);
 
-  await sql`
-    CREATE TABLE IF NOT EXISTS ${tables.products} (
+  await sql.unsafe(`
+    CREATE TABLE IF NOT EXISTS ${names.products} (
       id BIGSERIAL PRIMARY KEY,
       supplier_key TEXT NOT NULL,
       supplier_product_id TEXT NOT NULL,
@@ -130,10 +145,10 @@ export async function ensureDropshippingTables() {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       UNIQUE (supplier_key, supplier_product_id)
     )
-  `;
+  `);
 
-  await sql`
-    CREATE TABLE IF NOT EXISTS ${tables.variants} (
+  await sql.unsafe(`
+    CREATE TABLE IF NOT EXISTS ${names.variants} (
       id BIGSERIAL PRIMARY KEY,
       supplier_key TEXT NOT NULL,
       supplier_product_id TEXT NOT NULL,
@@ -154,10 +169,10 @@ export async function ensureDropshippingTables() {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       UNIQUE (supplier_key, supplier_variant_id)
     )
-  `;
+  `);
 
-  await sql`
-    CREATE TABLE IF NOT EXISTS ${tables.images} (
+  await sql.unsafe(`
+    CREATE TABLE IF NOT EXISTS ${names.images} (
       id BIGSERIAL PRIMARY KEY,
       supplier_key TEXT NOT NULL,
       supplier_product_id TEXT NOT NULL,
@@ -168,10 +183,10 @@ export async function ensureDropshippingTables() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       UNIQUE (supplier_key, supplier_product_id, url)
     )
-  `;
+  `);
 
-  await sql`
-    CREATE TABLE IF NOT EXISTS ${tables.categories} (
+  await sql.unsafe(`
+    CREATE TABLE IF NOT EXISTS ${names.categories} (
       id BIGSERIAL PRIMARY KEY,
       supplier_key TEXT NOT NULL,
       name TEXT NOT NULL,
@@ -180,10 +195,10 @@ export async function ensureDropshippingTables() {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       UNIQUE (supplier_key, name)
     )
-  `;
+  `);
 
-  await sql`
-    CREATE TABLE IF NOT EXISTS ${tables.syncRuns} (
+  await sql.unsafe(`
+    CREATE TABLE IF NOT EXISTS ${names.syncRuns} (
       id BIGSERIAL PRIMARY KEY,
       supplier_key TEXT NOT NULL,
       status TEXT NOT NULL,
@@ -196,10 +211,10 @@ export async function ensureDropshippingTables() {
       error_message TEXT,
       metadata_json JSONB NOT NULL DEFAULT '{}'::jsonb
     )
-  `;
+  `);
 
-  await sql`
-    CREATE TABLE IF NOT EXISTS ${tables.published} (
+  await sql.unsafe(`
+    CREATE TABLE IF NOT EXISTS ${names.published} (
       id BIGSERIAL PRIMARY KEY,
       supplier_key TEXT NOT NULL,
       supplier_product_id TEXT NOT NULL,
@@ -217,12 +232,12 @@ export async function ensureDropshippingTables() {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       UNIQUE (supplier_key, supplier_product_id)
     )
-  `;
+  `);
 
-  await sql`CREATE INDEX IF NOT EXISTS supplier_products_supplier_idx ON ${tables.products} (supplier_key, last_synced_at DESC)`;
-  await sql`CREATE INDEX IF NOT EXISTS supplier_products_title_idx ON ${tables.products} USING GIN (to_tsvector('english', title))`;
-  await sql`CREATE INDEX IF NOT EXISTS supplier_variants_product_idx ON ${tables.variants} (supplier_key, supplier_product_id)`;
-  await sql`CREATE INDEX IF NOT EXISTS supplier_sync_runs_supplier_idx ON ${tables.syncRuns} (supplier_key, started_at DESC)`;
+  await sql.unsafe(`CREATE INDEX IF NOT EXISTS supplier_products_supplier_idx ON ${names.products} (supplier_key, last_synced_at DESC)`);
+  await sql.unsafe(`CREATE INDEX IF NOT EXISTS supplier_products_title_idx ON ${names.products} USING GIN (to_tsvector('english', title))`);
+  await sql.unsafe(`CREATE INDEX IF NOT EXISTS supplier_variants_product_idx ON ${names.variants} (supplier_key, supplier_product_id)`);
+  await sql.unsafe(`CREATE INDEX IF NOT EXISTS supplier_sync_runs_supplier_idx ON ${names.syncRuns} (supplier_key, started_at DESC)`);
 
   await sql`
     INSERT INTO ${tables.sources} (key, name, base_url, is_active, updated_at)
