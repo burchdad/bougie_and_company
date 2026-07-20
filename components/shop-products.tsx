@@ -357,7 +357,8 @@ const categoryKeywordMap: Record<string, string[]> = {
   "tea-towels-pillows": ["tea towel", "pillow"],
   "week-from-hell": ["week from hell"],
   "womens-care": ["women", "week from hell", "bath salt", "body scrub", "bath bomb", "body spray", "chap"],
-  "womens-collection": ["women", "dress", "romper", "jumpsuit", "purse", "bath bomb", "body spray", "week from hell"]
+  "womens-collection": ["women", "dress", "romper", "jumpsuit", "purse", "bath bomb", "body spray", "week from hell"],
+  dropshipping: ["dropship", "dropshipping", "supplier"]
 };
 
 function money(value: string | null) {
@@ -502,6 +503,10 @@ function productMatchesFilter(product: Product, filterId: string) {
 
   if (filterId === "tack") {
     return false;
+  }
+
+  if (filterId === "dropshipping") {
+    return Boolean(product.is_dropship || product.category_slugs?.includes("dropshipping") || product.department === "dropshipping");
   }
 
   if (filterId === "gift-basket" || filterId === "gift-baskets" || filterId === "gift-sets") {
