@@ -228,3 +228,48 @@ Not ready to merge to `main` until:
 - Schema isolation is manually confirmed in the database.
 - Native checkout is spot-checked after fixture publish/unpublish.
 - The supplier integration decision is made for Dear-Lover production authentication.
+
+## Dropship Checkout Preview Testing
+
+Branch:
+
+```txt
+feature/bougie-dropship-checkout
+```
+
+Preview env for checkout testing:
+
+```txt
+DROPSHIPPING_ENABLED=true
+DROPSHIPPING_CHECKOUT_ENABLED=true
+DROPSHIPPING_MANUAL_FULFILLMENT_ENABLED=true
+DROPSHIPPING_USE_FIXTURE=true
+DROPSHIP_SHIPPING_MODE=per_item
+DROPSHIP_FLAT_SHIPPING_RATE=0
+```
+
+Payment processor status:
+
+- No online payment processor is currently implemented.
+- Checkout uses the existing custom website order submission flow.
+- Dropship fulfillment queue records are created immediately after local order creation.
+
+Acceptance steps:
+
+1. Native-only cart submits successfully and still attempts Epos sync.
+2. Dropship-only cart submits successfully when checkout and manual fulfillment flags are enabled.
+3. Mixed native plus dropship cart creates one `site_orders` record.
+4. Mixed cart sends only native lines to Epos.
+5. Dropship lines create one `dropship_fulfillment_queue` record per order item.
+6. Disable `DROPSHIPPING_CHECKOUT_ENABLED` and confirm dropship checkout rejects with a clear message.
+7. Disable `DROPSHIPPING_MANUAL_FULFILLMENT_ENABLED` and confirm dropship checkout rejects.
+8. Unpublish a dropship product after adding it to cart and confirm checkout rejects it.
+9. Set fixture inventory revision so a variant is out of stock and confirm checkout rejects over-quantity.
+10. Open `Admin -> Orders -> Dropship Fulfillment`.
+11. Enter supplier order ID/reference and save.
+12. Add carrier/tracking and mark shipped.
+13. Confirm supplier cost and estimated supplier shipping appear only in admin.
+14. Confirm `/api/products` does not expose wholesale cost or raw supplier JSON.
+15. Confirm unauthenticated `/api/admin/dropshipping/fulfillment` returns `401`.
+
+Do not place a real Dear-Lover supplier order during checkout testing.

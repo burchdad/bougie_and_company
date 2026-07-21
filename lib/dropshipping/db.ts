@@ -872,3 +872,115 @@ export async function getPublishedDropshipStoreProducts() {
     };
   });
 }
+
+export type DropshipCheckoutProduct = {
+  cart_id: string;
+  supplier_key: string;
+  supplier_product_id: string;
+  supplier_variant_id: string;
+  supplier_sku: string | null;
+  sku: string | null;
+  barcode: string | null;
+  title: string;
+  description: string | null;
+  category_names: string[];
+  image_url: string | null;
+  warehouse_type: string | null;
+  variant_title: string | null;
+  color: string | null;
+  size: string | null;
+  size_name: string | null;
+  inventory_quantity: number;
+  is_in_stock: boolean;
+  wholesale_price: number | null;
+  shipping_cost: number;
+  retail_price: number;
+  collection: string | null;
+};
+
+export async function getPublishedDropshipCheckoutProducts(cartIds: string[]) {
+  await ensureDropshippingTables();
+  const variantIds = cartIds
+    .map((id) => String(id || ""))
+    .filter((id) => id.startsWith("dropship:"))
+    .map((id) => id.split(":")[2])
+    .filter(Boolean);
+
+  if (!variantIds.length) {
+    return [] as DropshipCheckoutProduct[];
+  }
+
+  const sql = getSql();
+  const tables = dropshipTables(sql);
+  const rows = await sql`
+    SELECT
+      p.supplier_key,
+      p.supplier_product_id,
+      p.supplier_sku,
+      p.title,
+      p.description,
+      p.category_names,
+      p.image_url,
+      p.wholesale_price::text,
+      p.suggested_retail_price::text,
+      p.shipping_cost::text,
+      p.warehouse_type,
+      d.title_override,
+      d.description_override,
+      d.price_override::text,
+      d.markup_type,
+      d.markup_value::text,
+      d.collection,
+      v.supplier_variant_id,
+      v.sku,
+      v.barcode,
+      v.title AS variant_title,
+      v.color,
+      v.size,
+      v.size_name,
+      v.inventory_quantity::text,
+      v.is_in_stock
+    FROM ${tables.published} d
+    JOIN ${tables.products} p ON p.supplier_key = d.supplier_key AND p.supplier_product_id = d.supplier_product_id
+    JOIN ${tables.variants} v ON v.supplier_key = p.supplier_key AND v.supplier_product_id = p.supplier_product_id
+    WHERE d.is_published = TRUE
+      AND v.supplier_variant_id = ANY(${variantIds})
+  `;
+
+  return rows.map((row) => {
+    const retailPrice = calculateDropshipRetailPrice({
+      wholesalePrice: numberOrNull(row.wholesale_price),
+      shippingCost: numberOrNull(row.shipping_cost),
+      suggestedRetailPrice: numberOrNull(row.suggested_retail_price),
+      markupType: row.markup_type as MarkupType,
+      markupValue: numberOrNull(row.markup_value),
+      priceOverride: numberOrNull(row.price_override)
+    });
+    const title = row.title_override ? String(row.title_override) : String(row.title);
+
+    return {
+      cart_id: `dropship:${row.supplier_key}:${row.supplier_variant_id}`,
+      supplier_key: String(row.supplier_key),
+      supplier_product_id: String(row.supplier_product_id),
+      supplier_variant_id: String(row.supplier_variant_id),
+      supplier_sku: row.supplier_sku ? String(row.supplier_sku) : null,
+      sku: row.sku ? String(row.sku) : null,
+      barcode: row.barcode ? String(row.barcode) : null,
+      title,
+      description: row.description_override ? String(row.description_override) : row.description ? String(row.description) : null,
+      category_names: stringArray(row.category_names),
+      image_url: row.image_url ? String(row.image_url) : null,
+      warehouse_type: row.warehouse_type ? String(row.warehouse_type) : null,
+      variant_title: row.variant_title ? String(row.variant_title) : null,
+      color: row.color ? String(row.color) : null,
+      size: row.size ? String(row.size) : null,
+      size_name: row.size_name ? String(row.size_name) : null,
+      inventory_quantity: Number(row.is_in_stock ? row.inventory_quantity || 0 : 0),
+      is_in_stock: Boolean(row.is_in_stock),
+      wholesale_price: numberOrNull(row.wholesale_price),
+      shipping_cost: numberOrNull(row.shipping_cost) || 0,
+      retail_price: retailPrice,
+      collection: row.collection ? String(row.collection) : null
+    };
+  });
+}
