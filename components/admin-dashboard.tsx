@@ -748,7 +748,6 @@ export function AdminDashboard({ dropshippingEnabled = false }: { dropshippingEn
     setMessage("");
 
     try {
-      const parsed = JSON.parse(dropshipRawImport.trim()) as unknown;
       const response = await fetch("/api/admin/dropshipping/products/import-raw", {
         method: "POST",
         headers: {
@@ -757,7 +756,7 @@ export function AdminDashboard({ dropshippingEnabled = false }: { dropshippingEn
         },
         body: JSON.stringify({
           supplierKey: "dear-lover",
-          envelope: parsed,
+          rawText: dropshipRawImport,
           publish: true,
           markupType: "percentage",
           markupValue: 60,
@@ -789,8 +788,8 @@ export function AdminDashboard({ dropshippingEnabled = false }: { dropshippingEn
           : "Dear-Lover JSON import complete."
       );
       await loadDropshipProducts(dropshipQuery);
-    } catch (error) {
-      setMessage(error instanceof SyntaxError ? "Paste a complete Dear-Lover JSON response from the Network response body." : "Could not import pasted Dear-Lover JSON.");
+    } catch {
+      setMessage("Could not import pasted Dear-Lover JSON.");
     } finally {
       setImportingRawDropship(false);
     }

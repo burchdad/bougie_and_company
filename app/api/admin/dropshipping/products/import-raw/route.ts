@@ -32,6 +32,72 @@ function asRecord(value: unknown) {
   return value && typeof value === "object" ? value as Record<string, unknown> : {};
 }
 
+function escapeControlCharactersInStrings(value: string) {
+  let repaired = "";
+  let inString = false;
+  let escaped = false;
+
+  for (const char of value) {
+    if (!inString) {
+      repaired += char;
+      if (char === "\"") {
+        inString = true;
+      }
+      continue;
+    }
+
+    if (escaped) {
+      repaired += char;
+      escaped = false;
+      continue;
+    }
+
+    if (char === "\\") {
+      repaired += char;
+      escaped = true;
+      continue;
+    }
+
+    if (char === "\"") {
+      repaired += char;
+      inString = false;
+      continue;
+    }
+
+    if (char === "\n") {
+      repaired += "\\n";
+      continue;
+    }
+
+    if (char === "\r") {
+      repaired += "\\r";
+      continue;
+    }
+
+    if (char === "\t") {
+      repaired += "\\t";
+      continue;
+    }
+
+    repaired += char;
+  }
+
+  return repaired;
+}
+
+function parseRawJsonText(value: unknown) {
+  if (typeof value !== "string" || !value.trim()) {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  try {
+    return JSON.parse(trimmed) as unknown;
+  } catch {
+    return JSON.parse(escapeControlCharactersInStrings(trimmed)) as unknown;
+  }
+}
+
 function extractRawProducts(value: unknown): unknown[] {
   if (Array.isArray(value)) {
     return value;
@@ -59,6 +125,7 @@ function extractAllRawProducts(body: Record<string, unknown>) {
     body.products,
     body.envelope,
     body.raw,
+    parseRawJsonText(body.rawText),
     ...(Array.isArray(body.envelopes) ? body.envelopes : [])
   ];
 
