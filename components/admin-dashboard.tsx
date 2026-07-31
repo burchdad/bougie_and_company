@@ -259,6 +259,7 @@ export function AdminDashboard({ dropshippingEnabled = false }: { dropshippingEn
   const [editingDiscountId, setEditingDiscountId] = useState<number | null>(null);
   const [query, setQuery] = useState("");
   const [dropshipQuery, setDropshipQuery] = useState("");
+  const [dropshipRawImport, setDropshipRawImport] = useState("");
   const [dropshipSelectedId, setDropshipSelectedId] = useState("");
   const [selectedId, setSelectedId] = useState("");
   const [isCreatingProduct, setIsCreatingProduct] = useState(false);
@@ -270,6 +271,7 @@ export function AdminDashboard({ dropshippingEnabled = false }: { dropshippingEn
   const [syncingCatalog, setSyncingCatalog] = useState(false);
   const [syncingDropship, setSyncingDropship] = useState(false);
   const [publishingDropship, setPublishingDropship] = useState(false);
+  const [importingRawDropship, setImportingRawDropship] = useState(false);
   const [savingDropshipId, setSavingDropshipId] = useState<string | null>(null);
   const [syncingPrices, setSyncingPrices] = useState(false);
   const [importingImages, setImportingImages] = useState(false);
@@ -737,6 +739,60 @@ export function AdminDashboard({ dropshippingEnabled = false }: { dropshippingEn
       setMessage("Could not connect to the dropshipping publish backend.");
     } finally {
       setPublishingDropship(false);
+    }
+  }
+
+  async function handleRawDropshipImport(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setImportingRawDropship(true);
+    setMessage("");
+
+    try {
+      const parsed = JSON.parse(dropshipRawImport.trim()) as unknown;
+      const response = await fetch("/api/admin/dropshipping/products/import-raw", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(adminKey ? { "x-admin-key": adminKey } : {})
+        },
+        body: JSON.stringify({
+          supplierKey: "dear-lover",
+          envelope: parsed,
+          publish: true,
+          markupType: "percentage",
+          markupValue: 60,
+          collection: "dropshipping"
+        })
+      });
+      const result = (await response.json()) as {
+        ok: boolean;
+        message?: string;
+        importResult?: {
+          productsSeen: number;
+          productsUpserted: number;
+          variantsSeen: number;
+          variantsUpserted: number;
+          failures?: string[];
+        };
+        publishResult?: { publishedCount: number } | null;
+      };
+
+      if (!response.ok || !result.ok) {
+        setMessage(result.message || "Could not import pasted Dear-Lover JSON.");
+        return;
+      }
+
+      setDropshipRawImport("");
+      setMessage(
+        result.importResult
+          ? `Imported ${result.importResult.productsUpserted}/${result.importResult.productsSeen} pasted Dear-Lover products and published ${result.publishResult?.publishedCount ?? 0} storefront records.`
+          : "Dear-Lover JSON import complete."
+      );
+      await loadDropshipProducts(dropshipQuery);
+    } catch (error) {
+      setMessage(error instanceof SyntaxError ? "Paste a complete Dear-Lover JSON response from the Network response body." : "Could not import pasted Dear-Lover JSON.");
+    } finally {
+      setImportingRawDropship(false);
     }
   }
 
@@ -1425,6 +1481,30 @@ export function AdminDashboard({ dropshippingEnabled = false }: { dropshippingEn
                         {message}
                       </div>
                     ) : null}
+                    <form className="mt-4 rounded-lg border border-champagne/20 bg-ink/70 p-4" onSubmit={handleRawDropshipImport}>
+                      <div className="flex flex-wrap items-end justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-bold uppercase tracking-[0.18em] text-champagne">Browser JSON Import</p>
+                          <p className="mt-1 text-sm text-ivory/65">Paste one Dear-Lover <span className="font-semibold text-ivory">h-dropship-searchProducts.json</span> response from Edge Network, then import and publish it.</p>
+                        </div>
+                        <button
+                          className="focus-ring rounded-md bg-ivory px-5 py-3 text-xs font-bold uppercase tracking-[0.16em] text-ink hover:bg-champagne disabled:cursor-wait disabled:opacity-60"
+                          disabled={importingRawDropship || !dropshipRawImport.trim()}
+                          type="submit"
+                        >
+                          {importingRawDropship ? "Importing" : "Import Pasted JSON"}
+                        </button>
+                      </div>
+                      <label className="mt-3 block">
+                        <span className="sr-only">Dear-Lover JSON response</span>
+                        <textarea
+                          className="focus-ring min-h-32 w-full rounded-md border border-champagne/20 bg-black/40 p-3 font-mono text-xs text-ivory placeholder:text-ivory/35"
+                          onChange={(event) => setDropshipRawImport(event.target.value)}
+                          placeholder='Paste the full JSON response here, starting with {"data": ...}'
+                          value={dropshipRawImport}
+                        />
+                      </label>
+                    </form>
                     <div className="mt-6 grid gap-6 xl:grid-cols-[22rem_minmax(0,1fr)] 2xl:grid-cols-[24rem_minmax(0,1fr)]">
                       <aside className="rounded-lg border border-champagne/20 bg-ink/80 p-4">
                         <form className="flex gap-2" onSubmit={handleDropshipSearch}>
