@@ -70,7 +70,43 @@ type SiteOrder = {
   epos_customer_id: string | null;
   epos_sync_status: string;
   epos_sync_message: string | null;
+  payment_status: string;
+  fulfillment_status: string;
+  contains_native_items: boolean;
+  contains_dropship_items: boolean;
+  dropship_fulfillment_count: number;
   created_at: string;
+};
+
+type DropshipFulfillmentRecord = {
+  id: number;
+  order_id: number;
+  order_item_id: number;
+  order_number: string;
+  customer_name: string;
+  customer_email: string;
+  shipping_address: string;
+  supplier_key: string;
+  supplier_product_id: string;
+  supplier_variant_id: string;
+  supplier_sku: string | null;
+  product_title: string;
+  variant_title: string | null;
+  image_url: string | null;
+  quantity: number;
+  customer_paid_amount: string;
+  supplier_cost: string | null;
+  estimated_supplier_shipping: string;
+  payment_status: string;
+  fulfillment_status: string;
+  status: string;
+  supplier_order_id: string | null;
+  supplier_order_reference: string | null;
+  fulfillment_notes: string | null;
+  tracking_number: string | null;
+  tracking_carrier: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 type DropshipProduct = {
@@ -216,6 +252,7 @@ export function AdminDashboard({ dropshippingEnabled = false }: { dropshippingEn
   const [categories, setCategories] = useState<SiteCategory[]>([]);
   const [discounts, setDiscounts] = useState<SiteDiscount[]>([]);
   const [orders, setOrders] = useState<SiteOrder[]>([]);
+  const [dropshipFulfillments, setDropshipFulfillments] = useState<DropshipFulfillmentRecord[]>([]);
   const [shippingSettings, setShippingSettings] = useState<ShippingSettings | null>(null);
   const [editingCategoryId, setEditingCategoryId] = useState<number | null>(null);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
@@ -239,6 +276,7 @@ export function AdminDashboard({ dropshippingEnabled = false }: { dropshippingEn
   const [repairingStock, setRepairingStock] = useState(false);
   const [savingShipping, setSavingShipping] = useState(false);
   const [retryingOrderId, setRetryingOrderId] = useState<number | null>(null);
+  const [savingFulfillmentId, setSavingFulfillmentId] = useState<number | null>(null);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
@@ -365,6 +403,66 @@ export function AdminDashboard({ dropshippingEnabled = false }: { dropshippingEn
     }
   }
 
+  async function loadDropshipFulfillments() {
+    setMessage("");
+
+    try {
+      const response = await fetch("/api/admin/dropshipping/fulfillment", {
+        headers: adminKey ? { "x-admin-key": adminKey } : {}
+      });
+      const result = (await response.json()) as { ok: boolean; fulfillments?: DropshipFulfillmentRecord[]; message?: string };
+
+      if (!response.ok || !result.ok) {
+        setMessage(result.message || "Could not load dropship fulfillment queue.");
+        return;
+      }
+
+      setDropshipFulfillments(result.fulfillments || []);
+    } catch {
+      setMessage("Could not connect to the dropship fulfillment backend.");
+    }
+  }
+
+  async function handleFulfillmentSubmit(event: FormEvent<HTMLFormElement>, fulfillmentId: number) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    setSavingFulfillmentId(fulfillmentId);
+    setMessage("");
+
+    try {
+      const response = await fetch("/api/admin/dropshipping/fulfillment", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(adminKey ? { "x-admin-key": adminKey } : {})
+        },
+        body: JSON.stringify({
+          id: fulfillmentId,
+          status: String(form.get("status") || "ready_for_supplier_order"),
+          supplierOrderId: String(form.get("supplierOrderId") || ""),
+          supplierOrderReference: String(form.get("supplierOrderReference") || ""),
+          fulfillmentNotes: String(form.get("fulfillmentNotes") || ""),
+          trackingNumber: String(form.get("trackingNumber") || ""),
+          trackingCarrier: String(form.get("trackingCarrier") || "")
+        })
+      });
+      const result = (await response.json()) as { ok: boolean; message?: string };
+
+      if (!response.ok || !result.ok) {
+        setMessage(result.message || "Could not update dropship fulfillment.");
+        return;
+      }
+
+      setMessage("Dropship fulfillment updated.");
+      await loadDropshipFulfillments();
+      await loadOrders();
+    } catch {
+      setMessage("Could not connect to the dropship fulfillment backend.");
+    } finally {
+      setSavingFulfillmentId(null);
+    }
+  }
+
   async function retryOrderSync(orderId: number) {
     setRetryingOrderId(orderId);
     setMessage("");
@@ -486,6 +584,7 @@ export function AdminDashboard({ dropshippingEnabled = false }: { dropshippingEn
     }
     if (isSignedIn && activeTab === "orders") {
       loadOrders();
+      loadDropshipFulfillments();
     }
     if (isSignedIn && activeTab === "shipping" && !shippingSettings) {
       loadShippingSettings();
@@ -1487,7 +1586,7 @@ export function AdminDashboard({ dropshippingEnabled = false }: { dropshippingEn
                   <div className="mt-5">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <p className="max-w-3xl text-sm leading-6 text-ivory/70">Orders submitted from the storefront are saved in Neon and sent to Epos with product lines and website shipping.</p>
-                      <button className="focus-ring rounded-md border border-champagne/40 px-4 py-3 text-xs font-bold uppercase tracking-[0.16em] text-champagne hover:bg-champagne hover:text-ink" onClick={loadOrders} type="button">
+                      <button className="focus-ring rounded-md border border-champagne/40 px-4 py-3 text-xs font-bold uppercase tracking-[0.16em] text-champagne hover:bg-champagne hover:text-ink" onClick={() => { loadOrders(); loadDropshipFulfillments(); }} type="button">
                         Refresh
                       </button>
                     </div>
@@ -1534,11 +1633,92 @@ export function AdminDashboard({ dropshippingEnabled = false }: { dropshippingEn
                             <div className="rounded-md border border-champagne/15 bg-ivory/5 p-3">
                               <p className="text-xs font-bold uppercase tracking-[0.16em] text-champagne">Status</p>
                               <p className="mt-1 font-semibold text-ivory">{order.status}</p>
+                              {order.contains_dropship_items ? <p className="mt-2 text-xs text-champagne">{order.dropship_fulfillment_count} dropship queue item(s)</p> : null}
                             </div>
                           </div>
                           {order.epos_sync_message ? <p className="mt-3 text-sm text-champagne">{order.epos_sync_message}</p> : null}
                         </article>
                       ))}
+                    </div>
+                    <div className="mt-8 border-t border-champagne/20 pt-6">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-bold uppercase tracking-[0.22em] text-champagne">Dropship Fulfillment</p>
+                          <h3 className="mt-2 font-display text-3xl">Manual Dear-Lover Queue</h3>
+                        </div>
+                        <button className="focus-ring rounded-md border border-champagne/40 px-4 py-3 text-xs font-bold uppercase tracking-[0.16em] text-champagne hover:bg-champagne hover:text-ink" onClick={loadDropshipFulfillments} type="button">
+                          Refresh Queue
+                        </button>
+                      </div>
+                      <div className="mt-5 grid gap-4">
+                        {!dropshipFulfillments.length ? (
+                          <div className="rounded-lg border border-dashed border-champagne/25 bg-ink/50 p-6 text-center text-sm text-ivory/60">No dropship fulfillment records yet.</div>
+                        ) : null}
+                        {dropshipFulfillments.map((fulfillment) => (
+                          <article className="rounded-lg border border-champagne/25 bg-ink/50 p-4" key={fulfillment.id}>
+                            <div className="grid gap-4 lg:grid-cols-[8rem_1fr]">
+                              <div className="overflow-hidden rounded-md border border-champagne/15 bg-ivory/5">
+                                {fulfillment.image_url ? <Image alt={fulfillment.product_title} className="h-32 w-full object-contain" height={160} src={fulfillment.image_url} width={160} /> : <div className="grid h-32 place-items-center text-xs uppercase tracking-[0.16em] text-ivory/45">No Image</div>}
+                              </div>
+                              <div>
+                                <div className="flex flex-wrap items-start justify-between gap-4">
+                                  <div>
+                                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-champagne">{fulfillment.order_number} / {fulfillment.status}</p>
+                                    <h4 className="mt-2 font-display text-3xl">{fulfillment.product_title}</h4>
+                                    <p className="mt-1 text-sm text-ivory/65">{fulfillment.variant_title || "Default variant"} / Qty {fulfillment.quantity}</p>
+                                    <p className="mt-1 text-sm text-ivory/65">{fulfillment.customer_name} / {fulfillment.customer_email}</p>
+                                    <p className="mt-1 text-sm text-ivory/55">{fulfillment.shipping_address}</p>
+                                  </div>
+                                  <div className="grid gap-2 text-right text-sm">
+                                    <span className="font-bold text-ivory">Customer ${Number(fulfillment.customer_paid_amount).toFixed(2)}</span>
+                                    <span className="text-champagne">Supplier cost {fulfillment.supplier_cost ? `$${Number(fulfillment.supplier_cost).toFixed(2)}` : "n/a"}</span>
+                                    <span className="text-champagne">Est. supplier ship ${Number(fulfillment.estimated_supplier_shipping).toFixed(2)}</span>
+                                    <span className="text-ivory/60">SKU {fulfillment.supplier_sku || "n/a"}</span>
+                                  </div>
+                                </div>
+                                <form className="mt-4 grid gap-3 rounded-md border border-champagne/15 bg-ivory/5 p-3 md:grid-cols-3" onSubmit={(event) => handleFulfillmentSubmit(event, fulfillment.id)}>
+                                  <label className="grid gap-1 text-xs font-bold uppercase tracking-[0.14em] text-champagne">
+                                    Status
+                                    <select className="min-h-10 rounded-md border border-champagne/20 bg-ivory px-3 text-ink" defaultValue={fulfillment.status} name="status">
+                                      <option value="ready_for_supplier_order">Ready for supplier order</option>
+                                      <option value="supplier_order_submitted">Supplier order submitted</option>
+                                      <option value="supplier_processing">Supplier processing</option>
+                                      <option value="shipped">Shipped</option>
+                                      <option value="delivered">Delivered</option>
+                                      <option value="failed">Failed</option>
+                                      <option value="cancelled">Cancelled</option>
+                                      <option value="SUPPLIER_INVENTORY_CHANGED">Supplier inventory changed</option>
+                                    </select>
+                                  </label>
+                                  <label className="grid gap-1 text-xs font-bold uppercase tracking-[0.14em] text-champagne">
+                                    Supplier Order ID
+                                    <input className="min-h-10 rounded-md border border-champagne/20 bg-ivory px-3 text-ink" defaultValue={fulfillment.supplier_order_id || ""} name="supplierOrderId" />
+                                  </label>
+                                  <label className="grid gap-1 text-xs font-bold uppercase tracking-[0.14em] text-champagne">
+                                    Supplier Reference
+                                    <input className="min-h-10 rounded-md border border-champagne/20 bg-ivory px-3 text-ink" defaultValue={fulfillment.supplier_order_reference || ""} name="supplierOrderReference" />
+                                  </label>
+                                  <label className="grid gap-1 text-xs font-bold uppercase tracking-[0.14em] text-champagne">
+                                    Carrier
+                                    <input className="min-h-10 rounded-md border border-champagne/20 bg-ivory px-3 text-ink" defaultValue={fulfillment.tracking_carrier || ""} name="trackingCarrier" />
+                                  </label>
+                                  <label className="grid gap-1 text-xs font-bold uppercase tracking-[0.14em] text-champagne">
+                                    Tracking Number
+                                    <input className="min-h-10 rounded-md border border-champagne/20 bg-ivory px-3 text-ink" defaultValue={fulfillment.tracking_number || ""} name="trackingNumber" />
+                                  </label>
+                                  <label className="grid gap-1 text-xs font-bold uppercase tracking-[0.14em] text-champagne md:col-span-3">
+                                    Fulfillment Note
+                                    <textarea className="min-h-20 rounded-md border border-champagne/20 bg-ivory px-3 py-2 text-ink" defaultValue={fulfillment.fulfillment_notes || ""} name="fulfillmentNotes" />
+                                  </label>
+                                  <button className="focus-ring rounded-md bg-champagne px-4 py-3 text-xs font-bold uppercase tracking-[0.16em] text-ink hover:bg-ivory disabled:opacity-60 md:col-span-3" disabled={savingFulfillmentId === fulfillment.id} type="submit">
+                                    {savingFulfillmentId === fulfillment.id ? "Saving" : "Save Fulfillment"}
+                                  </button>
+                                </form>
+                              </div>
+                            </div>
+                          </article>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 ) : null}

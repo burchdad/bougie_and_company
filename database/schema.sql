@@ -249,3 +249,98 @@ CREATE TABLE IF NOT EXISTS dropship_published_products (
 CREATE INDEX IF NOT EXISTS supplier_products_supplier_idx ON supplier_products (supplier_key, last_synced_at DESC);
 CREATE INDEX IF NOT EXISTS supplier_variants_product_idx ON supplier_variants (supplier_key, supplier_product_id);
 CREATE INDEX IF NOT EXISTS supplier_sync_runs_supplier_idx ON supplier_sync_runs (supplier_key, started_at DESC);
+
+CREATE TABLE IF NOT EXISTS site_orders (
+  id BIGSERIAL PRIMARY KEY,
+  order_number TEXT NOT NULL UNIQUE,
+  status TEXT NOT NULL DEFAULT 'submitted',
+  customer_first_name TEXT NOT NULL,
+  customer_last_name TEXT NOT NULL,
+  customer_email TEXT NOT NULL,
+  customer_phone TEXT,
+  shipping_address1 TEXT NOT NULL,
+  shipping_address2 TEXT,
+  shipping_city TEXT NOT NULL,
+  shipping_state TEXT NOT NULL,
+  shipping_postal_code TEXT NOT NULL,
+  shipping_country TEXT NOT NULL DEFAULT 'US',
+  shipping_service TEXT NOT NULL,
+  subtotal NUMERIC(12, 2) NOT NULL,
+  shipping_amount NUMERIC(12, 2) NOT NULL,
+  total NUMERIC(12, 2) NOT NULL,
+  customer_notes TEXT,
+  payment_status TEXT NOT NULL DEFAULT 'payment_confirmed',
+  fulfillment_status TEXT NOT NULL DEFAULT 'pending',
+  currency TEXT NOT NULL DEFAULT 'USD',
+  tax_total NUMERIC(12, 2) NOT NULL DEFAULT 0,
+  discount_total NUMERIC(12, 2) NOT NULL DEFAULT 0,
+  payment_provider TEXT NOT NULL DEFAULT 'custom_order_request',
+  payment_reference TEXT,
+  checkout_session_id TEXT,
+  shipping_address_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+  billing_address_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+  contains_native_items BOOLEAN NOT NULL DEFAULT TRUE,
+  contains_dropship_items BOOLEAN NOT NULL DEFAULT FALSE,
+  cart_checksum TEXT,
+  epos_order_id TEXT,
+  epos_customer_id TEXT,
+  epos_sync_status TEXT NOT NULL DEFAULT 'pending',
+  epos_sync_message TEXT,
+  epos_raw JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS site_order_items (
+  id BIGSERIAL PRIMARY KEY,
+  order_id BIGINT NOT NULL REFERENCES site_orders(id) ON DELETE CASCADE,
+  epos_product_id TEXT NOT NULL,
+  product_type TEXT NOT NULL DEFAULT 'native',
+  supplier_key TEXT,
+  supplier_product_id TEXT,
+  supplier_variant_id TEXT,
+  supplier_sku TEXT,
+  name TEXT NOT NULL,
+  sku TEXT,
+  title_snapshot TEXT,
+  variant_title_snapshot TEXT,
+  image_snapshot TEXT,
+  quantity INTEGER NOT NULL,
+  unit_price NUMERIC(12, 2) NOT NULL,
+  shipping_cost_snapshot NUMERIC(12, 2) NOT NULL DEFAULT 0,
+  line_total NUMERIC(12, 2) NOT NULL,
+  fulfillment_status TEXT NOT NULL DEFAULT 'payment_confirmed',
+  inventory_snapshot NUMERIC,
+  metadata_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS dropship_fulfillment_queue (
+  id BIGSERIAL PRIMARY KEY,
+  order_id BIGINT NOT NULL REFERENCES site_orders(id) ON DELETE CASCADE,
+  order_item_id BIGINT NOT NULL REFERENCES site_order_items(id) ON DELETE CASCADE,
+  supplier_key TEXT NOT NULL,
+  supplier_product_id TEXT NOT NULL,
+  supplier_variant_id TEXT NOT NULL,
+  supplier_sku TEXT,
+  quantity INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'ready_for_supplier_order',
+  supplier_order_id TEXT,
+  supplier_order_reference TEXT,
+  fulfillment_notes TEXT,
+  assigned_to TEXT,
+  tracking_number TEXT,
+  tracking_carrier TEXT,
+  submitted_at TIMESTAMPTZ,
+  fulfilled_at TIMESTAMPTZ,
+  failed_at TIMESTAMPTZ,
+  error_message TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (order_item_id)
+);
+
+CREATE INDEX IF NOT EXISTS site_orders_created_idx ON site_orders (created_at DESC);
+CREATE INDEX IF NOT EXISTS site_order_items_order_idx ON site_order_items (order_id);
+CREATE INDEX IF NOT EXISTS dropship_fulfillment_queue_status_idx ON dropship_fulfillment_queue (status, created_at DESC);

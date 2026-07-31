@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { isDropshippingEnabled, isDropshippingFixtureEnabled } from "../lib/dropshipping/config";
+import { calculateDropshipShippingTotal } from "../lib/dropshipping/checkout";
+import { getDropshipShippingMode, isDropshippingCheckoutEnabled, isDropshippingEnabled, isDropshippingFixtureEnabled } from "../lib/dropshipping/config";
 import { calculateDropshipRetailPrice } from "../lib/dropshipping/pricing";
 import { dearLoverAdapter } from "../lib/dropshipping/suppliers/dear-lover";
 
@@ -59,6 +60,32 @@ test("feature flags default off and fixture is never enabled in production", asy
   await withEnv({ DROPSHIPPING_ENABLED: "true", DROPSHIPPING_USE_FIXTURE: "true", VERCEL_ENV: "preview" }, () => {
     assert.equal(isDropshippingEnabled(), true);
     assert.equal(isDropshippingFixtureEnabled(), true);
+  });
+});
+
+test("dropship checkout fails closed unless manual fulfillment is enabled", async () => {
+  await withEnv({ DROPSHIPPING_ENABLED: "true", DROPSHIPPING_CHECKOUT_ENABLED: "true", DROPSHIPPING_MANUAL_FULFILLMENT_ENABLED: undefined }, () => {
+    assert.equal(isDropshippingCheckoutEnabled(), false);
+  });
+
+  await withEnv({ DROPSHIPPING_ENABLED: "true", DROPSHIPPING_CHECKOUT_ENABLED: "true", DROPSHIPPING_MANUAL_FULFILLMENT_ENABLED: "true" }, () => {
+    assert.equal(isDropshippingCheckoutEnabled(), true);
+  });
+});
+
+test("dropship shipping modes calculate predictable server-side totals", async () => {
+  const lines = [
+    { quantity: 2, shippingCost: 4.25 },
+    { quantity: 1, shippingCost: 8.95 }
+  ];
+
+  assert.equal(calculateDropshipShippingTotal(lines, "per_item"), 17.45);
+  assert.equal(calculateDropshipShippingTotal(lines, "highest_item"), 8.95);
+  assert.equal(calculateDropshipShippingTotal(lines, "flat", 6.5), 6.5);
+  assert.equal(calculateDropshipShippingTotal(lines, "included"), 0);
+
+  await withEnv({ DROPSHIP_SHIPPING_MODE: "wild" }, () => {
+    assert.equal(getDropshipShippingMode(), "per_item");
   });
 });
 

@@ -993,11 +993,6 @@ export function ShopProducts() {
   const isGiftBasketCategory = activeDepartment === "gift-basket" || activeDepartment === "gift-baskets";
 
   function addToCart(product: Product, option?: string) {
-    if (product.is_dropship) {
-      setMessage("Dropshipping checkout is not yet enabled. Supplier checkout and order placement will be added in Phase 2.");
-      return;
-    }
-
     if (!isPurchasableProduct(product) || isFarmEggProduct(product)) {
       return;
     }
@@ -1227,7 +1222,7 @@ export function ShopProducts() {
                         type="button"
                       >
                         <ShoppingBag className="h-4 w-4" />
-                        {isFarmEgg ? "Contact" : isOutOfStock ? "Sold Out" : product.is_dropship ? "Review" : "Add"}
+                        {isFarmEgg ? "Contact" : isOutOfStock ? "Sold Out" : "Add"}
                       </button>
                     </div>
                     {isFarmEgg ? <p className="mt-3 text-sm font-semibold text-saddle">Local delivery only. Please contact to place order.</p> : null}
@@ -1398,7 +1393,7 @@ export function ShopProducts() {
                   type="button"
                 >
                   <ShoppingBag className="h-4 w-4" />
-                  {detailIsFarmEgg ? "Contact To Order" : !detailAvailable ? "Sold Out" : detailProduct.product.is_dropship ? "Review Item" : "Add To Cart"}
+                  {detailIsFarmEgg ? "Contact To Order" : !detailAvailable ? "Sold Out" : "Add To Cart"}
                 </button>
               </div>
             </div>

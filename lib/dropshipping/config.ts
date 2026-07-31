@@ -3,7 +3,27 @@ export function isDropshippingEnabled() {
 }
 
 export function isDropshippingCheckoutEnabled() {
-  return isDropshippingEnabled() && process.env.DROPSHIPPING_CHECKOUT_ENABLED === "true";
+  return isDropshippingEnabled() && process.env.DROPSHIPPING_CHECKOUT_ENABLED === "true" && isDropshippingManualFulfillmentEnabled();
+}
+
+export function isDropshippingManualFulfillmentEnabled() {
+  return process.env.DROPSHIPPING_MANUAL_FULFILLMENT_ENABLED === "true";
+}
+
+export type DropshipShippingMode = "per_item" | "highest_item" | "flat" | "included";
+
+export function getDropshipShippingMode(): DropshipShippingMode {
+  const mode = process.env.DROPSHIP_SHIPPING_MODE || "per_item";
+  if (["per_item", "highest_item", "flat", "included"].includes(mode)) {
+    return mode as DropshipShippingMode;
+  }
+
+  return "per_item";
+}
+
+export function getDropshipFlatShippingRate() {
+  const parsed = Number(process.env.DROPSHIP_FLAT_SHIPPING_RATE || 0);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
 }
 
 export function isDropshippingSyncEnabled() {
