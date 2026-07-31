@@ -98,6 +98,72 @@ function parseRawJsonText(value: unknown) {
   }
 }
 
+function splitConcatenatedJson(value: string) {
+  const parts: string[] = [];
+  let start = -1;
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let index = 0; index < value.length; index += 1) {
+    const char = value[index];
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === "\\") {
+        escaped = true;
+      } else if (char === "\"") {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === "\"") {
+      inString = true;
+      continue;
+    }
+
+    if (char === "{" || char === "[") {
+      if (depth === 0) {
+        start = index;
+      }
+      depth += 1;
+      continue;
+    }
+
+    if (char === "}" || char === "]") {
+      depth -= 1;
+      if (depth === 0 && start >= 0) {
+        parts.push(value.slice(start, index + 1));
+        start = -1;
+      }
+    }
+  }
+
+  return parts;
+}
+
+function parseRawJsonTexts(value: unknown) {
+  if (typeof value !== "string" || !value.trim()) {
+    return [];
+  }
+
+  try {
+    return [parseRawJsonText(value)];
+  } catch {
+    return splitConcatenatedJson(value)
+      .map((part) => {
+        try {
+          return parseRawJsonText(part);
+        } catch {
+          return null;
+        }
+      })
+      .filter(Boolean);
+  }
+}
+
 function extractRawProducts(value: unknown): unknown[] {
   if (Array.isArray(value)) {
     return value;
@@ -125,7 +191,7 @@ function extractAllRawProducts(body: Record<string, unknown>) {
     body.products,
     body.envelope,
     body.raw,
-    parseRawJsonText(body.rawText),
+    ...parseRawJsonTexts(body.rawText),
     ...(Array.isArray(body.envelopes) ? body.envelopes : [])
   ];
 

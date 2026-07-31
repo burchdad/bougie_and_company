@@ -1447,7 +1447,7 @@ export function AdminDashboard({ dropshippingEnabled = false }: { dropshippingEn
                   <div className="mt-5">
                     <div className="flex flex-wrap items-end justify-between gap-4">
                       <div>
-                        <p className="max-w-3xl text-sm leading-6 text-ivory/70">Sync supplier catalog data into review tables, then publish selected products or bulk publish every synced dropship product to the storefront.</p>
+                        <p className="max-w-3xl text-sm leading-6 text-ivory/70">Import Dear-Lover catalog responses into review tables, then publish selected products or bulk publish every synced dropship product to the storefront.</p>
                         <p className="mt-2 text-xs font-bold uppercase tracking-[0.18em] text-champagne">Supplier: Dear-Lover</p>
                       </div>
                       <button
@@ -1456,7 +1456,7 @@ export function AdminDashboard({ dropshippingEnabled = false }: { dropshippingEn
                         onClick={handleSyncDropship}
                         type="button"
                       >
-                        {syncingDropship ? "Syncing" : "Sync Dear-Lover"}
+                        {syncingDropship ? "Syncing" : "Server Sync"}
                       </button>
                       <button
                         className="focus-ring rounded-md bg-ivory px-5 py-3 text-xs font-bold uppercase tracking-[0.16em] text-ink hover:bg-champagne disabled:cursor-wait disabled:opacity-60"
@@ -1484,7 +1484,7 @@ export function AdminDashboard({ dropshippingEnabled = false }: { dropshippingEn
                       <div className="flex flex-wrap items-end justify-between gap-3">
                         <div>
                           <p className="text-xs font-bold uppercase tracking-[0.18em] text-champagne">Browser JSON Import</p>
-                          <p className="mt-1 text-sm text-ivory/65">Paste one Dear-Lover <span className="font-semibold text-ivory">h-dropship-searchProducts.json</span> response from Edge Network, then import and publish it.</p>
+                          <p className="mt-1 text-sm text-ivory/65">Paste one or more Dear-Lover <span className="font-semibold text-ivory">h-dropship-searchProducts.json</span> responses from Edge Network, then import and publish them.</p>
                         </div>
                         <button
                           className="focus-ring rounded-md bg-ivory px-5 py-3 text-xs font-bold uppercase tracking-[0.16em] text-ink hover:bg-champagne disabled:cursor-wait disabled:opacity-60"
@@ -1499,7 +1499,7 @@ export function AdminDashboard({ dropshippingEnabled = false }: { dropshippingEn
                         <textarea
                           className="focus-ring min-h-32 w-full rounded-md border border-champagne/20 bg-black/40 p-3 font-mono text-xs text-ivory placeholder:text-ivory/35"
                           onChange={(event) => setDropshipRawImport(event.target.value)}
-                          placeholder='Paste the full JSON response here, starting with {"data": ...}'
+                          placeholder='Paste the full JSON response here. You can paste multiple complete responses one after another.'
                           value={dropshipRawImport}
                         />
                       </label>
