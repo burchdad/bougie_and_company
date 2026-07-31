@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic";
 const allowedOrigins = new Set([
   "https://www.bougieandcompany.com",
   "https://bougieandcompany.com",
+  "https://dear-lover.com",
   "https://www.dear-lover.com",
   "https://ds.dear-lover.com"
 ]);
