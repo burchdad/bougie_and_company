@@ -523,6 +523,73 @@ export async function syncSupplierProducts(supplierKey: string, params: Supplier
   }
 }
 
+export async function importRawSupplierProducts(supplierKey: string, rawProducts: unknown[], metadata: Record<string, unknown> = {}) {
+  await ensureDropshippingTables();
+  const adapter = getSupplierAdapter(supplierKey);
+  const sql = getSql();
+  const tables = dropshipTables(sql);
+  const started = await sql`
+    INSERT INTO ${tables.syncRuns} (supplier_key, status, metadata_json)
+    VALUES (${supplierKey}, 'running', ${JSON.stringify({ ...metadata, source: "raw-import" })}::jsonb)
+    RETURNING id::int
+  `;
+  const syncRunId = Number(started[0].id);
+  let productsSeen = 0;
+  let productsUpserted = 0;
+  let variantsSeen = 0;
+  let variantsUpserted = 0;
+  const failures: string[] = [];
+
+  try {
+    for (const rawProduct of rawProducts) {
+      productsSeen += 1;
+      try {
+        const product = adapter.normalizeProduct(rawProduct);
+
+        if (!product.supplierProductId) {
+          throw new Error("Supplier product id is missing.");
+        }
+
+        variantsSeen += product.variants.length;
+        await upsertSupplierProduct(product);
+        productsUpserted += 1;
+        variantsUpserted += product.variants.length;
+      } catch (error) {
+        failures.push(error instanceof Error ? error.message : String(error));
+      }
+    }
+
+    const status = failures.length ? "partial" : "success";
+    await sql`
+      UPDATE ${tables.syncRuns}
+      SET status = ${status},
+        finished_at = NOW(),
+        products_seen = ${productsSeen},
+        products_upserted = ${productsUpserted},
+        variants_seen = ${variantsSeen},
+        variants_upserted = ${variantsUpserted},
+        error_message = ${failures.slice(0, 6).join(" | ") || null}
+      WHERE id = ${syncRunId}
+    `;
+
+    return { syncRunId, status, productsSeen, productsUpserted, variantsSeen, variantsUpserted, failures };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Raw supplier import failed.";
+    await sql`
+      UPDATE ${tables.syncRuns}
+      SET status = 'failed',
+        finished_at = NOW(),
+        products_seen = ${productsSeen},
+        products_upserted = ${productsUpserted},
+        variants_seen = ${variantsSeen},
+        variants_upserted = ${variantsUpserted},
+        error_message = ${message}
+      WHERE id = ${syncRunId}
+    `;
+    throw error;
+  }
+}
+
 function mapAdminProduct(row: Record<string, unknown>): DropshipAdminProduct {
   const retailPrice = calculateDropshipRetailPrice({
     wholesalePrice: numberOrNull(row.wholesale_price),

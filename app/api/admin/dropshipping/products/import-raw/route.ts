@@ -1,0 +1,130 @@
+import { isAdminRequest } from "@/lib/admin-products";
+import { isDropshippingEnabled } from "@/lib/dropshipping/config";
+import { importRawSupplierProducts, publishAllSyncedDropshipProducts } from "@/lib/dropshipping/db";
+import type { MarkupType } from "@/lib/dropshipping/types";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+const allowedOrigins = new Set([
+  "https://www.bougieandcompany.com",
+  "https://bougieandcompany.com",
+  "https://www.dear-lover.com",
+  "https://ds.dear-lover.com"
+]);
+
+function corsHeaders(request: Request) {
+  const origin = request.headers.get("origin") || "";
+  const allowedOrigin = allowedOrigins.has(origin) ? origin : "https://www.bougieandcompany.com";
+
+  return {
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "content-type, x-admin-key",
+    "Access-Control-Max-Age": "86400",
+    "Cache-Control": "no-store",
+    Vary: "Origin"
+  };
+}
+
+function asRecord(value: unknown) {
+  return value && typeof value === "object" ? value as Record<string, unknown> : {};
+}
+
+function extractRawProducts(value: unknown): unknown[] {
+  if (Array.isArray(value)) {
+    return value;
+  }
+
+  const record = asRecord(value);
+  if (Array.isArray(record.products)) {
+    return record.products;
+  }
+
+  if (Array.isArray(record.list)) {
+    return record.list;
+  }
+
+  const data = asRecord(record.data);
+  if (Array.isArray(data.list)) {
+    return data.list;
+  }
+
+  return [];
+}
+
+function extractAllRawProducts(body: Record<string, unknown>) {
+  const sources = [
+    body.products,
+    body.envelope,
+    body.raw,
+    ...(Array.isArray(body.envelopes) ? body.envelopes : [])
+  ];
+
+  const products = sources.flatMap((source) => extractRawProducts(source));
+  const seen = new Set<string>();
+
+  return products.filter((product) => {
+    const record = asRecord(product);
+    const supplierId = String(record.id || "");
+
+    if (!supplierId) {
+      return true;
+    }
+
+    if (seen.has(supplierId)) {
+      return false;
+    }
+
+    seen.add(supplierId);
+    return true;
+  });
+}
+
+export async function OPTIONS(request: Request) {
+  return new Response(null, { status: 204, headers: corsHeaders(request) });
+}
+
+export async function POST(request: Request) {
+  const headers = corsHeaders(request);
+
+  if (!isAdminRequest(request)) {
+    return Response.json({ ok: false, message: "Admin access required." }, { status: 401, headers });
+  }
+
+  if (!isDropshippingEnabled()) {
+    return Response.json({ ok: false, message: "Dropshipping is disabled." }, { status: 404, headers });
+  }
+
+  try {
+    const body = await request.json().catch(() => ({})) as Record<string, unknown>;
+    const supplierKey = typeof body.supplierKey === "string" && body.supplierKey.trim() ? body.supplierKey.trim() : "dear-lover";
+    const rawProducts = extractAllRawProducts(body);
+
+    if (!rawProducts.length) {
+      return Response.json({ ok: false, message: "No supplier products were found in the import payload." }, { status: 400, headers });
+    }
+
+    const importResult = await importRawSupplierProducts(supplierKey, rawProducts, {
+      importType: "browser-json",
+      pages: Array.isArray(body.envelopes) ? body.envelopes.length : undefined
+    });
+    let publishResult: { publishedCount: number } | null = null;
+
+    if (body.publish === true) {
+      const markupType = typeof body.markupType === "string" ? body.markupType as MarkupType : "percentage";
+      publishResult = await publishAllSyncedDropshipProducts({
+        supplierKey,
+        markupType,
+        markupValue: Number.isFinite(Number(body.markupValue)) ? Number(body.markupValue) : null,
+        collection: typeof body.collection === "string" && body.collection.trim() ? body.collection.trim() : "dropshipping"
+      });
+    }
+
+    return Response.json({ ok: true, importResult, publishResult }, { headers });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Could not import raw supplier products.";
+    console.error(message);
+    return Response.json({ ok: false, message }, { status: 500, headers });
+  }
+}
