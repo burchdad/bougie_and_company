@@ -62,6 +62,7 @@ const womensApparelSizes = ["Small", "Medium", "Large", "X-Large"] as const;
 const equineJewelryColors = ["Gold", "Silver"] as const;
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const homemadeSoapDisclaimer = "Handmade soap colors may vary slightly from batch to batch depending on when each bar is made.";
+const groupsPerPage = 48;
 
 function GiftBasketRequestForm() {
   const [message, setMessage] = useState("");
@@ -917,6 +918,7 @@ export function ShopProducts() {
   const [detailProduct, setDetailProduct] = useState<DetailProduct | null>(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [visibleGroupCount, setVisibleGroupCount] = useState(groupsPerPage);
 
   useEffect(() => {
     let ignore = false;
@@ -959,11 +961,13 @@ export function ShopProducts() {
       const nextDepartment = window.location.hash.replace("#", "");
       if (!nextDepartment) {
         setActiveDepartment("all");
+        setVisibleGroupCount(groupsPerPage);
         return;
       }
 
       if (nextDepartment) {
         setActiveDepartment(nextDepartment);
+        setVisibleGroupCount(groupsPerPage);
       }
     }
 
@@ -971,6 +975,7 @@ export function ShopProducts() {
     function applyCategoryEvent(event: Event) {
       const categoryId = (event as CustomEvent<{ categoryId?: string }>).detail?.categoryId || "all";
       setActiveDepartment(categoryId);
+      setVisibleGroupCount(groupsPerPage);
       window.history.replaceState(null, "", categoryId === "all" ? "/shop" : `/shop#${categoryId}`);
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
@@ -990,6 +995,7 @@ export function ShopProducts() {
   }, [activeDepartment, products]);
 
   const filteredGroups = useMemo(() => groupProducts(filteredProducts), [filteredProducts]);
+  const visibleGroups = useMemo(() => filteredGroups.slice(0, visibleGroupCount), [filteredGroups, visibleGroupCount]);
   const isGiftBasketCategory = activeDepartment === "gift-basket" || activeDepartment === "gift-baskets";
 
   function addToCart(product: Product, option?: string) {
@@ -1072,35 +1078,36 @@ export function ShopProducts() {
         ) : null}
 
         {!loading && filteredGroups.length ? (
-          <div className="mt-5 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-            {filteredGroups.map((group) => {
-              const selectedProductId = selectedVariants[group.key];
-              const womensSizeOptions = womensApparelSizeOptions(group);
-              const hasWomensSizeOptions = womensSizeOptions.length > 0;
-              const selectedWomensSize = selectedSizes[group.key] || womensSizeOptions[0]?.label;
-              const selectedWomensSizeOption = womensSizeOptions.find((option) => option.label === selectedWomensSize);
-              const womensVariantOptions = womensApparelVariantOptions(group, selectedWomensSize);
-              const hasWomensVariantOptions = womensVariantOptions.length > 1;
-              const defaultWomensVariantLabel = womensApparelOptionLabel(selectedWomensSizeOption?.product || group.products[0]) || womensVariantOptions[0]?.label;
-              const selectedWomensVariantLabel = selectedVariants[group.key] || defaultWomensVariantLabel;
-              const selectedWomensVariantOption = womensVariantOptions.find((option) => option.label === selectedWomensVariantLabel);
-              const selectedVariantProduct = group.products.find((variant) => variant.epos_product_id === selectedProductId);
-              const defaultProduct = group.products.find(hasAvailableStock) || group.products[0];
-              const product =
-                selectedWomensVariantOption?.product ||
-                selectedWomensSizeOption?.product ||
-                selectedVariantProduct ||
-                defaultProduct;
-              const imageProduct = product.primary_image_url ? product : group.products.find((variant) => variant.primary_image_url) || product;
-              const price = displayPrice(product);
-              const hasVariants = hasWomensVariantOptions || (!isWomensApparelGroup(group) && group.products.length > 1 && !hasOnlyWomensSizeVariants(group));
-              const hasTshirtSizes = group.products.some(isMensTshirtProduct);
-              const selectedTshirtSize = selectedSizes[group.key] || mensTshirtSizes[0];
-              const hasEquineJewelryOptions = group.products.some(isEquineJewelryProduct);
-              const selectedEquineJewelryColor = selectedOptions[group.key] || equineJewelryColors[0];
-              const isOutOfStock = !isPurchasableProduct(product);
-              const isFarmEgg = isFarmEggProduct(product);
-              const isHomemadeSoap = isHomemadeSoapProduct(product);
+          <>
+            <div className="mt-5 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+              {visibleGroups.map((group) => {
+                const selectedProductId = selectedVariants[group.key];
+                const womensSizeOptions = womensApparelSizeOptions(group);
+                const hasWomensSizeOptions = womensSizeOptions.length > 0;
+                const selectedWomensSize = selectedSizes[group.key] || womensSizeOptions[0]?.label;
+                const selectedWomensSizeOption = womensSizeOptions.find((option) => option.label === selectedWomensSize);
+                const womensVariantOptions = womensApparelVariantOptions(group, selectedWomensSize);
+                const hasWomensVariantOptions = womensVariantOptions.length > 1;
+                const defaultWomensVariantLabel = womensApparelOptionLabel(selectedWomensSizeOption?.product || group.products[0]) || womensVariantOptions[0]?.label;
+                const selectedWomensVariantLabel = selectedVariants[group.key] || defaultWomensVariantLabel;
+                const selectedWomensVariantOption = womensVariantOptions.find((option) => option.label === selectedWomensVariantLabel);
+                const selectedVariantProduct = group.products.find((variant) => variant.epos_product_id === selectedProductId);
+                const defaultProduct = group.products.find(hasAvailableStock) || group.products[0];
+                const product =
+                  selectedWomensVariantOption?.product ||
+                  selectedWomensSizeOption?.product ||
+                  selectedVariantProduct ||
+                  defaultProduct;
+                const imageProduct = product.primary_image_url ? product : group.products.find((variant) => variant.primary_image_url) || product;
+                const price = displayPrice(product);
+                const hasVariants = hasWomensVariantOptions || (!isWomensApparelGroup(group) && group.products.length > 1 && !hasOnlyWomensSizeVariants(group));
+                const hasTshirtSizes = group.products.some(isMensTshirtProduct);
+                const selectedTshirtSize = selectedSizes[group.key] || mensTshirtSizes[0];
+                const hasEquineJewelryOptions = group.products.some(isEquineJewelryProduct);
+                const selectedEquineJewelryColor = selectedOptions[group.key] || equineJewelryColors[0];
+                const isOutOfStock = !isPurchasableProduct(product);
+                const isFarmEgg = isFarmEggProduct(product);
+                const isHomemadeSoap = isHomemadeSoapProduct(product);
 
               return (
                 <article className={`group overflow-hidden rounded-lg border border-saddle/15 bg-white shadow-sm transition hover:-translate-y-1 hover:shadow-luxe ${isOutOfStock ? "opacity-90" : ""}`} key={group.key}>
@@ -1231,7 +1238,22 @@ export function ShopProducts() {
                 </article>
               );
             })}
-          </div>
+            </div>
+            {visibleGroups.length < filteredGroups.length ? (
+              <div className="mt-8 text-center">
+                <button
+                  className="focus-ring rounded-md border border-saddle/25 bg-white px-6 py-4 text-sm font-bold uppercase tracking-[0.18em] text-espresso hover:bg-cream"
+                  onClick={() => setVisibleGroupCount((current) => current + groupsPerPage)}
+                  type="button"
+                >
+                  Load More
+                </button>
+                <p className="mt-3 text-sm text-espresso/65">
+                  Showing {visibleGroups.length} of {filteredGroups.length} styles.
+                </p>
+              </div>
+            ) : null}
+          </>
         ) : null}
       </div>
       {detailProduct ? (

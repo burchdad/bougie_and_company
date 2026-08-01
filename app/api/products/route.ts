@@ -34,15 +34,25 @@ function getDisplayStock(product: ProductRow) {
   return eposStock > 0 ? eposStock : storefrontOverride;
 }
 
+function booleanParam(value: string | null, fallback: boolean) {
+  if (value === null) {
+    return fallback;
+  }
+
+  return ["1", "true", "yes", "on"].includes(value.toLowerCase());
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const query = searchParams.get("q")?.trim() || "";
+    const includeNative = booleanParam(searchParams.get("includeNative"), true);
+    const includeDropship = booleanParam(searchParams.get("includeDropship"), true);
     const requestedLimit = Number(searchParams.get("limit") || 1000);
-    const rows = await getAdminProducts(query, Number.isFinite(requestedLimit) ? requestedLimit : 1000) as ProductRow[];
+    const rows = includeNative ? await getAdminProducts(query, Number.isFinite(requestedLimit) ? requestedLimit : 1000) as ProductRow[] : [];
     let dropshipProducts: Awaited<ReturnType<typeof getPublishedDropshipStoreProducts>> = [];
 
-    if (isDropshippingEnabled()) {
+    if (includeDropship && isDropshippingEnabled()) {
       try {
         dropshipProducts = await getPublishedDropshipStoreProducts();
       } catch (error) {

@@ -33,7 +33,7 @@ export function ProductShowcase() {
 
     async function loadPrices() {
       try {
-        const response = await fetch("/api/products", { cache: "no-store" });
+        const response = await fetch("/api/products?includeDropship=false&limit=500", { cache: "no-store" });
         const result = (await response.json()) as ProductResponse;
         if (!ignore && response.ok && result.ok) {
           setStorefrontProducts(result.products || []);
