@@ -9,3 +9,5 @@ yarn-debug.log*
 yarn-error.log*
 *.log
 .vercel
+.dear-lover-agent-profile
+.dear-lover-sync-agent-state.json

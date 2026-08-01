@@ -8,6 +8,7 @@
     "lint": "next lint",
     "test": "tsx --test tests/dropshipping.test.ts",
     "sync:epos": "node scripts/sync-epos-catalog.mjs",
+    "sync:dear-lover": "node scripts/dear-lover-sync-agent.mjs",
     "start": "next start"
   },
   "dependencies": {
@@ -29,6 +30,7 @@
     "eslint-config-next": "^15.0.0",
     "postcss": "^8.4.39",
     "tailwindcss": "^3.4.6",
+    "playwright-core": "^1.54.2",
     "tsx": "^4.23.1"
   }
 }
