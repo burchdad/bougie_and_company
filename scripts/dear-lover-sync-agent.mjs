@@ -73,7 +73,7 @@ Useful env:
 Examples:
   npm run sync:dear-lover -- --from=1 --to=193 --publish
   npm run sync:dear-lover -- --from=181 --to=193 --publish --headless
-  npm run sync:dear-lover -- --from=1 --to=193 --publish --resume --batch-size=4
+  npm run sync:dear-lover -- --from=1 --to=193 --publish --batch-size=4
 
 Flags:
   --from=1              First Dear-Lover page to fetch.
@@ -84,7 +84,7 @@ Flags:
   --markup-value=60     Publish markup percentage.
   --collection=...      Storefront collection handle.
   --headless            Run Edge headless after the profile has logged in once.
-  --resume              Skip pages already marked imported in the state file.
+  --resume              Recovery mode: skip pages already marked imported in the state file.
   --dry-run             Fetch pages but do not post to Bougie.
 `);
 }

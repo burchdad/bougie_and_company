@@ -31,7 +31,7 @@ If Dear-Lover asks for login, complete it in the browser window the agent opens,
 ## Full Catalog Sync
 
 ```bash
-npm run sync:dear-lover -- --from=1 --to=193 --publish --resume
+npm run sync:dear-lover -- --from=1 --to=193 --publish
 ```
 
 The defaults match the current production import:
@@ -42,14 +42,14 @@ The defaults match the current production import:
 - `markup-type`: `percentage`
 - `markup-value`: `60`
 
-The agent writes `.dear-lover-sync-agent-state.json` after each successful import batch. Use `--resume` to skip completed pages.
+The agent writes `.dear-lover-sync-agent-state.json` after each successful import batch. Use `--resume` only when recovering an interrupted run.
 
 ## Scheduled Inventory/Price Refresh
 
 After the local profile is logged in, the agent can run headless:
 
 ```bash
-npm run sync:dear-lover -- --from=1 --to=193 --publish --resume --headless
+npm run sync:dear-lover -- --from=1 --to=193 --publish --headless
 ```
 
 For Windows Task Scheduler, run this command from the repo folder. Use a dedicated Windows user/profile if the sync should run unattended.
