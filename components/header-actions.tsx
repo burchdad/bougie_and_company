@@ -408,7 +408,7 @@ export function HeaderActions({ showSearch = true, showAccount = true, showCart 
                   </div>
                   {containsDropshipItems ? (
                     <div className="rounded-lg border border-saddle/20 bg-cream p-4 text-sm leading-6 text-espresso">
-                      Dropshipping items may ship separately from boutique inventory. The order will be saved for team review and supplier fulfillment after checkout.
+                      Supplier-shipped items may ship separately from boutique inventory. The order will be saved for team review and fulfillment after checkout.
                     </div>
                   ) : null}
                   <form className="rounded-lg border border-saddle/15 bg-white p-4" onSubmit={handleShippingSubmit}>

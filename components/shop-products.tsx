@@ -5,6 +5,7 @@ import { ShoppingBag, Sparkles, X } from "lucide-react";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { readFormResponse } from "@/lib/form-response";
 import { departmentTitle, inferDepartment } from "@/lib/product-categorization";
+import { getDropshipCategorySearchTerms } from "@/lib/dropshipping/categorization";
 
 type Product = {
   epos_product_id: string;
@@ -61,6 +62,12 @@ type DetailProduct = {
   imageProduct: Product;
   title: string;
   group?: ProductGroup;
+};
+
+type DropshipPageState = {
+  loaded: boolean;
+  hasMore: boolean;
+  nextOffset: number;
 };
 
 const mensTshirtSizes = ["Medium", "Large", "X-Large"];
@@ -365,7 +372,6 @@ const categoryKeywordMap: Record<string, string[]> = {
   "week-from-hell": ["week from hell"],
   "womens-care": ["women", "week from hell", "bath salt", "body scrub", "bath bomb", "body spray", "chap"],
   "womens-collection": ["women", "dress", "romper", "jumpsuit", "purse", "bath bomb", "body spray", "week from hell"],
-  dropshipping: ["dropship", "dropshipping", "supplier"]
 };
 
 function money(value: string | null) {
@@ -510,10 +516,6 @@ function productMatchesFilter(product: Product, filterId: string) {
 
   if (filterId === "tack") {
     return false;
-  }
-
-  if (filterId === "dropshipping") {
-    return Boolean(product.is_dropship || product.category_slugs?.includes("dropshipping") || product.department === "dropshipping");
   }
 
   if (filterId === "gift-basket" || filterId === "gift-baskets" || filterId === "gift-sets") {
@@ -927,8 +929,7 @@ export function ShopProducts() {
   const [visibleGroupCount, setVisibleGroupCount] = useState(groupsPerPage);
   const [dropshipLoading, setDropshipLoading] = useState(false);
   const [dropshipMessage, setDropshipMessage] = useState("");
-  const [dropshipHasMore, setDropshipHasMore] = useState(true);
-  const [dropshipNextOffset, setDropshipNextOffset] = useState(0);
+  const [dropshipPages, setDropshipPages] = useState<Record<string, DropshipPageState>>({});
 
   useEffect(() => {
     let ignore = false;
@@ -966,18 +967,22 @@ export function ShopProducts() {
     };
   }, []);
 
-  const loadDropshipProducts = useCallback(async (offset = dropshipNextOffset) => {
+  const loadDropshipProducts = useCallback(async (categoryId: string, offset = 0) => {
+    if (!categoryId || categoryId === "all" || !getDropshipCategorySearchTerms(categoryId).length) {
+      return;
+    }
+
     setDropshipLoading(true);
     setDropshipMessage("");
 
     try {
-      const response = await fetch(`/api/products?includeNative=false&includeDropship=true&dropshipCollection=dropshipping&dropshipLimit=${groupsPerPage}&dropshipOffset=${offset}`, {
+      const response = await fetch(`/api/products?includeNative=false&includeDropship=true&dropshipCategory=${encodeURIComponent(categoryId)}&dropshipLimit=${groupsPerPage}&dropshipOffset=${offset}`, {
         cache: "no-store"
       });
       const result = (await response.json()) as ProductResponse;
 
       if (!response.ok || !result.ok) {
-        setDropshipMessage(result.message || "Dropshipping products are still loading. Please try again shortly.");
+        setDropshipMessage(result.message || "Supplier products are still loading. Please try again shortly.");
         return;
       }
 
@@ -988,14 +993,20 @@ export function ShopProducts() {
         });
         return [...byId.values()];
       });
-      setDropshipHasMore(Boolean(result.meta?.dropship?.hasMore));
-      setDropshipNextOffset(result.meta?.dropship?.nextOffset ?? offset + groupsPerPage);
+      setDropshipPages((current) => ({
+        ...current,
+        [categoryId]: {
+          loaded: true,
+          hasMore: Boolean(result.meta?.dropship?.hasMore),
+          nextOffset: result.meta?.dropship?.nextOffset ?? offset + groupsPerPage
+        }
+      }));
     } catch {
-      setDropshipMessage("We could not load more dropshipping products right now. Please try again shortly.");
+      setDropshipMessage("We could not load more supplier products right now. Please try again shortly.");
     } finally {
       setDropshipLoading(false);
     }
-  }, [dropshipNextOffset]);
+  }, []);
 
   useEffect(() => {
     function applyHash() {
@@ -1029,13 +1040,14 @@ export function ShopProducts() {
     };
   }, []);
 
-  const hasLoadedDropshipProducts = useMemo(() => products.some((product) => product.is_dropship), [products]);
+  const canCategoryLoadDropship = activeDepartment !== "all" && getDropshipCategorySearchTerms(activeDepartment).length > 0;
+  const activeDropshipPage = dropshipPages[activeDepartment] || { loaded: false, hasMore: canCategoryLoadDropship, nextOffset: 0 };
 
   useEffect(() => {
-    if (activeDepartment === "dropshipping" && !hasLoadedDropshipProducts && !dropshipLoading) {
-      loadDropshipProducts(0);
+    if (canCategoryLoadDropship && !activeDropshipPage.loaded && !dropshipLoading) {
+      loadDropshipProducts(activeDepartment, 0);
     }
-  }, [activeDepartment, dropshipLoading, hasLoadedDropshipProducts, loadDropshipProducts]);
+  }, [activeDepartment, activeDropshipPage.loaded, canCategoryLoadDropship, dropshipLoading, loadDropshipProducts]);
 
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
@@ -1047,7 +1059,7 @@ export function ShopProducts() {
   const visibleGroups = useMemo(() => filteredGroups.slice(0, visibleGroupCount), [filteredGroups, visibleGroupCount]);
   const isGiftBasketCategory = activeDepartment === "gift-basket" || activeDepartment === "gift-baskets";
   const canLoadLocalGroups = visibleGroups.length < filteredGroups.length;
-  const canLoadDropshipGroups = activeDepartment === "dropshipping" && dropshipHasMore;
+  const canLoadDropshipGroups = canCategoryLoadDropship && activeDropshipPage.hasMore;
 
   function addToCart(product: Product, option?: string) {
     if (!isPurchasableProduct(product) || isFarmEggProduct(product)) {
@@ -1304,7 +1316,7 @@ export function ShopProducts() {
                       return;
                     }
 
-                    loadDropshipProducts();
+                    loadDropshipProducts(activeDepartment, activeDropshipPage.nextOffset);
                   }}
                   type="button"
                 >

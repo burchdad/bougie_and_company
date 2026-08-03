@@ -1,5 +1,6 @@
 import { getSql } from "@/lib/db";
 import { getDropshippingSchema } from "./config";
+import { getDropshipCategorySearchTerms, getDropshipDepartmentSlug, inferDropshipCategorySlugs } from "./categorization";
 import { calculateDropshipRetailPrice } from "./pricing";
 import { getSupplierAdapter, listSupplierAdapters } from "./suppliers";
 import type { MarkupType, NormalizedSupplierProduct, SupplierSyncParams } from "./types";
@@ -865,6 +866,9 @@ function mapPublishedDropshipStoreProduct(row: Record<string, unknown>) {
   });
   const title = row.title_override ? String(row.title_override) : String(row.title);
   const variantLabel = [row.color, row.size || row.size_name || row.variant_title].map((item) => item ? String(item) : "").filter(Boolean).join(" / ");
+  const categoryNames = stringArray(row.category_names);
+  const inferredCategorySlugs = inferDropshipCategorySlugs({ title, categoryNames });
+  const department = getDropshipDepartmentSlug({ title, categoryNames });
 
   return {
     epos_product_id: `dropship:${row.supplier_key}:${row.supplier_variant_id}`,
@@ -879,12 +883,9 @@ function mapPublishedDropshipStoreProduct(row: Record<string, unknown>) {
     synced_at: new Date().toISOString(),
     marketing_title: title,
     marketing_description: row.description_override ? String(row.description_override) : null,
-    department: row.collection ? String(row.collection) : "dropshipping",
+    department,
     category_ids: [],
-    category_slugs: [
-      row.collection ? String(row.collection) : "dropshipping",
-      ...stringArray(row.category_names).map((category) => category.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""))
-    ].filter(Boolean),
+    category_slugs: inferredCategorySlugs,
     has_explicit_categories: true,
     is_featured: false,
     is_hidden: false,
@@ -905,6 +906,7 @@ export async function getPublishedDropshipStoreProductPage(options: {
   offset?: number;
   search?: string;
   collection?: string;
+  category?: string;
 } = {}) {
   await ensureDropshippingTables();
   const sql = getSql();
@@ -914,6 +916,11 @@ export async function getPublishedDropshipStoreProductPage(options: {
   const offset = Math.max(0, Math.trunc(Number(options.offset || 0)));
   const search = options.search?.trim() || "";
   const collection = options.collection?.trim() || "";
+  const category = options.category?.trim() || "";
+  const categoryTerms = getDropshipCategorySearchTerms(category);
+  const hasCategoryFilter = category !== "";
+  const canMatchCategory = categoryTerms.length > 0;
+  const categoryPatterns = canMatchCategory ? categoryTerms.map((term) => `%${term}%`) : ["__no_dropship_category_match__"];
 
   const parentRows = await sql`
     SELECT
@@ -925,6 +932,7 @@ export async function getPublishedDropshipStoreProductPage(options: {
       AND p.supplier_key = ${supplierKey}
       AND (${collection} = '' OR d.collection = ${collection})
       AND (${search} = '' OR p.title ILIKE ${`%${search}%`} OR p.supplier_sku ILIKE ${`%${search}%`} OR p.supplier_product_id ILIKE ${`%${search}%`})
+      AND (${!hasCategoryFilter} OR (${canMatchCategory} AND (p.title ILIKE ANY(${categoryPatterns}) OR array_to_string(p.category_names, ' ') ILIKE ANY(${categoryPatterns}))))
     ORDER BY p.title ASC
     LIMIT ${limit + 1}
     OFFSET ${offset}

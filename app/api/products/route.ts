@@ -68,7 +68,8 @@ export async function GET(request: Request) {
           limit: numberParam(searchParams.get("dropshipLimit"), 48, 1, 96),
           offset: numberParam(searchParams.get("dropshipOffset"), 0, 0, 100000),
           search: query,
-          collection: searchParams.get("dropshipCollection")?.trim() || ""
+          collection: searchParams.get("dropshipCollection")?.trim() || "",
+          category: searchParams.get("dropshipCategory")?.trim() || ""
         });
         dropshipProducts = dropshipPage.products;
         dropshipPagination = dropshipPage.pagination;

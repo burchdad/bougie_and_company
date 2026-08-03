@@ -8,7 +8,6 @@ export const departmentKeywords: Record<string, string[]> = {
   "home-collection": ["candle", "wax", "melt", "tea towel", "pillow", "coaster", "mixer", "outdoor"],
   "mens-collection": ["men", "beard", "mechanic", "shave", "shaving", "cap", "t-shirt", "body spray", "shampoo"],
   "womens-collection": ["women", "dress", "romper", "jumpsuit", "purse", "bath bomb", "body spray", "week from hell"],
-  dropshipping: ["dropship", "dropshipping", "supplier"],
   "kitchen-selection": ["dish soap", "foaming hand", "hand soap", "handmade soap", "homemade soap", "kitchen"],
   "gift-collection": ["gift", "certificate", "set"],
   "jewelry-headbands": ["jewelry", "headband", "earring", "bracelet", "necklace"]

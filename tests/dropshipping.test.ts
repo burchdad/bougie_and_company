@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { calculateDropshipShippingTotal } from "../lib/dropshipping/checkout";
+import { getDropshipCategorySearchTerms, inferDropshipCategorySlugs } from "../lib/dropshipping/categorization";
 import { getDropshipShippingMode, isDropshippingCheckoutEnabled, isDropshippingEnabled, isDropshippingFixtureEnabled } from "../lib/dropshipping/config";
 import { calculateDropshipRetailPrice } from "../lib/dropshipping/pricing";
 import { dearLoverAdapter } from "../lib/dropshipping/suppliers/dear-lover";
@@ -87,6 +88,29 @@ test("dropship shipping modes calculate predictable server-side totals", async (
   await withEnv({ DROPSHIP_SHIPPING_MODE: "wild" }, () => {
     assert.equal(getDropshipShippingMode(), "per_item");
   });
+});
+
+test("Dear-Lover categories map into storefront apparel sections", () => {
+  assert.deepEqual(
+    inferDropshipCategorySlugs({
+      title: "Jet Stream Short Sleeve Knit Denim Patchwork Polo Collar Sweater",
+      categoryNames: ["Sweaters & Cardigans", "Short Sleeve Sweaters", "Women Clothing"]
+    }).filter((slug) => ["womens-collection", "clothing", "tops", "cardigans"].includes(slug)).sort(),
+    ["cardigans", "clothing", "tops", "womens-collection"]
+  );
+
+  assert.deepEqual(
+    inferDropshipCategorySlugs({
+      title: "Khaki Animal Print Wide Leg Terry Knit Pants",
+      categoryNames: ["Bottoms", "Pants & Culotte", "Women Clothing"]
+    }).filter((slug) => ["womens-collection", "clothing", "bottoms", "pants"].includes(slug)).sort(),
+    ["bottoms", "clothing", "pants", "womens-collection"]
+  );
+});
+
+test("dropship category search terms only exist for supported storefront sections", () => {
+  assert.ok(getDropshipCategorySearchTerms("tops").includes("blouse"));
+  assert.equal(getDropshipCategorySearchTerms("soaps").length, 0);
 });
 
 test("Dear-Lover fixture uses the adapter normalizer and sanitized test records", async () => {

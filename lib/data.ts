@@ -107,11 +107,6 @@ export const shopDepartments = [
     items: ["Tops", "Bottoms", "Dresses", "Rompers & Jumpsuits", "Women's Care", "Week From Hell", "Bath Salts", "Body Scrubs", "Bath Bombs", "Body Butter/Lotion", "Chap Stick", "Body Sprays", "Purses", "Luggage"]
   },
   {
-    id: "dropshipping",
-    title: "Dropshipping",
-    items: ["Supplier Boutique"]
-  },
-  {
     id: "kitchen-selection",
     title: "Kitchen Selection",
     items: ["Soaps", "Hand Soaps", "Foaming Hand Soaps"]
