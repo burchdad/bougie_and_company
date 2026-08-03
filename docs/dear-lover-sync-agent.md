@@ -20,10 +20,12 @@ BOUGIE_BASE_URL=https://www.bougieandcompany.com
 DEAR_LOVER_BASE_URL=https://ds.dear-lover.com
 ```
 
+For an unattended Windows schedule, prefer `.env.dropship-sync.local`. It is ignored by git and is loaded after `.env.local`.
+
 Run Edge in visible mode once so the Dear-Lover session can be logged in:
 
 ```bash
-npm run sync:dear-lover -- --from=1 --to=1 --dry-run
+npm run sync:dear-lover -- --from=1 --to=1 --dry-run --login
 ```
 
 If Dear-Lover asks for login, complete it in the browser window the agent opens, close the agent, then run the real sync.
@@ -46,13 +48,15 @@ The agent writes `.dear-lover-sync-agent-state.json` after each successful impor
 
 ## Scheduled Inventory/Price Refresh
 
-After the local profile is logged in, the agent can run headless:
+Dear-Lover may block headless browser traffic. The scheduled Windows runner uses a visible Edge session with the dedicated profile:
 
 ```bash
-npm run sync:dear-lover -- --from=1 --to=193 --publish --headless
+npm run sync:dear-lover -- --from=1 --to=193 --publish
 ```
 
 For Windows Task Scheduler, run this command from the repo folder. Use a dedicated Windows user/profile if the sync should run unattended.
+
+The repository includes `scripts/run-dear-lover-sync.ps1` for Task Scheduler. It runs the headless full-catalog refresh and writes logs under `logs/`.
 
 ## Recovery
 

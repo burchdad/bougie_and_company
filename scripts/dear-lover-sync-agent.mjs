@@ -2,6 +2,7 @@
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import readline from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
@@ -34,6 +35,7 @@ function readEnvFile(path) {
 
 readEnvFile(resolve(projectRoot, ".env"));
 readEnvFile(resolve(projectRoot, ".env.local"));
+readEnvFile(resolve(projectRoot, ".env.dropship-sync.local"));
 
 function parseArgs(argv) {
   const args = {};
@@ -84,6 +86,7 @@ Flags:
   --markup-value=60     Publish markup percentage.
   --collection=...      Storefront collection handle.
   --headless            Run Edge headless after the profile has logged in once.
+  --login               Open Edge visibly and wait for you to complete Dear-Lover login.
   --resume              Recovery mode: skip pages already marked imported in the state file.
   --dry-run             Fetch pages but do not post to Bougie.
 `);
@@ -193,6 +196,7 @@ async function main() {
     markupValue: asNumber(args["markup-value"], 60),
     collection: String(args.collection || "dropshipping"),
     headless: asBoolean(args.headless, false),
+    login: asBoolean(args.login, false),
     resume: asBoolean(args.resume, false),
     dryRun: asBoolean(args["dry-run"], false),
     statePath: resolve(projectRoot, String(args["state-file"] || defaultStatePath)),
@@ -228,6 +232,12 @@ async function main() {
       waitUntil: "domcontentloaded",
       timeout: 60_000
     });
+
+    if (config.login) {
+      const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+      await rl.question("Complete Dear-Lover login in the opened Edge window, then press Enter here to test the catalog session.");
+      rl.close();
+    }
 
     console.log(`Dear-Lover sync agent starting pages ${config.from}-${config.to}.`);
     console.log(`Posting to ${config.bougieBaseUrl}${config.dryRun ? " (dry run)" : ""}.`);
