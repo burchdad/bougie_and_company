@@ -119,6 +119,7 @@ export function HeaderActions({ showSearch = true, showAccount = true, showCart 
   const subtotal = cartItems.reduce((sum, item) => sum + priceToNumber(item.price) * item.quantity, 0);
   const shippingAmount = shippingQuote?.ok ? shippingQuote.shippingAmount : 0;
   const cartTotal = subtotal + shippingAmount;
+  const containsDropshipItems = cartItems.some((item) => item.id?.startsWith("dropship:"));
 
   function removeItem(name: string) {
     setCartItems((current) => {
@@ -405,6 +406,11 @@ export function HeaderActions({ showSearch = true, showAccount = true, showCart 
                       </div>
                     ))}
                   </div>
+                  {containsDropshipItems ? (
+                    <div className="rounded-lg border border-saddle/20 bg-cream p-4 text-sm leading-6 text-espresso">
+                      Dropshipping items may ship separately from boutique inventory. The order will be saved for team review and supplier fulfillment after checkout.
+                    </div>
+                  ) : null}
                   <form className="rounded-lg border border-saddle/15 bg-white p-4" onSubmit={handleShippingSubmit}>
                     <p className="font-display text-2xl text-ink">Shipping</p>
                     <div className="mt-3 grid gap-3">

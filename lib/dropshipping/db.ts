@@ -854,10 +854,96 @@ export async function updateDropshipPublication(id: string, input: {
   return rows[0];
 }
 
-export async function getPublishedDropshipStoreProducts() {
+function mapPublishedDropshipStoreProduct(row: Record<string, unknown>) {
+  const retailPrice = calculateDropshipRetailPrice({
+    wholesalePrice: numberOrNull(row.wholesale_price),
+    shippingCost: numberOrNull(row.shipping_cost),
+    suggestedRetailPrice: numberOrNull(row.suggested_retail_price),
+    markupType: row.markup_type as MarkupType,
+    markupValue: numberOrNull(row.markup_value),
+    priceOverride: numberOrNull(row.price_override)
+  });
+  const title = row.title_override ? String(row.title_override) : String(row.title);
+  const variantLabel = [row.color, row.size || row.size_name || row.variant_title].map((item) => item ? String(item) : "").filter(Boolean).join(" / ");
+
+  return {
+    epos_product_id: `dropship:${row.supplier_key}:${row.supplier_variant_id}`,
+    name: title,
+    description: row.description ? String(row.description) : null,
+    sku: row.sku ? String(row.sku) : row.supplier_sku ? String(row.supplier_sku) : null,
+    barcode: row.barcode ? String(row.barcode) : null,
+    category_id: null,
+    sale_price: retailPrice.toFixed(2),
+    stock: String(row.is_in_stock ? Number(row.inventory_quantity || 0) : 0),
+    storefront_stock_override: null,
+    synced_at: new Date().toISOString(),
+    marketing_title: title,
+    marketing_description: row.description_override ? String(row.description_override) : null,
+    department: row.collection ? String(row.collection) : "dropshipping",
+    category_ids: [],
+    category_slugs: [
+      row.collection ? String(row.collection) : "dropshipping",
+      ...stringArray(row.category_names).map((category) => category.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""))
+    ].filter(Boolean),
+    has_explicit_categories: true,
+    is_featured: false,
+    is_hidden: false,
+    primary_image_url: row.image_url ? String(row.image_url) : null,
+    primary_image_alt: title,
+    is_dropship: true,
+    supplier_key: String(row.supplier_key),
+    supplier_product_id: String(row.supplier_product_id),
+    supplier_variant_id: String(row.supplier_variant_id),
+    dropship_variant_label: variantLabel || null,
+    dropship_warehouse_type: row.warehouse_type ? String(row.warehouse_type) : null
+  };
+}
+
+export async function getPublishedDropshipStoreProductPage(options: {
+  supplierKey?: string;
+  limit?: number;
+  offset?: number;
+  search?: string;
+  collection?: string;
+} = {}) {
   await ensureDropshippingTables();
   const sql = getSql();
   const tables = dropshipTables(sql);
+  const supplierKey = options.supplierKey?.trim() || "dear-lover";
+  const limit = Math.max(1, Math.min(96, Math.trunc(Number(options.limit || 48))));
+  const offset = Math.max(0, Math.trunc(Number(options.offset || 0)));
+  const search = options.search?.trim() || "";
+  const collection = options.collection?.trim() || "";
+
+  const parentRows = await sql`
+    SELECT
+      p.supplier_product_id,
+      p.title
+    FROM ${tables.published} d
+    JOIN ${tables.products} p ON p.supplier_key = d.supplier_key AND p.supplier_product_id = d.supplier_product_id
+    WHERE d.is_published = TRUE
+      AND p.supplier_key = ${supplierKey}
+      AND (${collection} = '' OR d.collection = ${collection})
+      AND (${search} = '' OR p.title ILIKE ${`%${search}%`} OR p.supplier_sku ILIKE ${`%${search}%`} OR p.supplier_product_id ILIKE ${`%${search}%`})
+    ORDER BY p.title ASC
+    LIMIT ${limit + 1}
+    OFFSET ${offset}
+  `;
+  const pageProductIds = parentRows.slice(0, limit).map((row) => String(row.supplier_product_id));
+
+  if (!pageProductIds.length) {
+    return {
+      products: [] as ReturnType<typeof mapPublishedDropshipStoreProduct>[],
+      pagination: {
+        limit,
+        offset,
+        returned: 0,
+        hasMore: false,
+        nextOffset: null as number | null
+      }
+    };
+  }
+
   const rows = await sql`
     SELECT
       p.supplier_key,
@@ -891,53 +977,27 @@ export async function getPublishedDropshipStoreProducts() {
     JOIN ${tables.products} p ON p.supplier_key = d.supplier_key AND p.supplier_product_id = d.supplier_product_id
     JOIN ${tables.variants} v ON v.supplier_key = p.supplier_key AND v.supplier_product_id = p.supplier_product_id
     WHERE d.is_published = TRUE
+      AND p.supplier_key = ${supplierKey}
+      AND p.supplier_product_id = ANY(${pageProductIds})
     ORDER BY p.title ASC, v.size_name ASC, v.title ASC
   `;
+  const hasMore = parentRows.length > limit;
 
-  return rows.map((row) => {
-    const retailPrice = calculateDropshipRetailPrice({
-      wholesalePrice: numberOrNull(row.wholesale_price),
-      shippingCost: numberOrNull(row.shipping_cost),
-      suggestedRetailPrice: numberOrNull(row.suggested_retail_price),
-      markupType: row.markup_type as MarkupType,
-      markupValue: numberOrNull(row.markup_value),
-      priceOverride: numberOrNull(row.price_override)
-    });
-    const title = row.title_override ? String(row.title_override) : String(row.title);
-    const variantLabel = [row.color, row.size || row.size_name || row.variant_title].map((item) => item ? String(item) : "").filter(Boolean).join(" / ");
+  return {
+    products: rows.map((row) => mapPublishedDropshipStoreProduct(row)),
+    pagination: {
+      limit,
+      offset,
+      returned: pageProductIds.length,
+      hasMore,
+      nextOffset: hasMore ? offset + limit : null
+    }
+  };
+}
 
-    return {
-      epos_product_id: `dropship:${row.supplier_key}:${row.supplier_variant_id}`,
-      name: title,
-      description: row.description ? String(row.description) : null,
-      sku: row.sku ? String(row.sku) : row.supplier_sku ? String(row.supplier_sku) : null,
-      barcode: row.barcode ? String(row.barcode) : null,
-      category_id: null,
-      sale_price: retailPrice.toFixed(2),
-      stock: String(row.is_in_stock ? Number(row.inventory_quantity || 0) : 0),
-      storefront_stock_override: null,
-      synced_at: new Date().toISOString(),
-      marketing_title: title,
-      marketing_description: row.description_override ? String(row.description_override) : null,
-      department: row.collection ? String(row.collection) : "dropshipping",
-      category_ids: [],
-      category_slugs: [
-        row.collection ? String(row.collection) : "dropshipping",
-        ...stringArray(row.category_names).map((category) => category.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""))
-      ].filter(Boolean),
-      has_explicit_categories: true,
-      is_featured: false,
-      is_hidden: false,
-      primary_image_url: row.image_url ? String(row.image_url) : null,
-      primary_image_alt: title,
-      is_dropship: true,
-      supplier_key: String(row.supplier_key),
-      supplier_product_id: String(row.supplier_product_id),
-      supplier_variant_id: String(row.supplier_variant_id),
-      dropship_variant_label: variantLabel || null,
-      dropship_warehouse_type: row.warehouse_type ? String(row.warehouse_type) : null
-    };
-  });
+export async function getPublishedDropshipStoreProducts() {
+  const page = await getPublishedDropshipStoreProductPage({ limit: 96, offset: 0 });
+  return page.products;
 }
 
 export type DropshipCheckoutProduct = {

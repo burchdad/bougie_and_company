@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { ShoppingBag, Sparkles, X } from "lucide-react";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { readFormResponse } from "@/lib/form-response";
 import { departmentTitle, inferDepartment } from "@/lib/product-categorization";
 
@@ -37,6 +37,12 @@ type ProductResponse = {
   ok: boolean;
   products?: Product[];
   message?: string;
+  meta?: {
+    dropship?: {
+      hasMore: boolean;
+      nextOffset: number | null;
+    } | null;
+  };
 };
 
 type ProductGroup = {
@@ -919,6 +925,10 @@ export function ShopProducts() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [visibleGroupCount, setVisibleGroupCount] = useState(groupsPerPage);
+  const [dropshipLoading, setDropshipLoading] = useState(false);
+  const [dropshipMessage, setDropshipMessage] = useState("");
+  const [dropshipHasMore, setDropshipHasMore] = useState(true);
+  const [dropshipNextOffset, setDropshipNextOffset] = useState(0);
 
   useEffect(() => {
     let ignore = false;
@@ -928,7 +938,7 @@ export function ShopProducts() {
       setMessage("");
 
       try {
-        const response = await fetch("/api/products", { cache: "no-store" });
+        const response = await fetch("/api/products?includeDropship=false&limit=1000", { cache: "no-store" });
         const result = (await response.json()) as ProductResponse;
 
         if (!response.ok || !result.ok) {
@@ -955,6 +965,37 @@ export function ShopProducts() {
       ignore = true;
     };
   }, []);
+
+  const loadDropshipProducts = useCallback(async (offset = dropshipNextOffset) => {
+    setDropshipLoading(true);
+    setDropshipMessage("");
+
+    try {
+      const response = await fetch(`/api/products?includeNative=false&includeDropship=true&dropshipCollection=dropshipping&dropshipLimit=${groupsPerPage}&dropshipOffset=${offset}`, {
+        cache: "no-store"
+      });
+      const result = (await response.json()) as ProductResponse;
+
+      if (!response.ok || !result.ok) {
+        setDropshipMessage(result.message || "Dropshipping products are still loading. Please try again shortly.");
+        return;
+      }
+
+      setProducts((current) => {
+        const byId = new Map(current.map((product) => [product.epos_product_id, product]));
+        (result.products || []).forEach((product) => {
+          byId.set(product.epos_product_id, product);
+        });
+        return [...byId.values()];
+      });
+      setDropshipHasMore(Boolean(result.meta?.dropship?.hasMore));
+      setDropshipNextOffset(result.meta?.dropship?.nextOffset ?? offset + groupsPerPage);
+    } catch {
+      setDropshipMessage("We could not load more dropshipping products right now. Please try again shortly.");
+    } finally {
+      setDropshipLoading(false);
+    }
+  }, [dropshipNextOffset]);
 
   useEffect(() => {
     function applyHash() {
@@ -988,6 +1029,14 @@ export function ShopProducts() {
     };
   }, []);
 
+  const hasLoadedDropshipProducts = useMemo(() => products.some((product) => product.is_dropship), [products]);
+
+  useEffect(() => {
+    if (activeDepartment === "dropshipping" && !hasLoadedDropshipProducts && !dropshipLoading) {
+      loadDropshipProducts(0);
+    }
+  }, [activeDepartment, dropshipLoading, hasLoadedDropshipProducts, loadDropshipProducts]);
+
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
       return productMatchesFilter(product, activeDepartment);
@@ -997,6 +1046,8 @@ export function ShopProducts() {
   const filteredGroups = useMemo(() => groupProducts(filteredProducts), [filteredProducts]);
   const visibleGroups = useMemo(() => filteredGroups.slice(0, visibleGroupCount), [filteredGroups, visibleGroupCount]);
   const isGiftBasketCategory = activeDepartment === "gift-basket" || activeDepartment === "gift-baskets";
+  const canLoadLocalGroups = visibleGroups.length < filteredGroups.length;
+  const canLoadDropshipGroups = activeDepartment === "dropshipping" && dropshipHasMore;
 
   function addToCart(product: Product, option?: string) {
     if (!isPurchasableProduct(product) || isFarmEggProduct(product)) {
@@ -1055,8 +1106,11 @@ export function ShopProducts() {
         {message ? (
           <div className="mt-5 rounded-lg border border-ember/20 bg-ember/10 p-5 text-sm font-semibold text-ember">{message}</div>
         ) : null}
+        {dropshipMessage ? (
+          <div className="mt-5 rounded-lg border border-ember/20 bg-ember/10 p-5 text-sm font-semibold text-ember">{dropshipMessage}</div>
+        ) : null}
 
-        {loading ? (
+        {loading || (dropshipLoading && !filteredGroups.length) ? (
           <div className="mt-5 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
             {Array.from({ length: 6 }).map((_, index) => (
               <div className="h-72 animate-pulse rounded-lg bg-white/80 shadow-sm" key={index} />
@@ -1064,7 +1118,7 @@ export function ShopProducts() {
           </div>
         ) : null}
 
-        {!loading && !filteredGroups.length && !message ? (
+        {!loading && !dropshipLoading && !filteredGroups.length && !message && !dropshipMessage ? (
           <div className="mt-5 rounded-lg border border-dashed border-saddle/25 bg-white p-8 text-center">
             <Sparkles className="mx-auto h-8 w-8 text-saddle" />
             <p className="mt-3 font-display text-3xl text-ink">{isGiftBasketCategory ? "Build your own gift basket." : "No products found here yet."}</p>
@@ -1239,17 +1293,25 @@ export function ShopProducts() {
               );
             })}
             </div>
-            {visibleGroups.length < filteredGroups.length ? (
+            {canLoadLocalGroups || canLoadDropshipGroups ? (
               <div className="mt-8 text-center">
                 <button
                   className="focus-ring rounded-md border border-saddle/25 bg-white px-6 py-4 text-sm font-bold uppercase tracking-[0.18em] text-espresso hover:bg-cream"
-                  onClick={() => setVisibleGroupCount((current) => current + groupsPerPage)}
+                  disabled={dropshipLoading}
+                  onClick={() => {
+                    if (canLoadLocalGroups) {
+                      setVisibleGroupCount((current) => current + groupsPerPage);
+                      return;
+                    }
+
+                    loadDropshipProducts();
+                  }}
                   type="button"
                 >
-                  Load More
+                  {dropshipLoading ? "Loading..." : "Load More"}
                 </button>
                 <p className="mt-3 text-sm text-espresso/65">
-                  Showing {visibleGroups.length} of {filteredGroups.length} styles.
+                  Showing {visibleGroups.length} loaded style{visibleGroups.length === 1 ? "" : "s"}.
                 </p>
               </div>
             ) : null}

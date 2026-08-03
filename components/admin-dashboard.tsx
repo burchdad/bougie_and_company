@@ -521,6 +521,20 @@ export function AdminDashboard({ dropshippingEnabled = false }: { dropshippingEn
 
     return { featured, hidden, withPhotos };
   }, [products]);
+  const dropshipFulfillmentStats = useMemo(() => {
+    const ready = dropshipFulfillments.filter((item) => item.status === "ready_for_supplier_order").length;
+    const processing = dropshipFulfillments.filter((item) => ["supplier_order_submitted", "supplier_processing"].includes(item.status)).length;
+    const shipped = dropshipFulfillments.filter((item) => ["shipped", "delivered"].includes(item.status)).length;
+    const needsAttention = dropshipFulfillments.filter((item) => ["failed", "SUPPLIER_INVENTORY_CHANGED"].includes(item.status)).length;
+
+    return {
+      total: dropshipFulfillments.length,
+      ready,
+      processing,
+      shipped,
+      needsAttention
+    };
+  }, [dropshipFulfillments]);
   const visibleAdminTabs = useMemo(() => adminTabs.filter((tab) => dropshippingEnabled || tab.id !== "dropshipping"), [dropshippingEnabled]);
 
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
@@ -1730,6 +1744,22 @@ export function AdminDashboard({ dropshippingEnabled = false }: { dropshippingEn
                         </button>
                       </div>
                       <div className="mt-5 grid gap-4">
+                        {dropshipFulfillments.length ? (
+                          <div className="grid gap-3 md:grid-cols-5">
+                            {[
+                              ["Queue", dropshipFulfillmentStats.total],
+                              ["Ready", dropshipFulfillmentStats.ready],
+                              ["Processing", dropshipFulfillmentStats.processing],
+                              ["Shipped", dropshipFulfillmentStats.shipped],
+                              ["Needs Review", dropshipFulfillmentStats.needsAttention]
+                            ].map(([label, value]) => (
+                              <div className="rounded-md border border-champagne/15 bg-ivory/5 p-3" key={label}>
+                                <p className="text-xs font-bold uppercase tracking-[0.16em] text-champagne">{label}</p>
+                                <p className="mt-1 font-display text-3xl text-ivory">{value}</p>
+                              </div>
+                            ))}
+                          </div>
+                        ) : null}
                         {!dropshipFulfillments.length ? (
                           <div className="rounded-lg border border-dashed border-champagne/25 bg-ink/50 p-6 text-center text-sm text-ivory/60">No dropship fulfillment records yet.</div>
                         ) : null}

@@ -1,6 +1,6 @@
 import { getAdminProducts } from "@/lib/admin-products";
 import { isDropshippingEnabled } from "@/lib/dropshipping/config";
-import { getPublishedDropshipStoreProducts } from "@/lib/dropshipping/db";
+import { getPublishedDropshipStoreProductPage } from "@/lib/dropshipping/db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,6 +42,15 @@ function booleanParam(value: string | null, fallback: boolean) {
   return ["1", "true", "yes", "on"].includes(value.toLowerCase());
 }
 
+function numberParam(value: string | null, fallback: number, min: number, max: number) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+
+  return Math.max(min, Math.min(max, Math.trunc(parsed)));
+}
+
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -50,11 +59,19 @@ export async function GET(request: Request) {
     const includeDropship = booleanParam(searchParams.get("includeDropship"), true);
     const requestedLimit = Number(searchParams.get("limit") || 1000);
     const rows = includeNative ? await getAdminProducts(query, Number.isFinite(requestedLimit) ? requestedLimit : 1000) as ProductRow[] : [];
-    let dropshipProducts: Awaited<ReturnType<typeof getPublishedDropshipStoreProducts>> = [];
+    let dropshipProducts: Awaited<ReturnType<typeof getPublishedDropshipStoreProductPage>>["products"] = [];
+    let dropshipPagination: Awaited<ReturnType<typeof getPublishedDropshipStoreProductPage>>["pagination"] | null = null;
 
     if (includeDropship && isDropshippingEnabled()) {
       try {
-        dropshipProducts = await getPublishedDropshipStoreProducts();
+        const dropshipPage = await getPublishedDropshipStoreProductPage({
+          limit: numberParam(searchParams.get("dropshipLimit"), 48, 1, 96),
+          offset: numberParam(searchParams.get("dropshipOffset"), 0, 0, 100000),
+          search: query,
+          collection: searchParams.get("dropshipCollection")?.trim() || ""
+        });
+        dropshipProducts = dropshipPage.products;
+        dropshipPagination = dropshipPage.pagination;
       } catch (error) {
         console.error(error instanceof Error ? `Dropship products unavailable: ${error.message}` : "Dropship products unavailable.");
       }
@@ -66,7 +83,13 @@ export async function GET(request: Request) {
         stock: String(getDisplayStock(product))
       }));
 
-    return Response.json({ ok: true, products: [...products, ...dropshipProducts] }, { headers: { "Cache-Control": "no-store" } });
+    return Response.json({
+      ok: true,
+      products: [...products, ...dropshipProducts],
+      meta: {
+        dropship: dropshipPagination
+      }
+    }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Product catalog is not available yet.";
     console.error(message);
