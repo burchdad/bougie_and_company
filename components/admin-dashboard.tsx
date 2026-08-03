@@ -109,6 +109,22 @@ type DropshipFulfillmentRecord = {
   updated_at: string;
 };
 
+type DropshipOrderPacket = {
+  orderNumber: string;
+  customerName: string;
+  customerEmail: string;
+  shippingAddress: string;
+  items: DropshipFulfillmentRecord[];
+  statuses: string[];
+  customerTotal: number;
+  supplierProductTotal: number;
+  supplierShippingTotal: number;
+  estimatedSupplierTotal: number;
+  estimatedProfit: number;
+  readyCount: number;
+  needsAttention: boolean;
+};
+
 type DropshipProduct = {
   id: string;
   supplier_key: string;
@@ -170,6 +186,146 @@ type AdminTab = (typeof adminTabs)[number]["id"];
 function money(value: string | null) {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? `$${parsed.toFixed(2)}` : "No price";
+}
+
+function moneyNumber(value: string | number | null | undefined) {
+  const parsed = Number(value || 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function formatCurrency(value: number) {
+  return `$${value.toFixed(2)}`;
+}
+
+function humanStatus(status: string) {
+  if (status === "SUPPLIER_INVENTORY_CHANGED") {
+    return "Supplier inventory changed";
+  }
+
+  return status
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function csvValue(value: string | number | null | undefined) {
+  return `"${String(value ?? "").replace(/"/g, '""')}"`;
+}
+
+function groupDropshipFulfillments(fulfillments: DropshipFulfillmentRecord[]) {
+  const packets = new Map<string, DropshipOrderPacket>();
+
+  for (const item of fulfillments) {
+    const existing = packets.get(item.order_number);
+    const packet =
+      existing ||
+      ({
+        orderNumber: item.order_number,
+        customerName: item.customer_name,
+        customerEmail: item.customer_email,
+        shippingAddress: item.shipping_address,
+        items: [],
+        statuses: [],
+        customerTotal: 0,
+        supplierProductTotal: 0,
+        supplierShippingTotal: 0,
+        estimatedSupplierTotal: 0,
+        estimatedProfit: 0,
+        readyCount: 0,
+        needsAttention: false
+      } satisfies DropshipOrderPacket);
+
+    const quantity = Number(item.quantity || 1);
+    packet.items.push(item);
+    packet.customerTotal += moneyNumber(item.customer_paid_amount);
+    packet.supplierProductTotal += moneyNumber(item.supplier_cost) * quantity;
+    packet.supplierShippingTotal += moneyNumber(item.estimated_supplier_shipping) * quantity;
+    packet.statuses = Array.from(new Set([...packet.statuses, item.status]));
+    packet.readyCount += item.status === "ready_for_supplier_order" ? 1 : 0;
+    packet.needsAttention = packet.needsAttention || ["failed", "SUPPLIER_INVENTORY_CHANGED"].includes(item.status);
+    packet.estimatedSupplierTotal = packet.supplierProductTotal + packet.supplierShippingTotal;
+    packet.estimatedProfit = packet.customerTotal - packet.estimatedSupplierTotal;
+
+    packets.set(item.order_number, packet);
+  }
+
+  return Array.from(packets.values()).sort((a, b) => Math.max(...b.items.map((item) => Date.parse(item.created_at))) - Math.max(...a.items.map((item) => Date.parse(item.created_at))));
+}
+
+function buildDropshipSupplierPacket(packet: DropshipOrderPacket) {
+  const lines = [
+    "Dear-Lover dropship order",
+    `Bougie order: ${packet.orderNumber}`,
+    `Customer: ${packet.customerName}`,
+    `Email: ${packet.customerEmail}`,
+    `Ship to: ${packet.shippingAddress}`,
+    "",
+    "Items:"
+  ];
+
+  for (const item of packet.items) {
+    const quantity = Number(item.quantity || 1);
+    lines.push(
+      `- ${item.product_title}`,
+      `  Variant: ${item.variant_title || "Default variant"}`,
+      `  Quantity: ${quantity}`,
+      `  SKU: ${item.supplier_sku || "n/a"}`,
+      `  Supplier product ID: ${item.supplier_product_id}`,
+      `  Supplier variant ID: ${item.supplier_variant_id}`,
+      `  Supplier cost estimate: ${formatCurrency(moneyNumber(item.supplier_cost) * quantity)}`,
+      `  Supplier shipping estimate: ${formatCurrency(moneyNumber(item.estimated_supplier_shipping) * quantity)}`
+    );
+  }
+
+  lines.push(
+    "",
+    `Customer paid: ${formatCurrency(packet.customerTotal)}`,
+    `Estimated supplier total: ${formatCurrency(packet.estimatedSupplierTotal)}`,
+    `Estimated profit before payment fees: ${formatCurrency(packet.estimatedProfit)}`,
+    "",
+    "After placing the supplier order, paste the Dear-Lover order ID/reference back into Bougie admin."
+  );
+
+  return lines.join("\n");
+}
+
+function buildDropshipSupplierCsv(packet: DropshipOrderPacket) {
+  const header = [
+    "Bougie Order",
+    "Customer",
+    "Customer Email",
+    "Ship To",
+    "Product",
+    "Variant",
+    "Quantity",
+    "Supplier SKU",
+    "Supplier Product ID",
+    "Supplier Variant ID",
+    "Customer Paid",
+    "Supplier Cost Est",
+    "Supplier Shipping Est",
+    "Status"
+  ];
+  const rows = packet.items.map((item) => {
+    const quantity = Number(item.quantity || 1);
+    return [
+      packet.orderNumber,
+      packet.customerName,
+      packet.customerEmail,
+      packet.shippingAddress,
+      item.product_title,
+      item.variant_title || "Default variant",
+      quantity,
+      item.supplier_sku || "",
+      item.supplier_product_id,
+      item.supplier_variant_id,
+      formatCurrency(moneyNumber(item.customer_paid_amount)),
+      formatCurrency(moneyNumber(item.supplier_cost) * quantity),
+      formatCurrency(moneyNumber(item.estimated_supplier_shipping) * quantity),
+      humanStatus(item.status)
+    ];
+  });
+
+  return [header, ...rows].map((row) => row.map(csvValue).join(",")).join("\n");
 }
 
 function adminStockValue(product: AdminProduct | null | undefined) {
@@ -279,6 +435,8 @@ export function AdminDashboard({ dropshippingEnabled = false }: { dropshippingEn
   const [savingShipping, setSavingShipping] = useState(false);
   const [retryingOrderId, setRetryingOrderId] = useState<number | null>(null);
   const [savingFulfillmentId, setSavingFulfillmentId] = useState<number | null>(null);
+  const [bulkSavingFulfillmentOrder, setBulkSavingFulfillmentOrder] = useState<string | null>(null);
+  const [copiedDropshipOrder, setCopiedDropshipOrder] = useState<string | null>(null);
   const [message, setMessage] = useState("");
 
   useEffect(() => {
@@ -294,6 +452,7 @@ export function AdminDashboard({ dropshippingEnabled = false }: { dropshippingEn
   const selectedCategory = useMemo(() => categories.find((category) => category.id === editingCategoryId) || null, [categories, editingCategoryId]);
   const selectedDiscount = useMemo(() => discounts.find((discount) => discount.id === editingDiscountId) || null, [discounts, editingDiscountId]);
   const productCategoryOptions = useMemo(() => categories.map((category) => ({ ...category, depth: categoryDepth(category, categories) })), [categories]);
+  const dropshipOrderPackets = useMemo(() => groupDropshipFulfillments(dropshipFulfillments), [dropshipFulfillments]);
 
   async function loadProducts(searchTerm = query) {
     setLoading(true);
@@ -463,6 +622,114 @@ export function AdminDashboard({ dropshippingEnabled = false }: { dropshippingEn
     } finally {
       setSavingFulfillmentId(null);
     }
+  }
+
+  async function updateFulfillmentStatus(fulfillment: DropshipFulfillmentRecord, status: string) {
+    setSavingFulfillmentId(fulfillment.id);
+    setMessage("");
+
+    try {
+      const response = await fetch("/api/admin/dropshipping/fulfillment?limit=200", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(adminKey ? { "x-admin-key": adminKey } : {})
+        },
+        body: JSON.stringify({
+          id: fulfillment.id,
+          status,
+          supplierOrderId: fulfillment.supplier_order_id || "",
+          supplierOrderReference: fulfillment.supplier_order_reference || "",
+          fulfillmentNotes: fulfillment.fulfillment_notes || "",
+          trackingNumber: fulfillment.tracking_number || "",
+          trackingCarrier: fulfillment.tracking_carrier || ""
+        })
+      });
+      const result = (await response.json()) as { ok: boolean; message?: string };
+
+      if (!response.ok || !result.ok) {
+        setMessage(result.message || "Could not update dropship fulfillment.");
+        return;
+      }
+
+      setMessage(`Marked ${fulfillment.order_number} as ${humanStatus(status)}.`);
+      await loadDropshipFulfillments();
+      await loadOrders();
+    } catch {
+      setMessage("Could not connect to the dropship fulfillment backend.");
+    } finally {
+      setSavingFulfillmentId(null);
+    }
+  }
+
+  async function markPacketReadyItemsSubmitted(packet: DropshipOrderPacket) {
+    const readyItems = packet.items.filter((item) => item.status === "ready_for_supplier_order");
+
+    if (!readyItems.length) {
+      setMessage(`${packet.orderNumber} has no ready items to mark submitted.`);
+      return;
+    }
+
+    setBulkSavingFulfillmentOrder(packet.orderNumber);
+    setMessage("");
+
+    try {
+      for (const fulfillment of readyItems) {
+        const response = await fetch("/api/admin/dropshipping/fulfillment", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(adminKey ? { "x-admin-key": adminKey } : {})
+          },
+          body: JSON.stringify({
+            id: fulfillment.id,
+            status: "supplier_order_submitted",
+            supplierOrderId: fulfillment.supplier_order_id || "",
+            supplierOrderReference: fulfillment.supplier_order_reference || "",
+            fulfillmentNotes: fulfillment.fulfillment_notes || "",
+            trackingNumber: fulfillment.tracking_number || "",
+            trackingCarrier: fulfillment.tracking_carrier || ""
+          })
+        });
+        const result = (await response.json()) as { ok: boolean; message?: string };
+
+        if (!response.ok || !result.ok) {
+          setMessage(result.message || `Could not update ${packet.orderNumber}.`);
+          return;
+        }
+      }
+
+      setMessage(`Marked ${readyItems.length} item(s) submitted for ${packet.orderNumber}.`);
+      await loadDropshipFulfillments();
+      await loadOrders();
+    } catch {
+      setMessage("Could not connect to the dropship fulfillment backend.");
+    } finally {
+      setBulkSavingFulfillmentOrder(null);
+    }
+  }
+
+  async function copyDropshipPacket(packet: DropshipOrderPacket) {
+    try {
+      await navigator.clipboard.writeText(buildDropshipSupplierPacket(packet));
+      setCopiedDropshipOrder(packet.orderNumber);
+      setMessage(`Supplier packet copied for ${packet.orderNumber}.`);
+    } catch {
+      setMessage("Clipboard access was blocked. Use Download CSV instead.");
+    }
+  }
+
+  function downloadDropshipPacket(packet: DropshipOrderPacket) {
+    const blob = new Blob([buildDropshipSupplierCsv(packet)], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${packet.orderNumber.toLowerCase()}-dear-lover-order.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    setMessage(`Downloaded supplier CSV for ${packet.orderNumber}.`);
   }
 
   async function retryOrderSync(orderId: number) {
@@ -1737,7 +2004,7 @@ export function AdminDashboard({ dropshippingEnabled = false }: { dropshippingEn
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
                           <p className="text-xs font-bold uppercase tracking-[0.22em] text-champagne">Dropship Fulfillment</p>
-                          <h3 className="mt-2 font-display text-3xl">Manual Dear-Lover Queue</h3>
+                          <h3 className="mt-2 font-display text-3xl">Dear-Lover Order Desk</h3>
                         </div>
                         <button className="focus-ring rounded-md border border-champagne/40 px-4 py-3 text-xs font-bold uppercase tracking-[0.16em] text-champagne hover:bg-champagne hover:text-ink" onClick={loadDropshipFulfillments} type="button">
                           Refresh Queue
@@ -1758,6 +2025,78 @@ export function AdminDashboard({ dropshippingEnabled = false }: { dropshippingEn
                                 <p className="mt-1 font-display text-3xl text-ivory">{value}</p>
                               </div>
                             ))}
+                          </div>
+                        ) : null}
+                        {dropshipOrderPackets.length ? (
+                          <div className="grid gap-4">
+                            {dropshipOrderPackets.map((packet) => (
+                              <article className="rounded-lg border border-champagne/25 bg-ink/50 p-4" key={packet.orderNumber}>
+                                <div className="flex flex-wrap items-start justify-between gap-4">
+                                  <div>
+                                    <p className="text-xs font-bold uppercase tracking-[0.22em] text-champagne">Supplier Packet</p>
+                                    <h4 className="mt-2 font-display text-3xl">{packet.orderNumber}</h4>
+                                    <p className="mt-2 text-sm text-ivory/70">{packet.customerName} / {packet.customerEmail}</p>
+                                    <p className="mt-1 text-sm text-ivory/55">{packet.shippingAddress}</p>
+                                  </div>
+                                  <div className="flex flex-wrap gap-2">
+                                    <button className="focus-ring rounded-md bg-champagne px-4 py-3 text-xs font-bold uppercase tracking-[0.16em] text-ink hover:bg-ivory" onClick={() => copyDropshipPacket(packet)} type="button">
+                                      {copiedDropshipOrder === packet.orderNumber ? "Copied" : "Copy Packet"}
+                                    </button>
+                                    <button className="focus-ring rounded-md border border-champagne/40 px-4 py-3 text-xs font-bold uppercase tracking-[0.16em] text-champagne hover:bg-champagne hover:text-ink" onClick={() => downloadDropshipPacket(packet)} type="button">
+                                      Download CSV
+                                    </button>
+                                    <button
+                                      className="focus-ring rounded-md border border-champagne/40 px-4 py-3 text-xs font-bold uppercase tracking-[0.16em] text-champagne hover:bg-champagne hover:text-ink disabled:cursor-wait disabled:opacity-60"
+                                      disabled={!packet.readyCount || bulkSavingFulfillmentOrder === packet.orderNumber}
+                                      onClick={() => markPacketReadyItemsSubmitted(packet)}
+                                      type="button"
+                                    >
+                                      {bulkSavingFulfillmentOrder === packet.orderNumber ? "Updating" : "Mark Ready Submitted"}
+                                    </button>
+                                  </div>
+                                </div>
+                                <div className="mt-4 grid gap-3 md:grid-cols-5">
+                                  {[
+                                    ["Items", packet.items.length],
+                                    ["Customer", formatCurrency(packet.customerTotal)],
+                                    ["Supplier Est.", formatCurrency(packet.estimatedSupplierTotal)],
+                                    ["Profit Est.", formatCurrency(packet.estimatedProfit)],
+                                    ["Status", packet.needsAttention ? "Needs Review" : packet.statuses.map(humanStatus).join(", ")]
+                                  ].map(([label, value]) => (
+                                    <div className="rounded-md border border-champagne/15 bg-ivory/5 p-3" key={label}>
+                                      <p className="text-[0.65rem] font-bold uppercase tracking-[0.16em] text-champagne">{label}</p>
+                                      <p className="mt-1 text-sm font-semibold text-ivory">{value}</p>
+                                    </div>
+                                  ))}
+                                </div>
+                                <div className="mt-4 overflow-x-auto rounded-md border border-champagne/15">
+                                  <div className="grid min-w-[42rem] grid-cols-[1fr_5rem_8rem_8rem] gap-3 bg-ivory/5 px-3 py-2 text-[0.65rem] font-bold uppercase tracking-[0.14em] text-champagne">
+                                    <span>Item</span>
+                                    <span>Qty</span>
+                                    <span>Supplier</span>
+                                    <span>Status</span>
+                                  </div>
+                                  {packet.items.map((item) => {
+                                    const quantity = Number(item.quantity || 1);
+                                    return (
+                                      <div className="grid min-w-[42rem] grid-cols-[1fr_5rem_8rem_8rem] gap-3 border-t border-champagne/10 px-3 py-3 text-sm text-ivory/75" key={item.id}>
+                                        <div>
+                                          <p className="font-semibold text-ivory">{item.product_title}</p>
+                                          <p className="mt-1 text-xs text-ivory/55">{item.variant_title || "Default variant"} / SKU {item.supplier_sku || "n/a"}</p>
+                                        </div>
+                                        <span>{quantity}</span>
+                                        <span>{formatCurrency(moneyNumber(item.supplier_cost) * quantity)}</span>
+                                        <span>{humanStatus(item.status)}</span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </article>
+                            ))}
+                            <div className="pt-2">
+                              <p className="text-xs font-bold uppercase tracking-[0.22em] text-champagne">Line Item Controls</p>
+                              <p className="mt-1 text-sm text-ivory/60">Use these when a supplier item needs its own reference, tracking number, or exception status.</p>
+                            </div>
                           </div>
                         ) : null}
                         {!dropshipFulfillments.length ? (
@@ -1784,6 +2123,23 @@ export function AdminDashboard({ dropshippingEnabled = false }: { dropshippingEn
                                     <span className="text-champagne">Est. supplier ship ${Number(fulfillment.estimated_supplier_shipping).toFixed(2)}</span>
                                     <span className="text-ivory/60">SKU {fulfillment.supplier_sku || "n/a"}</span>
                                   </div>
+                                </div>
+                                <div className="mt-4 flex flex-wrap gap-2">
+                                  {[
+                                    ["supplier_order_submitted", "Mark Submitted"],
+                                    ["supplier_processing", "Mark Processing"],
+                                    ["failed", "Needs Review"]
+                                  ].map(([status, label]) => (
+                                    <button
+                                      className="focus-ring rounded-md border border-champagne/35 px-3 py-2 text-[0.65rem] font-bold uppercase tracking-[0.14em] text-champagne hover:bg-champagne hover:text-ink disabled:cursor-wait disabled:opacity-60"
+                                      disabled={savingFulfillmentId === fulfillment.id || fulfillment.status === status}
+                                      key={status}
+                                      onClick={() => updateFulfillmentStatus(fulfillment, status)}
+                                      type="button"
+                                    >
+                                      {label}
+                                    </button>
+                                  ))}
                                 </div>
                                 <form className="mt-4 grid gap-3 rounded-md border border-champagne/15 bg-ivory/5 p-3 md:grid-cols-3" onSubmit={(event) => handleFulfillmentSubmit(event, fulfillment.id)}>
                                   <label className="grid gap-1 text-xs font-bold uppercase tracking-[0.14em] text-champagne">
