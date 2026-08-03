@@ -106,10 +106,19 @@ test("Dear-Lover categories map into storefront apparel sections", () => {
     }).filter((slug) => ["womens-collection", "clothing", "bottoms", "pants"].includes(slug)).sort(),
     ["bottoms", "clothing", "pants", "womens-collection"]
   );
+
+  assert.deepEqual(
+    inferDropshipCategorySlugs({
+      title: "Western Buckle Detail Tall Boots",
+      categoryNames: ["Shoes & Bags", "Women Shoes"]
+    }).filter((slug) => ["womens-collection", "womens-footwear", "footwear", "accessories"].includes(slug)).sort(),
+    ["accessories", "footwear", "womens-collection", "womens-footwear"]
+  );
 });
 
 test("dropship category search terms only exist for supported storefront sections", () => {
   assert.ok(getDropshipCategorySearchTerms("tops").includes("blouse"));
+  assert.ok(getDropshipCategorySearchTerms("womens-footwear").includes("boots"));
   assert.equal(getDropshipCategorySearchTerms("soaps").length, 0);
 });
 

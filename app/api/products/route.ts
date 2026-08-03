@@ -34,6 +34,10 @@ function getDisplayStock(product: ProductRow) {
   return eposStock > 0 ? eposStock : storefrontOverride;
 }
 
+function hasDisplayStock(product: ProductRow) {
+  return getDisplayStock(product) > 0;
+}
+
 function booleanParam(value: string | null, fallback: boolean) {
   if (value === null) {
     return fallback;
@@ -57,6 +61,7 @@ export async function GET(request: Request) {
     const query = searchParams.get("q")?.trim() || "";
     const includeNative = booleanParam(searchParams.get("includeNative"), true);
     const includeDropship = booleanParam(searchParams.get("includeDropship"), true);
+    const includeOutOfStock = booleanParam(searchParams.get("includeOutOfStock"), false);
     const requestedLimit = Number(searchParams.get("limit") || 1000);
     const rows = includeNative ? await getAdminProducts(query, Number.isFinite(requestedLimit) ? requestedLimit : 1000) as ProductRow[] : [];
     let dropshipProducts: Awaited<ReturnType<typeof getPublishedDropshipStoreProductPage>>["products"] = [];
@@ -71,7 +76,7 @@ export async function GET(request: Request) {
           collection: searchParams.get("dropshipCollection")?.trim() || "",
           category: searchParams.get("dropshipCategory")?.trim() || ""
         });
-        dropshipProducts = dropshipPage.products;
+        dropshipProducts = includeOutOfStock ? dropshipPage.products : dropshipPage.products.filter((product) => Number(product.stock || 0) > 0);
         dropshipPagination = dropshipPage.pagination;
       } catch (error) {
         console.error(error instanceof Error ? `Dropship products unavailable: ${error.message}` : "Dropship products unavailable.");
@@ -79,6 +84,7 @@ export async function GET(request: Request) {
     }
     const products = rows
       .filter((product) => !product.is_hidden)
+      .filter((product) => includeOutOfStock || hasDisplayStock(product))
       .map((product) => ({
         ...product,
         stock: String(getDisplayStock(product))

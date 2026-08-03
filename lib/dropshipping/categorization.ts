@@ -36,7 +36,17 @@ export function inferDropshipCategorySlugs(input: { title?: string | null; categ
     "short",
     "skirt",
     "legging",
-    "swim"
+    "swim",
+    "shoe",
+    "shoes",
+    "sandal",
+    "sandals",
+    "boot",
+    "boots",
+    "heel",
+    "heels",
+    "slipper",
+    "slippers"
   ]);
 
   if (looksLikeApparel) {
@@ -66,8 +76,13 @@ export function inferDropshipCategorySlugs(input: { title?: string | null; categ
     slugs.add("pants");
   }
 
-  if (hasAny(text, ["purse", "bag", "handbag", "tote", "wallet", "shoe", "shoes", "sandal", "boot", "hat", "cap"])) {
+  if (hasAny(text, ["purse", "bag", "handbag", "tote", "wallet", "shoe", "shoes", "sandal", "sandals", "boot", "boots", "heel", "heels", "slipper", "slippers", "hat", "cap"])) {
     slugs.add("accessories");
+  }
+
+  if (hasAny(text, ["shoe", "shoes", "sandal", "sandals", "boot", "boots", "heel", "heels", "slipper", "slippers", "footwear"])) {
+    slugs.add("womens-footwear");
+    slugs.add("footwear");
   }
 
   if (hasAny(text, ["purse", "bag", "handbag", "tote", "wallet"])) {
@@ -91,7 +106,7 @@ export function inferDropshipCategorySlugs(input: { title?: string | null; categ
     slugs.add("fashion-earrings");
   }
 
-  const priority = ["womens-collection", "clothing", "tops", "bottoms", "pants", "dresses", "cardigans", "rompers-jumpsuits", "accessories", "purses", "jewelry-headbands"];
+  const priority = ["womens-collection", "clothing", "tops", "bottoms", "pants", "dresses", "cardigans", "rompers-jumpsuits", "womens-footwear", "footwear", "accessories", "purses", "jewelry-headbands"];
   return [...slugs]
     .filter((slug) => slug !== "dropshipping" && slug !== "drop-shipping")
     .sort((a, b) => {
@@ -109,7 +124,7 @@ export function getDropshipDepartmentSlug(input: { title?: string | null; catego
 export function getDropshipCategorySearchTerms(filterId: string) {
   const normalized = slugify(filterId);
   const terms: Record<string, string[]> = {
-    accessories: ["purse", "bag", "handbag", "tote", "wallet", "shoe", "shoes", "sandal", "boot", "hat", "cap"],
+    accessories: ["purse", "bag", "handbag", "tote", "wallet", "shoe", "shoes", "sandal", "sandals", "boot", "boots", "hat", "cap"],
     bottoms: ["bottom", "pant", "pants", "jean", "short", "shorts", "skirt", "legging", "culotte"],
     cardigans: ["cardigan", "kimono", "duster"],
     clothing: ["women clothing", "top", "blouse", "shirt", "tee", "t-shirt", "sweater", "dress", "romper", "jumpsuit", "bottom", "pant", "jean", "short", "skirt"],
@@ -122,7 +137,9 @@ export function getDropshipCategorySearchTerms(filterId: string) {
     purses: ["purse", "bag", "handbag", "tote", "wallet"],
     "rompers-jumpsuits": ["romper", "jumpsuit"],
     tops: ["top", "blouse", "shirt", "tee", "t-shirt", "tank", "tunic", "polo", "hoodie", "sweatshirt", "pullover", "sweater", "vest"],
-    "womens-collection": ["women clothing", "top", "blouse", "shirt", "tee", "t-shirt", "sweater", "cardigan", "dress", "romper", "jumpsuit", "bottom", "pant", "jean", "short", "skirt", "legging"]
+    footwear: ["shoe", "shoes", "sandal", "sandals", "boot", "boots", "heel", "heels", "slipper", "slippers", "footwear"],
+    "womens-footwear": ["shoe", "shoes", "sandal", "sandals", "boot", "boots", "heel", "heels", "slipper", "slippers", "footwear"],
+    "womens-collection": ["women clothing", "top", "blouse", "shirt", "tee", "t-shirt", "sweater", "cardigan", "dress", "romper", "jumpsuit", "bottom", "pant", "jean", "short", "skirt", "legging", "shoe", "shoes", "sandal", "sandals", "boot", "boots"]
   };
 
   return terms[normalized] || [];

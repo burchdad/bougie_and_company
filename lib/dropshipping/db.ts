@@ -930,6 +930,14 @@ export async function getPublishedDropshipStoreProductPage(options: {
     JOIN ${tables.products} p ON p.supplier_key = d.supplier_key AND p.supplier_product_id = d.supplier_product_id
     WHERE d.is_published = TRUE
       AND p.supplier_key = ${supplierKey}
+      AND EXISTS (
+        SELECT 1
+        FROM ${tables.variants} in_stock_variant
+        WHERE in_stock_variant.supplier_key = p.supplier_key
+          AND in_stock_variant.supplier_product_id = p.supplier_product_id
+          AND in_stock_variant.is_in_stock = TRUE
+          AND in_stock_variant.inventory_quantity > 0
+      )
       AND (${collection} = '' OR d.collection = ${collection})
       AND (${search} = '' OR p.title ILIKE ${`%${search}%`} OR p.supplier_sku ILIKE ${`%${search}%`} OR p.supplier_product_id ILIKE ${`%${search}%`})
       AND (${!hasCategoryFilter} OR (${canMatchCategory} AND (p.title ILIKE ANY(${categoryPatterns}) OR array_to_string(p.category_names, ' ') ILIKE ANY(${categoryPatterns}))))
@@ -987,6 +995,8 @@ export async function getPublishedDropshipStoreProductPage(options: {
     WHERE d.is_published = TRUE
       AND p.supplier_key = ${supplierKey}
       AND p.supplier_product_id = ANY(${pageProductIds})
+      AND v.is_in_stock = TRUE
+      AND v.inventory_quantity > 0
     ORDER BY p.title ASC, v.size_name ASC, v.title ASC
   `;
   const hasMore = parentRows.length > limit;

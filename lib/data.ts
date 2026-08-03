@@ -104,7 +104,7 @@ export const shopDepartments = [
   {
     id: "womens-collection",
     title: "Women's Collection",
-    items: ["Tops", "Bottoms", "Dresses", "Rompers & Jumpsuits", "Women's Care", "Week From Hell", "Bath Salts", "Body Scrubs", "Bath Bombs", "Body Butter/Lotion", "Chap Stick", "Body Sprays", "Purses", "Luggage"]
+    items: ["Tops", "Bottoms", "Dresses", "Rompers & Jumpsuits", "Footwear", "Women's Care", "Week From Hell", "Bath Salts", "Body Scrubs", "Bath Bombs", "Body Butter/Lotion", "Chap Stick", "Body Sprays", "Purses", "Luggage"]
   },
   {
     id: "kitchen-selection",

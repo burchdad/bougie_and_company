@@ -329,6 +329,7 @@ const categoryKeywordMap: Record<string, string[]> = {
   "equine-earrings": ["earring", "ear ring"],
   "equine-jewelry": ["equine", "horse", "rein", "snaffle", "necklace", "bracelet", "earring", "ear ring"],
   "fashion-earrings": ["earring", "ear ring"],
+  footwear: ["shoe", "shoes", "sandal", "sandals", "boot", "boots", "heel", "heels", "slipper", "slippers", "footwear"],
   "foaming-hand-soap": ["foaming hand"],
   "hand-soaps": ["hand soap", "handmade soap", "homemade soap", "dish soap"],
   "gift-certificates": ["gift certificate"],
@@ -372,6 +373,7 @@ const categoryKeywordMap: Record<string, string[]> = {
   "week-from-hell": ["week from hell"],
   "womens-care": ["women", "week from hell", "bath salt", "body scrub", "bath bomb", "body spray", "chap"],
   "womens-collection": ["women", "dress", "romper", "jumpsuit", "purse", "bath bomb", "body spray", "week from hell"],
+  "womens-footwear": ["shoe", "shoes", "sandal", "sandals", "boot", "boots", "heel", "heels", "slipper", "slippers", "footwear"],
 };
 
 function money(value: string | null) {
