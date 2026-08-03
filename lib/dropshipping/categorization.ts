@@ -71,7 +71,7 @@ export function inferDropshipCategorySlugs(input: { title?: string | null; categ
     slugs.add("rompers-jumpsuits");
   }
 
-  if (hasAny(text, ["bottom", "pant", "pants", "jean", "short", "shorts", "skirt", "legging", "culotte"])) {
+  if (hasAny(text, ["bottom", "pant", "pants", "jean", "shorts", "skirt", "legging", "culotte"])) {
     slugs.add("bottoms");
     slugs.add("pants");
   }
@@ -125,7 +125,7 @@ export function getDropshipCategorySearchTerms(filterId: string) {
   const normalized = slugify(filterId);
   const terms: Record<string, string[]> = {
     accessories: ["purse", "bag", "handbag", "tote", "wallet", "shoe", "shoes", "sandal", "sandals", "boot", "boots", "hat", "cap"],
-    bottoms: ["bottom", "pant", "pants", "jean", "short", "shorts", "skirt", "legging", "culotte"],
+    bottoms: ["bottom", "pant", "pants", "jean", "shorts", "skirt", "legging", "culotte"],
     cardigans: ["cardigan", "kimono", "duster"],
     clothing: ["women clothing", "top", "blouse", "shirt", "tee", "t-shirt", "sweater", "dress", "romper", "jumpsuit", "bottom", "pant", "jean", "short", "skirt"],
     dresses: ["dress", "dresses"],
@@ -133,7 +133,7 @@ export function getDropshipCategorySearchTerms(filterId: string) {
     jewelry: ["jewelry", "necklace", "bracelet", "earring", "earrings"],
     "jewelry-headbands": ["jewelry", "necklace", "bracelet", "earring", "earrings"],
     necklaces: ["necklace", "necklaces"],
-    pants: ["bottom", "pant", "pants", "jean", "short", "shorts", "skirt", "legging", "culotte"],
+    pants: ["bottom", "pant", "pants", "jean", "shorts", "skirt", "legging", "culotte"],
     purses: ["purse", "bag", "handbag", "tote", "wallet"],
     "rompers-jumpsuits": ["romper", "jumpsuit"],
     tops: ["top", "blouse", "shirt", "tee", "t-shirt", "tank", "tunic", "polo", "hoodie", "sweatshirt", "pullover", "sweater", "vest"],

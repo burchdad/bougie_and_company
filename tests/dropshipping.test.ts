@@ -91,13 +91,17 @@ test("dropship shipping modes calculate predictable server-side totals", async (
 });
 
 test("Dear-Lover categories map into storefront apparel sections", () => {
+  const shortSleeveTopSlugs = inferDropshipCategorySlugs({
+    title: "Jet Stream Short Sleeve Knit Denim Patchwork Polo Collar Sweater",
+    categoryNames: ["Sweaters & Cardigans", "Short Sleeve Sweaters", "Women Clothing"]
+  });
+
   assert.deepEqual(
-    inferDropshipCategorySlugs({
-      title: "Jet Stream Short Sleeve Knit Denim Patchwork Polo Collar Sweater",
-      categoryNames: ["Sweaters & Cardigans", "Short Sleeve Sweaters", "Women Clothing"]
-    }).filter((slug) => ["womens-collection", "clothing", "tops", "cardigans"].includes(slug)).sort(),
+    shortSleeveTopSlugs.filter((slug) => ["womens-collection", "clothing", "tops", "cardigans"].includes(slug)).sort(),
     ["cardigans", "clothing", "tops", "womens-collection"]
   );
+  assert.equal(shortSleeveTopSlugs.includes("bottoms"), false);
+  assert.equal(shortSleeveTopSlugs.includes("pants"), false);
 
   assert.deepEqual(
     inferDropshipCategorySlugs({
