@@ -304,7 +304,7 @@ const equineJewelryCategorySlugs = new Set(["equine-jewelry", "necklaces", "brac
 type WomensApparelSize = (typeof womensApparelSizes)[number];
 
 const categoryKeywordMap: Record<string, string[]> = {
-  accessories: ["purse", "bag", "luggage", "weekender", "coozie", "koozie", "coaster", "infusion", "cocktail", "cap", "hat"],
+  accessories: ["purse", "handbag", "shoulder bag", "crossbody", "tote", "wallet", "clutch", "satchel", "luggage", "weekender", "duffle", "duffel", "travel bag", "makeup bag", "make up", "cosmetic bag", "toiletry", "organizer", "shoes", "sneaker", "sneakers", "sandal", "sandals", "boot", "boots", "cap", "hat"],
   "bath-body": ["bath", "body", "scrub", "salt", "bomb", "chap", "mask", "lotion", "soap", "beard", "spray", "week from hell", "shampoo"],
   "bath-bombs": ["bath bomb"],
   "bath-salts": ["bath salt", "bath salts"],
@@ -329,7 +329,7 @@ const categoryKeywordMap: Record<string, string[]> = {
   "equine-earrings": ["earring", "ear ring"],
   "equine-jewelry": ["equine", "horse", "rein", "snaffle", "necklace", "bracelet", "earring", "ear ring"],
   "fashion-earrings": ["earring", "ear ring"],
-  footwear: ["shoe", "shoes", "sandal", "sandals", "boot", "boots", "heel", "heels", "slipper", "slippers", "footwear"],
+  footwear: ["shoes", "sneaker", "sneakers", "sandal", "sandals", "boot", "boots", "heel", "heels", "slipper", "slippers", "flip flop", "flip flops", "loafer", "loafers", "mule", "mules", "footwear"],
   "foaming-hand-soap": ["foaming hand"],
   "hand-soaps": ["hand soap", "handmade soap", "homemade soap", "dish soap"],
   "gift-certificates": ["gift certificate"],
@@ -350,14 +350,14 @@ const categoryKeywordMap: Record<string, string[]> = {
   "kitchen-collection": ["dish soap", "foaming hand", "hand soap", "handmade soap", "homemade soap", "kitchen"],
   "kitchen-selection": ["dish soap", "foaming hand", "hand soap", "handmade soap", "homemade soap", "kitchen"],
   "leather-coasters": ["leather coaster"],
-  luggage: ["luggage", "weekender", "duffle", "travel"],
+  luggage: ["luggage", "weekender", "duffle", "duffel", "travel bag", "travel case", "makeup bag", "make up", "cosmetic bag", "toiletry", "organizer", "train case", "vanity case"],
   "mens-care": ["men", "beard", "mechanic", "shave", "shaving", "body spray", "shampoo", "chap"],
   "mens-collection": ["men", "beard", "mechanic", "shave", "shaving", "cap", "t-shirt", "body spray", "shampoo"],
   necklaces: ["necklace"],
   "outdoor-items": ["outdoor"],
   outdoor: ["outdoor"],
   pants: ["pant", "wideleg", "wide leg", "bottom", "shorts", "skirt"],
-  purses: ["purse", "bag"],
+  purses: ["purse", "handbag", "shoulder bag", "crossbody", "tote", "wallet", "clutch", "satchel", "hobo bag"],
   "farm-eggs": ["farm fresh egg", "farm eggs"],
   regular: ["regular coaster"],
   "regular-coasters": ["coaster"],
@@ -373,7 +373,7 @@ const categoryKeywordMap: Record<string, string[]> = {
   "week-from-hell": ["week from hell"],
   "womens-care": ["women", "week from hell", "bath salt", "body scrub", "bath bomb", "body spray", "chap"],
   "womens-collection": ["women", "dress", "romper", "jumpsuit", "purse", "bath bomb", "body spray", "week from hell"],
-  "womens-footwear": ["shoe", "shoes", "sandal", "sandals", "boot", "boots", "heel", "heels", "slipper", "slippers", "footwear"],
+  "womens-footwear": ["shoes", "sneaker", "sneakers", "sandal", "sandals", "boot", "boots", "heel", "heels", "slipper", "slippers", "flip flop", "flip flops", "loafer", "loafers", "mule", "mules", "footwear"],
 };
 
 function money(value: string | null) {

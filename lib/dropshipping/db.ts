@@ -940,7 +940,7 @@ export async function getPublishedDropshipStoreProductPage(options: {
       )
       AND (${collection} = '' OR d.collection = ${collection})
       AND (${search} = '' OR p.title ILIKE ${`%${search}%`} OR p.supplier_sku ILIKE ${`%${search}%`} OR p.supplier_product_id ILIKE ${`%${search}%`})
-      AND (${!hasCategoryFilter} OR (${canMatchCategory} AND (p.title ILIKE ANY(${categoryPatterns}) OR array_to_string(p.category_names, ' ') ILIKE ANY(${categoryPatterns}))))
+      AND (${!hasCategoryFilter} OR (${canMatchCategory} AND p.title ILIKE ANY(${categoryPatterns})))
     ORDER BY p.title ASC
     LIMIT ${limit + 1}
     OFFSET ${offset}

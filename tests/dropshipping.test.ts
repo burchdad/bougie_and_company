@@ -95,6 +95,10 @@ test("Dear-Lover categories map into storefront apparel sections", () => {
     title: "Jet Stream Short Sleeve Knit Denim Patchwork Polo Collar Sweater",
     categoryNames: ["Sweaters & Cardigans", "Short Sleeve Sweaters", "Women Clothing"]
   });
+  const horseShoeTopSlugs = inferDropshipCategorySlugs({
+    title: "Beige Horse Shoe Western Print Tied Side Cap Sleeve Knitted T Shirt",
+    categoryNames: ["Sweaters & Cardigans", "Short Sleeve Sweaters"]
+  });
 
   assert.deepEqual(
     shortSleeveTopSlugs.filter((slug) => ["womens-collection", "clothing", "tops", "cardigans"].includes(slug)).sort(),
@@ -102,6 +106,8 @@ test("Dear-Lover categories map into storefront apparel sections", () => {
   );
   assert.equal(shortSleeveTopSlugs.includes("bottoms"), false);
   assert.equal(shortSleeveTopSlugs.includes("pants"), false);
+  assert.equal(horseShoeTopSlugs.includes("womens-footwear"), false);
+  assert.equal(horseShoeTopSlugs.includes("footwear"), false);
 
   assert.deepEqual(
     inferDropshipCategorySlugs({
@@ -115,14 +121,31 @@ test("Dear-Lover categories map into storefront apparel sections", () => {
     inferDropshipCategorySlugs({
       title: "Western Buckle Detail Tall Boots",
       categoryNames: ["Shoes & Bags", "Women Shoes"]
-    }).filter((slug) => ["womens-collection", "womens-footwear", "footwear", "accessories"].includes(slug)).sort(),
+    }).filter((slug) => ["womens-collection", "womens-footwear", "footwear", "accessories", "clothing"].includes(slug)).sort(),
     ["accessories", "footwear", "womens-collection", "womens-footwear"]
+  );
+
+  assert.deepEqual(
+    inferDropshipCategorySlugs({
+      title: "Apricot Multi-functional Make Up Organizer Travel Toiletry Bag",
+      categoryNames: ["Shoes & Bags", "Makeup Bags"]
+    }).filter((slug) => ["womens-collection", "womens-footwear", "footwear", "luggage", "purses", "accessories", "clothing"].includes(slug)).sort(),
+    ["accessories", "luggage", "womens-collection"]
+  );
+
+  assert.deepEqual(
+    inferDropshipCategorySlugs({
+      title: "Beau Blue Retro Polka Dot Print Double Zip Crossbody Bag",
+      categoryNames: ["Shoes & Bags", "Crossbody Bags"]
+    }).filter((slug) => ["womens-collection", "womens-footwear", "footwear", "luggage", "purses", "accessories", "clothing"].includes(slug)).sort(),
+    ["accessories", "purses", "womens-collection"]
   );
 });
 
 test("dropship category search terms only exist for supported storefront sections", () => {
   assert.ok(getDropshipCategorySearchTerms("tops").includes("blouse"));
   assert.ok(getDropshipCategorySearchTerms("womens-footwear").includes("boots"));
+  assert.ok(getDropshipCategorySearchTerms("luggage").includes("cosmetic bag"));
   assert.equal(getDropshipCategorySearchTerms("soaps").length, 0);
 });
 
