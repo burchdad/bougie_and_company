@@ -13,9 +13,44 @@ function hasAny(text: string, terms: string[]) {
 const footwearTitleTerms = ["shoes", "sneaker", "sneakers", "sandal", "sandals", "boot", "boots", "heel", "heels", "slipper", "slippers", "flip flop", "flip flops", "loafer", "loafers", "mule", "mules"];
 const luggageTitleTerms = ["luggage", "weekender", "duffle", "duffel", "travel bag", "travel case", "makeup bag", "make up", "cosmetic bag", "toiletry", "organizer", "train case", "vanity case"];
 const purseTitleTerms = ["purse", "handbag", "shoulder bag", "crossbody", "tote", "wallet", "clutch", "satchel", "hobo bag"];
+const titleHiddenFromStorefront = [
+  "High Rise Solid Color Open Front Lightweight Cardigan",
+  "Brown Western Aztec Printed Open Front Long Cardigan"
+];
+const topTitleTerms = ["top", "blouse", "shirt", "tee", "t shirt", "t-shirt", "tank", "tunic", "polo", "hoodie", "sweatshirt", "pullover", "sweater", "vest"];
+const cardiganTitleTerms = ["cardigan", "kimono", "duster"];
+const bottomTitleTerms = ["bottom", "pant", "pants", "jean", "shorts", "skirt", "legging", "culotte"];
+const supplierLeafCategorySlugsToIgnore = new Set([
+  "bottoms",
+  "cardigans",
+  "dresses",
+  "footwear",
+  "pants",
+  "shoes-and-bags",
+  "tops",
+  "women-shoes",
+  "womens-footwear"
+]);
+
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function keywordRegex(term: string) {
+  const words = normalize(term).split(/\s+/).filter(Boolean).map(escapeRegex);
+  return `(^|[^a-z0-9])${words.join("[^a-z0-9]+")}([^a-z0-9]|$)`;
+}
+
+function hasKeyword(text: string, terms: string[]) {
+  return terms.some((term) => new RegExp(keywordRegex(term)).test(text));
+}
 
 function footwearText(title: string) {
   return title.replace(/horse\s*shoe/g, "").replace(/horseshoe/g, "");
+}
+
+function dressText(title: string) {
+  return title.replace(/dress\s+(pants?|trousers|slacks|shorts)/g, " ");
 }
 
 export function inferDropshipCategorySlugs(input: { title?: string | null; categoryNames?: string[] | null }) {
@@ -23,12 +58,18 @@ export function inferDropshipCategorySlugs(input: { title?: string | null; categ
   const categories = (input.categoryNames || []).map(normalize).filter(Boolean);
   const text = [title, ...categories].join(" ");
   const titleForFootwear = footwearText(title);
+  const titleForDresses = dressText(title);
   const slugs = new Set<string>();
-  const isFootwear = hasAny(titleForFootwear, footwearTitleTerms);
-  const isLuggage = hasAny(title, luggageTitleTerms);
-  const isPurse = !isLuggage && hasAny(title, purseTitleTerms);
+  const isFootwear = hasKeyword(titleForFootwear, footwearTitleTerms);
+  const isLuggage = hasKeyword(title, luggageTitleTerms);
+  const isPurse = !isLuggage && hasKeyword(title, purseTitleTerms);
 
-  categories.forEach((category) => slugs.add(slugify(category)));
+  categories.forEach((category) => {
+    const categorySlug = slugify(category);
+    if (!supplierLeafCategorySlugsToIgnore.has(categorySlug)) {
+      slugs.add(categorySlug);
+    }
+  });
 
   const looksLikeApparel = hasAny(text, [
     "clothing",
@@ -58,29 +99,29 @@ export function inferDropshipCategorySlugs(input: { title?: string | null; categ
     slugs.add("clothing");
   }
 
-  if (hasAny(text, ["top", "blouse", "shirt", "tee", "t shirt", "tank", "tunic", "polo", "hoodie", "sweatshirt", "pullover", "vest"])) {
+  if (hasKeyword(title, topTitleTerms)) {
     slugs.add("tops");
   }
 
-  if (hasAny(text, ["cardigan", "kimono", "duster"])) {
+  if (hasKeyword(title, cardiganTitleTerms)) {
     slugs.add("cardigans");
     slugs.add("tops");
   }
 
-  if (hasAny(text, ["dress"])) {
+  if (hasKeyword(titleForDresses, ["dress", "dresses"])) {
     slugs.add("dresses");
   }
 
-  if (hasAny(text, ["romper", "jumpsuit"])) {
+  if (hasKeyword(title, ["romper", "jumpsuit"])) {
     slugs.add("rompers-jumpsuits");
   }
 
-  if (hasAny(text, ["bottom", "pant", "pants", "jean", "shorts", "skirt", "legging", "culotte"])) {
+  if (hasKeyword(title, bottomTitleTerms)) {
     slugs.add("bottoms");
     slugs.add("pants");
   }
 
-  if (isPurse || isLuggage || isFootwear || hasAny(title, ["hat", "cap"])) {
+  if (isPurse || isLuggage || isFootwear || hasKeyword(title, ["hat", "cap"])) {
     slugs.add("accessories");
   }
 
@@ -129,6 +170,53 @@ export function getDropshipDepartmentSlug(input: { title?: string | null; catego
   return slugs.find((slug) => ["womens-collection", "clothing", "accessories", "jewelry-headbands"].includes(slug)) || "womens-collection";
 }
 
+export function getDropshipDepartmentForOverride(overrideSlug?: string | null) {
+  const slug = slugify(overrideSlug || "");
+  if (["purses", "luggage", "womens-footwear", "footwear"].includes(slug)) {
+    return "womens-collection";
+  }
+  if (["jewelry", "jewelry-headbands", "necklaces", "bracelets", "fashion-earrings"].includes(slug)) {
+    return "jewelry-headbands";
+  }
+  return "womens-collection";
+}
+
+export function applyDropshipCategoryOverride(inferredSlugs: string[], overrideSlug?: string | null) {
+  const override = slugify(overrideSlug || "");
+  if (!override || override === "dropshipping" || override === "drop-shipping") {
+    return inferredSlugs;
+  }
+
+  const overrides: Record<string, string[]> = {
+    tops: ["womens-collection", "clothing", "tops"],
+    cardigans: ["womens-collection", "clothing", "tops", "cardigans"],
+    bottoms: ["womens-collection", "clothing", "bottoms", "pants"],
+    pants: ["womens-collection", "clothing", "bottoms", "pants"],
+    dresses: ["womens-collection", "clothing", "dresses"],
+    "rompers-jumpsuits": ["womens-collection", "clothing", "rompers-jumpsuits"],
+    "womens-footwear": ["womens-collection", "accessories", "womens-footwear", "footwear"],
+    footwear: ["womens-collection", "accessories", "womens-footwear", "footwear"],
+    purses: ["womens-collection", "accessories", "purses"],
+    luggage: ["womens-collection", "accessories", "luggage"],
+    "jewelry-headbands": ["jewelry-headbands"],
+    jewelry: ["jewelry-headbands", "jewelry"],
+    necklaces: ["jewelry-headbands", "jewelry", "necklaces"],
+    bracelets: ["jewelry-headbands", "jewelry", "bracelets"],
+    "fashion-earrings": ["jewelry-headbands", "jewelry", "fashion-earrings"]
+  };
+
+  return overrides[override] || [override];
+}
+
+export function getHiddenDropshipStorefrontTitles() {
+  return titleHiddenFromStorefront;
+}
+
+export function isHiddenDropshipStorefrontTitle(title: string) {
+  const normalizedTitle = normalize(title);
+  return titleHiddenFromStorefront.some((hiddenTitle) => normalize(hiddenTitle) === normalizedTitle);
+}
+
 export function getDropshipCategorySearchTerms(filterId: string) {
   const normalized = slugify(filterId);
   const terms: Record<string, string[]> = {
@@ -152,4 +240,18 @@ export function getDropshipCategorySearchTerms(filterId: string) {
   };
 
   return terms[normalized] || [];
+}
+
+export function getDropshipCategorySearchRegexes(filterId: string) {
+  return getDropshipCategorySearchTerms(filterId).map(keywordRegex);
+}
+
+export function getDropshipCategoryExcludeRegexes(filterId: string) {
+  const normalized = slugify(filterId);
+
+  if (normalized === "dresses") {
+    return ["(^|[^a-z0-9])dress[^a-z0-9]+(pants?|trousers|slacks|shorts)([^a-z0-9]|$)"];
+  }
+
+  return [];
 }

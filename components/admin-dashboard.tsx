@@ -151,6 +151,19 @@ type DropshipProduct = {
   retail_price: number;
 };
 
+const dropshipStorefrontCategoryOptions = [
+  { label: "Auto categorize", slug: "dropshipping" },
+  { label: "Women's Tops", slug: "tops" },
+  { label: "Cardigans", slug: "cardigans" },
+  { label: "Women's Bottoms / Pants", slug: "pants" },
+  { label: "Dresses", slug: "dresses" },
+  { label: "Rompers / Jumpsuits", slug: "rompers-jumpsuits" },
+  { label: "Women's Footwear", slug: "womens-footwear" },
+  { label: "Purses", slug: "purses" },
+  { label: "Luggage / Travel Bags", slug: "luggage" },
+  { label: "Jewelry", slug: "jewelry-headbands" }
+];
+
 type ShippingSettings = {
   origin_postal_code: string;
   free_shipping_threshold: string;
@@ -1906,10 +1919,12 @@ export function AdminDashboard({ dropshippingEnabled = false }: { dropshippingEn
                                     <input className="focus-ring min-h-12 rounded-md border border-saddle/20 bg-white px-4 font-normal" defaultValue={selectedDropshipProduct.price_override || ""} name="priceOverride" step="0.01" type="number" />
                                   </label>
                                   <label className="grid gap-2 text-sm font-semibold text-espresso">
-                                    Collection
+                                    Storefront category
                                     <select className="focus-ring min-h-12 rounded-md border border-saddle/20 bg-white px-3 font-normal" defaultValue={selectedDropshipProduct.collection || "dropshipping"} name="collection">
-                                      <option value="dropshipping">Dropshipping</option>
-                                      {categories.map((category) => (
+                                      {dropshipStorefrontCategoryOptions.map((category) => (
+                                        <option key={category.slug} value={category.slug}>{category.label}</option>
+                                      ))}
+                                      {categories.filter((category) => !dropshipStorefrontCategoryOptions.some((option) => option.slug === category.slug)).map((category) => (
                                         <option key={category.id} value={category.slug}>{category.label}</option>
                                       ))}
                                     </select>

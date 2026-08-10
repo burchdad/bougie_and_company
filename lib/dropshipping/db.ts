@@ -1,6 +1,14 @@
 import { getSql } from "@/lib/db";
 import { getDropshippingSchema } from "./config";
-import { getDropshipCategorySearchTerms, getDropshipDepartmentSlug, inferDropshipCategorySlugs } from "./categorization";
+import {
+  applyDropshipCategoryOverride,
+  getDropshipCategoryExcludeRegexes,
+  getDropshipCategorySearchRegexes,
+  getDropshipDepartmentForOverride,
+  getDropshipDepartmentSlug,
+  getHiddenDropshipStorefrontTitles,
+  inferDropshipCategorySlugs
+} from "./categorization";
 import { calculateDropshipRetailPrice } from "./pricing";
 import { getSupplierAdapter, listSupplierAdapters } from "./suppliers";
 import type { MarkupType, NormalizedSupplierProduct, SupplierSyncParams } from "./types";
@@ -868,7 +876,9 @@ function mapPublishedDropshipStoreProduct(row: Record<string, unknown>) {
   const variantLabel = [row.color, row.size || row.size_name || row.variant_title].map((item) => item ? String(item) : "").filter(Boolean).join(" / ");
   const categoryNames = stringArray(row.category_names);
   const inferredCategorySlugs = inferDropshipCategorySlugs({ title, categoryNames });
-  const department = getDropshipDepartmentSlug({ title, categoryNames });
+  const collectionOverride = row.collection && !["dropshipping", "drop-shipping"].includes(String(row.collection)) ? String(row.collection) : "";
+  const categorySlugs = applyDropshipCategoryOverride(inferredCategorySlugs, collectionOverride);
+  const department = collectionOverride ? getDropshipDepartmentForOverride(collectionOverride) : getDropshipDepartmentSlug({ title, categoryNames });
 
   return {
     epos_product_id: `dropship:${row.supplier_key}:${row.supplier_variant_id}`,
@@ -885,7 +895,7 @@ function mapPublishedDropshipStoreProduct(row: Record<string, unknown>) {
     marketing_description: row.description_override ? String(row.description_override) : null,
     department,
     category_ids: [],
-    category_slugs: inferredCategorySlugs,
+    category_slugs: categorySlugs,
     has_explicit_categories: true,
     is_featured: false,
     is_hidden: false,
@@ -917,10 +927,14 @@ export async function getPublishedDropshipStoreProductPage(options: {
   const search = options.search?.trim() || "";
   const collection = options.collection?.trim() || "";
   const category = options.category?.trim() || "";
-  const categoryTerms = getDropshipCategorySearchTerms(category);
+  const categoryRegexes = getDropshipCategorySearchRegexes(category);
+  const categoryExcludeRegexes = getDropshipCategoryExcludeRegexes(category);
+  const hiddenTitles = getHiddenDropshipStorefrontTitles();
   const hasCategoryFilter = category !== "";
-  const canMatchCategory = categoryTerms.length > 0;
-  const categoryPatterns = canMatchCategory ? categoryTerms.map((term) => `%${term}%`) : ["__no_dropship_category_match__"];
+  const canMatchCategory = categoryRegexes.length > 0;
+  const canExcludeCategory = categoryExcludeRegexes.length > 0;
+  const categoryPatterns = canMatchCategory ? categoryRegexes : ["a^"];
+  const categoryExcludePatterns = canExcludeCategory ? categoryExcludeRegexes : ["a^"];
 
   const parentRows = await sql`
     SELECT
@@ -939,8 +953,23 @@ export async function getPublishedDropshipStoreProductPage(options: {
           AND in_stock_variant.inventory_quantity > 0
       )
       AND (${collection} = '' OR d.collection = ${collection})
+      AND NOT (p.title = ANY(${hiddenTitles}))
       AND (${search} = '' OR p.title ILIKE ${`%${search}%`} OR p.supplier_sku ILIKE ${`%${search}%`} OR p.supplier_product_id ILIKE ${`%${search}%`})
-      AND (${!hasCategoryFilter} OR (${canMatchCategory} AND p.title ILIKE ANY(${categoryPatterns})))
+      AND (
+        ${!hasCategoryFilter}
+        OR (
+          ${canMatchCategory}
+          AND (
+            p.title ~* ANY(${categoryPatterns})
+            OR (d.collection IS NOT NULL AND d.collection <> 'dropshipping' AND d.collection = ${category})
+            OR (${category} = 'footwear' AND d.collection = 'womens-footwear')
+            OR (${category} = 'womens-footwear' AND d.collection = 'footwear')
+            OR (${category} = 'bottoms' AND d.collection = 'pants')
+            OR (${category} = 'pants' AND d.collection = 'bottoms')
+          )
+          AND (${!canExcludeCategory} OR NOT (p.title ~* ANY(${categoryExcludePatterns})))
+        )
+      )
     ORDER BY p.title ASC
     LIMIT ${limit + 1}
     OFFSET ${offset}

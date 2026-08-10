@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { calculateDropshipShippingTotal } from "../lib/dropshipping/checkout";
-import { getDropshipCategorySearchTerms, inferDropshipCategorySlugs } from "../lib/dropshipping/categorization";
+import {
+  applyDropshipCategoryOverride,
+  getDropshipCategoryExcludeRegexes,
+  getDropshipCategorySearchRegexes,
+  getDropshipCategorySearchTerms,
+  isHiddenDropshipStorefrontTitle,
+  inferDropshipCategorySlugs
+} from "../lib/dropshipping/categorization";
 import { getDropshipShippingMode, isDropshippingCheckoutEnabled, isDropshippingEnabled, isDropshippingFixtureEnabled } from "../lib/dropshipping/config";
 import { calculateDropshipRetailPrice } from "../lib/dropshipping/pricing";
 import { dearLoverAdapter } from "../lib/dropshipping/suppliers/dear-lover";
@@ -102,7 +109,7 @@ test("Dear-Lover categories map into storefront apparel sections", () => {
 
   assert.deepEqual(
     shortSleeveTopSlugs.filter((slug) => ["womens-collection", "clothing", "tops", "cardigans"].includes(slug)).sort(),
-    ["cardigans", "clothing", "tops", "womens-collection"]
+    ["clothing", "tops", "womens-collection"]
   );
   assert.equal(shortSleeveTopSlugs.includes("bottoms"), false);
   assert.equal(shortSleeveTopSlugs.includes("pants"), false);
@@ -116,6 +123,15 @@ test("Dear-Lover categories map into storefront apparel sections", () => {
     }).filter((slug) => ["womens-collection", "clothing", "bottoms", "pants"].includes(slug)).sort(),
     ["bottoms", "clothing", "pants", "womens-collection"]
   );
+
+  const dressPantsSlugs = inferDropshipCategorySlugs({
+    title: "Black High Waist Wide Leg Dress Pants",
+    categoryNames: ["Dresses", "Women Clothing"]
+  });
+
+  assert.equal(dressPantsSlugs.includes("dresses"), false);
+  assert.equal(dressPantsSlugs.includes("bottoms"), true);
+  assert.equal(dressPantsSlugs.includes("pants"), true);
 
   assert.deepEqual(
     inferDropshipCategorySlugs({
@@ -147,6 +163,32 @@ test("dropship category search terms only exist for supported storefront section
   assert.ok(getDropshipCategorySearchTerms("womens-footwear").includes("boots"));
   assert.ok(getDropshipCategorySearchTerms("luggage").includes("cosmetic bag"));
   assert.equal(getDropshipCategorySearchTerms("soaps").length, 0);
+});
+
+test("dropship category filters use whole-word matching and dress pants exclusions", () => {
+  const footwearRegex = new RegExp(getDropshipCategorySearchRegexes("womens-footwear").join("|"), "i");
+  const dressRegex = new RegExp(getDropshipCategorySearchRegexes("dresses").join("|"), "i");
+  const dressExcludeRegex = new RegExp(getDropshipCategoryExcludeRegexes("dresses").join("|"), "i");
+
+  assert.equal(footwearRegex.test("Beige Horse Shoe Western Print Tied Side Cap Sleeve Knitted T Shirt"), false);
+  assert.equal(footwearRegex.test("Western Buckle Detail Tall Boots"), true);
+  assert.equal(dressRegex.test("Black High Waist Wide Leg Dress Pants"), true);
+  assert.equal(dressExcludeRegex.test("Black High Waist Wide Leg Dress Pants"), true);
+  assert.equal(dressRegex.test("Floral Ruffle Hem Midi Dress"), true);
+  assert.equal(dressExcludeRegex.test("Floral Ruffle Hem Midi Dress"), false);
+});
+
+test("dropship storefront supports admin category overrides and duplicate title hiding", () => {
+  assert.deepEqual(
+    applyDropshipCategoryOverride(["womens-collection", "clothing", "dresses"], "womens-footwear"),
+    ["womens-collection", "accessories", "womens-footwear", "footwear"]
+  );
+  assert.deepEqual(
+    applyDropshipCategoryOverride(["womens-collection", "clothing", "tops"], "dropshipping"),
+    ["womens-collection", "clothing", "tops"]
+  );
+  assert.equal(isHiddenDropshipStorefrontTitle("High Rise Solid Color Open Front Lightweight Cardigan"), true);
+  assert.equal(isHiddenDropshipStorefrontTitle("Brown Western Aztec Printed Open Front Long Cardigan"), true);
 });
 
 test("Dear-Lover fixture uses the adapter normalizer and sanitized test records", async () => {
