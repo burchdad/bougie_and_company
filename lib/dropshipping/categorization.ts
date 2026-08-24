@@ -11,7 +11,7 @@ function hasAny(text: string, terms: string[]) {
 }
 
 const footwearTitleTerms = ["shoes", "sneaker", "sneakers", "sandal", "sandals", "boot", "boots", "heel", "heels", "slipper", "slippers", "flip flop", "flip flops", "loafer", "loafers", "mule", "mules"];
-const luggageTitleTerms = ["luggage", "weekender", "duffle", "duffel", "travel bag", "travel case", "makeup bag", "make up", "cosmetic bag", "toiletry", "organizer", "train case", "vanity case"];
+const luggageTitleTerms = ["luggage", "weekender", "duffle", "duffel", "travel bag", "travel bags", "travel case", "makeup bag", "makeup bags", "make up", "cosmetic bag", "cosmetic bags", "toiletry", "organizer", "train case", "vanity case"];
 const purseTitleTerms = ["purse", "handbag", "shoulder bag", "crossbody", "tote", "wallet", "clutch", "satchel", "hobo bag"];
 const titleHiddenFromStorefront = [
   "High Rise Solid Color Open Front Lightweight Cardigan",
@@ -220,7 +220,7 @@ export function isHiddenDropshipStorefrontTitle(title: string) {
 export function getDropshipCategorySearchTerms(filterId: string) {
   const normalized = slugify(filterId);
   const terms: Record<string, string[]> = {
-    accessories: ["purse", "handbag", "shoulder bag", "crossbody", "tote", "wallet", "clutch", "satchel", "luggage", "weekender", "duffle", "duffel", "travel bag", "makeup bag", "make up", "cosmetic bag", "toiletry", "organizer", "shoes", "sneaker", "sneakers", "sandal", "sandals", "boot", "boots", "hat", "cap"],
+    accessories: ["purse", "handbag", "shoulder bag", "crossbody", "tote", "wallet", "clutch", "satchel", ...luggageTitleTerms, "shoes", "sneaker", "sneakers", "sandal", "sandals", "boot", "boots", "hat", "cap"],
     bottoms: ["bottom", "pant", "pants", "jean", "shorts", "skirt", "legging", "culotte"],
     cardigans: ["cardigan", "kimono", "duster"],
     clothing: ["women clothing", "top", "blouse", "shirt", "tee", "t-shirt", "sweater", "dress", "romper", "jumpsuit", "bottom", "pant", "jean", "short", "skirt"],
@@ -230,7 +230,7 @@ export function getDropshipCategorySearchTerms(filterId: string) {
     "jewelry-headbands": ["jewelry", "necklace", "bracelet", "earring", "earrings"],
     necklaces: ["necklace", "necklaces"],
     pants: ["bottom", "pant", "pants", "jean", "shorts", "skirt", "legging", "culotte"],
-    luggage: ["luggage", "weekender", "duffle", "duffel", "travel bag", "travel case", "makeup bag", "make up", "cosmetic bag", "toiletry", "organizer", "train case", "vanity case"],
+    luggage: luggageTitleTerms,
     purses: ["purse", "handbag", "shoulder bag", "crossbody", "tote", "wallet", "clutch", "satchel", "hobo bag"],
     "rompers-jumpsuits": ["romper", "jumpsuit"],
     tops: ["top", "blouse", "shirt", "tee", "t-shirt", "tank", "tunic", "polo", "hoodie", "sweatshirt", "pullover", "sweater", "vest"],

@@ -787,6 +787,23 @@ export async function publishAllSyncedDropshipProducts(input: {
     throw new Error("Invalid markup type.");
   }
 
+  const summaryRows = await sql`
+    SELECT
+      COUNT(*)::int AS synced_count,
+      COUNT(*) FILTER (
+        WHERE EXISTS (
+          SELECT 1
+          FROM ${tables.variants} summary_variant
+          WHERE summary_variant.supplier_key = p.supplier_key
+            AND summary_variant.supplier_product_id = p.supplier_product_id
+            AND summary_variant.is_in_stock = TRUE
+            AND summary_variant.inventory_quantity > 0
+        )
+      )::int AS storefront_eligible_count
+    FROM ${tables.products} p
+    WHERE p.supplier_key = ${input.supplierKey}
+  `;
+
   const rows = await sql`
     INSERT INTO ${tables.published} AS published (
       supplier_key,
@@ -807,6 +824,14 @@ export async function publishAllSyncedDropshipProducts(input: {
       NOW()
     FROM ${tables.products} p
     WHERE p.supplier_key = ${input.supplierKey}
+      AND EXISTS (
+        SELECT 1
+        FROM ${tables.variants} publish_variant
+        WHERE publish_variant.supplier_key = p.supplier_key
+          AND publish_variant.supplier_product_id = p.supplier_product_id
+          AND publish_variant.is_in_stock = TRUE
+          AND publish_variant.inventory_quantity > 0
+      )
     ON CONFLICT (supplier_key, supplier_product_id)
     DO UPDATE SET
       markup_type = published.markup_type,
@@ -817,7 +842,12 @@ export async function publishAllSyncedDropshipProducts(input: {
     RETURNING id::text
   `;
 
-  return { publishedCount: rows.length };
+  const summary = summaryRows[0] || {};
+  return {
+    syncedCount: Number(summary.synced_count || 0),
+    storefrontEligibleCount: Number(summary.storefront_eligible_count || 0),
+    publishedCount: rows.length
+  };
 }
 
 export async function updateDropshipPublication(id: string, input: {
@@ -961,6 +991,7 @@ export async function getPublishedDropshipStoreProductPage(options: {
           ${canMatchCategory}
           AND (
             p.title ~* ANY(${categoryPatterns})
+            OR array_to_string(p.category_names, ' ') ~* ANY(${categoryPatterns})
             OR (d.collection IS NOT NULL AND d.collection <> 'dropshipping' AND d.collection = ${category})
             OR (${category} = 'footwear' AND d.collection = 'womens-footwear')
             OR (${category} = 'womens-footwear' AND d.collection = 'footwear')

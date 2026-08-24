@@ -178,6 +178,14 @@ test("dropship category filters use whole-word matching and dress pants exclusio
   assert.equal(dressExcludeRegex.test("Floral Ruffle Hem Midi Dress"), false);
 });
 
+test("dropship category filters can match supplier category names", () => {
+  const dressRegex = new RegExp(getDropshipCategorySearchRegexes("dresses").join("|"), "i");
+  const luggageRegex = new RegExp(getDropshipCategorySearchRegexes("luggage").join("|"), "i");
+
+  assert.equal(dressRegex.test(["Women Clothing", "Dresses"].join(" ")), true);
+  assert.equal(luggageRegex.test(["Shoes & Bags", "Makeup Bags"].join(" ")), true);
+});
+
 test("dropship storefront supports admin category overrides and duplicate title hiding", () => {
   assert.deepEqual(
     applyDropshipCategoryOverride(["womens-collection", "clothing", "dresses"], "womens-footwear"),

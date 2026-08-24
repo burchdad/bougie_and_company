@@ -1020,14 +1020,29 @@ export function AdminDashboard({ dropshippingEnabled = false }: { dropshippingEn
           collection: "dropshipping"
         })
       });
-      const result = (await response.json()) as { ok: boolean; message?: string; result?: { publishedCount: number } };
+      const result = (await response.json()) as {
+        ok: boolean;
+        message?: string;
+        result?: {
+          syncedCount?: number;
+          storefrontEligibleCount?: number;
+          publishedCount: number;
+        };
+      };
 
       if (!response.ok || !result.ok) {
         setMessage(result.message || "Could not publish synced dropship products.");
         return;
       }
 
-      setMessage(`Published ${result.result?.publishedCount ?? 0} synced dropship product${result.result?.publishedCount === 1 ? "" : "s"} to the storefront.`);
+      const publishedCount = result.result?.publishedCount ?? 0;
+      const eligibleCount = result.result?.storefrontEligibleCount ?? publishedCount;
+      const syncedCount = result.result?.syncedCount ?? eligibleCount;
+      const skippedCount = Math.max(0, syncedCount - eligibleCount);
+      setMessage(
+        `Published ${publishedCount} synced dropship product${publishedCount === 1 ? "" : "s"} to the storefront.` +
+        (skippedCount ? ` Skipped ${skippedCount} product${skippedCount === 1 ? "" : "s"} without in-stock supplier variants.` : "")
+      );
       await loadDropshipProducts(dropshipQuery);
     } catch {
       setMessage("Could not connect to the dropshipping publish backend.");
